@@ -1,0 +1,149 @@
+/* GLOBAL */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    height: 100vh;
+    background: linear-gradient(to bottom, #E4F8E8, #F8FCF9, #E0F7F4);
+}
+
+/* WRAPPER (Full Screen Chat App) */
+.chat-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+}
+
+/* HEADER */
+.chat-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    background: #7CC043;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.header-logo {
+    width: 45px;
+    height: 45px;
+    border-radius: 8px;
+    margin-right: 12px;
+}
+
+.header-text h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.header-text span {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+/* CHAT MESSAGES AREA */
+.chat-messages {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* MESSAGE BUBBLES */
+.message {
+    max-width: 80%;
+    margin-bottom: 12px;
+    padding: 12px 18px;
+    border-radius: 20px;
+    line-height: 1.4;
+    animation: fadeIn 0.25s ease-out;
+}
+
+/* BOT */
+.bot-message {
+    background: #ffffff;
+    border: 1px solid #DDE5DD;
+    color: #2f3a2f;
+    border-radius: 18px 18px 18px 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* USER */
+.user-message {
+    background: #7CC043;
+    color: white;
+    border-radius: 18px 18px 6px 18px;
+    margin-left: auto;
+}
+
+/* INPUT BAR */
+.chat-input-bar {
+    background: white;
+    padding: 12px 15px;
+    border-top: 1px solid #DDE5DD;
+}
+
+#chatbot-form {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* TEXT INPUT */
+#messageText {
+    flex-grow: 1;
+    padding: 12px 16px;
+    font-size: 15px;
+    border-radius: 25px;
+    border: 1px solid #ccc;
+    margin: 0 10px;
+}
+
+#messageText:focus {
+    outline: none;
+    border-color: #7CC043;
+    box-shadow: 0 0 0 3px rgba(124, 192, 67, 0.2);
+}
+
+/* BUTTONS */
+.input-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s ease;
+}
+
+.mic {
+    background: #4FD1C5;
+    color: white;
+}
+
+.send {
+    background: #7CC043;
+    color: white;
+}
+
+.input-btn:hover {
+    transform: scale(1.08);
+    opacity: 0.9;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

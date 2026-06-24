@@ -1,0 +1,33 @@
+# Virtual environment — never commit this
+dakikobo_env/
+venv/
+.venv/
+env/
+
+# Secret keys
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Generated audio files (TTS output)
+static/audio/*.mp3
+
+# ChromaDB persisted data (if you switch to persistent storage later)
+chroma_db/
+
+# macOS junk
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Local planning docs with prompts (optional — remove line to track)
+# suggestions/

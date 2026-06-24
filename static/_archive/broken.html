@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>DakiKobo • Assistant Agricole</title>
+
+    <link
+      id="favicon"
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='logo.png') }}"
+      type="image/x-png"
+    />
+
+    <!-- Fonts & Icons -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+
+  <body>
+    <div class="chat-wrapper">
+      <!-- HEADER -->
+      <div class="chat-header">
+        <img
+          src="{{ url_for('static', filename='logo.png') }}"
+          class="header-logo"
+        />
+        <div class="header-text">
+          <h2>DakiKobo</h2>
+          <span>Assistant Agricole</span>
+        </div>
+      </div>
+
+      <!-- MESSAGES -->
+      <div id="chatPanel" class="chat-messages"></div>
+
+      <!-- INPUT BAR -->
+      <div class="chat-input-bar">
+        <form id="chatbot-form">
+          <!-- Microphone Button -->
+          <button id="voice-btn" type="button" class="input-btn mic">
+            <i class="fas fa-microphone"></i>
+          </button>
+
+          <!-- Text Input -->
+          <input
+            type="text"
+            id="messageText"
+            name="messageText"
+            placeholder="Écrivez votre message…"
+          />
+
+          <!-- Send Button -->
+          <button id="send-btn" type="submit" class="input-btn send">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+  </body>
+</html>
