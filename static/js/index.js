@@ -13,8 +13,8 @@ $(function() {
     function appendMessage(message, isUser) {
         var messageClass = isUser ? 'user-message' : 'bot-message';
         // Updated logo reference to DakiKobo
-        var logoHTML = isUser ? '' : '<div class="bot-logo"><img src="/static/robo.png" alt="DakiKobo Logo"></div>';
-        var userImageHTML = isUser ? '<div class="user-image"><img src="/static/user.png" alt="User"></div>' : '';
+        var logoHTML = isUser ? '' : '<div class="bot-logo"><img src="/static/images/bot_avatar.png" alt="DakiKobo Logo"></div>';
+        var userImageHTML = isUser ? '<div class="user-image"><img src="/static/images/user_avatar.png" alt="User"></div>' : '';
         var messageElement = $('<div class="message-container ' + (isUser ? 'user-container' : 'bot-container') + '">' + 
                             logoHTML + 
                             '<div class="message ' + messageClass + '"></div>' +

@@ -20,7 +20,7 @@ CHUNK_OVERLAP = 100
 
 # --- Knowledge Base ---
 # Relative path from app.py to the folder containing your PDF files
-DATA_FOLDER = os.path.join("data", "knowledge_base")
+DATA_FOLDER = os.path.join("Data", "knowledge_base")
 
 # External URLs to scrape at startup (add URLs here, uncomment to activate)
 KNOWLEDGE_URLS = [
@@ -31,7 +31,7 @@ KNOWLEDGE_URLS = [
 
 # --- TTS ---
 TTS_LANGUAGE = "fr"           # French — official language of Burkina Faso
-TTS_MAX_CHARS = 180           # gTTS limit; keep conservative
+TTS_MAX_CHARS = 700           # answers run ~100 words (~600 chars); cover the full reply
 AUDIO_OUTPUT_DIR = os.path.join("static", "audio")
 
 # --- Flask ---

@@ -103,6 +103,26 @@ def _random_filename(length: int = 15) -> str:
     return "".join(random.choice(chars) for _ in range(length)) + ".mp3"
 
 
+def _truncate_for_speech(text: str, max_chars: int) -> str:
+    """Trim text to max_chars without cutting a word in half.
+
+    Prefers to end on the last sentence boundary (.!?) within the limit; falls
+    back to the last whitespace, so the audio never stops mid-word.
+    """
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+
+    window = text[:max_chars]
+    cut = max(window.rfind(". "), window.rfind("! "), window.rfind("? "))
+    if cut == -1:
+        cut = window.rfind(" ")
+    if cut == -1:
+        return window  # single very long token; nothing to cut on
+    # +1 keeps the sentence-ending punctuation when we cut on it
+    return window[: cut + 1].strip()
+
+
 def text_to_speech_to_static(text: str) -> str:
     """
     Convert text to an MP3 file saved under static/audio/.
@@ -110,7 +130,7 @@ def text_to_speech_to_static(text: str) -> str:
     """
     try:
         os.makedirs(AUDIO_OUTPUT_DIR, exist_ok=True)
-        truncated = text[:TTS_MAX_CHARS]
+        truncated = _truncate_for_speech(text, TTS_MAX_CHARS)
         filename = _random_filename()
         output_path = os.path.join(AUDIO_OUTPUT_DIR, filename)
 
