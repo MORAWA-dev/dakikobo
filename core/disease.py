@@ -14,6 +14,25 @@ from config import GEMINI_API_KEY, GEMINI_MODEL
 
 _API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
+# If the configured model is out of quota (429) or unavailable (404), fall back
+# to these (known vision-capable) models in order.
+_FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+]
+
+
+def _models_to_try():
+    """Configured model first, then fallbacks (de-duplicated, order preserved)."""
+    seen = set()
+    ordered = []
+    for m in [GEMINI_MODEL, *_FALLBACK_MODELS]:
+        if m and m not in seen:
+            seen.add(m)
+            ordered.append(m)
+    return ordered
+
 # Sentinel the model returns for unusable photos (kept short for reliability).
 _UNCLEAR_SENTINEL = "UNCLEAR"
 
@@ -72,25 +91,36 @@ def screen_leaf_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict
         ]
     }
 
-    try:
-        resp = requests.post(
-            f"{_API_ROOT}/models/{GEMINI_MODEL}:generateContent",
-            params={"key": GEMINI_API_KEY},
-            json=payload,
-            timeout=45,
-        )
-    except requests.RequestException:
-        return {
-            "answer": "Désolé, je n'ai pas pu contacter le service d'analyse "
-            "d'image. Vérifiez votre connexion et réessayez."
-        }
+    resp = None
+    last_status = None
+    for model in _models_to_try():
+        try:
+            resp = requests.post(
+                f"{_API_ROOT}/models/{model}:generateContent",
+                params={"key": GEMINI_API_KEY},
+                json=payload,
+                timeout=45,
+            )
+        except requests.RequestException:
+            return {
+                "answer": "Désolé, je n'ai pas pu contacter le service d'analyse "
+                "d'image. Vérifiez votre connexion et réessayez."
+            }
+        last_status = resp.status_code
+        if resp.status_code == 200:
+            break
+        # Out of quota (429) or model unavailable (404): try the next model.
+        if resp.status_code in (429, 404):
+            continue
+        # Other errors aren't model-specific — stop trying.
+        break
 
-    if resp.status_code == 429:
-        return {
-            "answer": "Le service d'analyse d'image est très sollicité pour le "
-            "moment (quota atteint). Veuillez réessayer plus tard."
-        }
-    if resp.status_code != 200:
+    if resp is None or resp.status_code != 200:
+        if last_status == 429:
+            return {
+                "answer": "Le service d'analyse d'image est très sollicité pour le "
+                "moment (quota atteint). Veuillez réessayer plus tard."
+            }
         return {
             "answer": "Désolé, l'analyse de l'image a échoué. Veuillez réessayer "
             "plus tard."

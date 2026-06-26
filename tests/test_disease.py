@@ -55,3 +55,23 @@ def test_missing_key_is_handled(monkeypatch):
     monkeypatch.setattr(disease, "GEMINI_API_KEY", "")
     out = screen_leaf_image(b"x", "image/jpeg")
     assert "configur" in out["answer"].lower()
+
+
+def test_falls_back_to_next_model_on_429(monkeypatch):
+    # First model is out of quota (429), second succeeds.
+    responses = [
+        _FakeResp(429),
+        _FakeResp(200, _candidate("Il pourrait s'agir de la rouille du mil.")),
+    ]
+    calls = {"i": 0}
+
+    def fake_post(*a, **k):
+        r = responses[min(calls["i"], len(responses) - 1)]
+        calls["i"] += 1
+        return r
+
+    monkeypatch.setattr(disease, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(disease.requests, "post", fake_post)
+    out = screen_leaf_image(b"x", "image/jpeg")
+    assert "rouille" in out["answer"]
+    assert calls["i"] >= 2, "should have tried a fallback model"
