@@ -17,12 +17,22 @@ from config import (
 # LLM
 # =================================================================
 
-llm = ChatGroq(
-    model=LLM_MODEL,
-    max_tokens=LLM_MAX_TOKENS,
-    temperature=LLM_TEMPERATURE,
-    groq_api_key=GROQ_API_KEY,
-)
+_llm = None
+
+
+def get_llm():
+    """Create the Groq client only when a RAG answer is requested."""
+    global _llm
+    if _llm is None:
+        if not GROQ_API_KEY:
+            raise RuntimeError("GROQ_API_KEY is not configured.")
+        _llm = ChatGroq(
+            model=LLM_MODEL,
+            max_tokens=LLM_MAX_TOKENS,
+            temperature=LLM_TEMPERATURE,
+            groq_api_key=GROQ_API_KEY,
+        )
+    return _llm
 
 # =================================================================
 # RAG CHAIN
@@ -47,12 +57,15 @@ PROMPT = PromptTemplate(
 
 def setup_retrieval_qa(db):
     """Build and return a RetrievalQA chain from an initialized vector store."""
+    if db is None:
+        raise RuntimeError("Vector store is not initialized.")
+
     retriever = db.as_retriever(
         search_type="similarity_score_threshold",
         search_kwargs={"score_threshold": SIMILARITY_THRESHOLD, "k": 4},
     )
     chain = RetrievalQA.from_chain_type(
-        llm=llm,
+        llm=get_llm(),
         chain_type="stuff",
         retriever=retriever,
         input_key="query",

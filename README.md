@@ -1,3 +1,13 @@
+---
+title: DakiKobo
+sdk: docker
+app_port: 7860
+suggested_hardware: cpu-basic
+startup_duration_timeout: 1h
+preload_from_hub:
+  - sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+---
+
 # DakiKobo — AI Agricultural Advisor for Burkina Faso 🌾
 
 DakiKobo is a French-language AI assistant for smallholder farmers in Burkina Faso.

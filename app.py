@@ -2,6 +2,7 @@
 
 import os
 import csv
+from threading import Lock
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify
 
@@ -13,7 +14,7 @@ from core.rag_pipeline import (
     load_vector_store,
     text_to_speech_to_static,
 )
-from core.llm_chain import llm, setup_retrieval_qa
+from core.llm_chain import setup_retrieval_qa
 from core.fertilizer import get_fertilizer_advice
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
@@ -21,25 +22,32 @@ from config import (
     KNOWLEDGE_URLS,
     DATA_FOLDER,
     DEBUG,
+    SECRET_KEY,
     BOT_NAME,
     BOT_CREATOR,
     REBUILD_VECTORSTORE,
 )
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = SECRET_KEY
 
 # Lightweight feedback log (no database) — one CSV row per thumbs up/down.
 FEEDBACK_FILE = os.path.join("data", "feedback.csv")
 
 
 # =================================================================
-# RAG INITIALIZATION — runs once at startup
+# RAG INITIALIZATION — lazy, cached after the first RAG request
 # =================================================================
 
-if vector_store_exists() and not REBUILD_VECTORSTORE:
-    print("1. Loading existing vector store (set REBUILD_VECTORSTORE=true to rebuild)...")
-    db = load_vector_store()
-else:
+_rag_chain = None
+_rag_lock = Lock()
+
+
+def _load_or_build_vector_store():
+    if vector_store_exists() and not REBUILD_VECTORSTORE:
+        print("1. Loading existing vector store (set REBUILD_VECTORSTORE=true to rebuild)...")
+        return load_vector_store()
+
     print("1. Fetching external content...")
     website_docs = []
     try:
@@ -54,11 +62,20 @@ else:
 
     print(f"3. Building & persisting vector store ({len(pdf_docs)} PDFs + {len(website_docs)} web sources)...")
     all_docs = website_docs + pdf_docs
-    db = initialize_vector_store(all_docs)
+    return initialize_vector_store(all_docs)
 
-print("4. Setting up RetrievalQA chain...")
-chain = setup_retrieval_qa(db)
-print(f"✅ {BOT_NAME} is ready!")
+
+def get_rag_chain():
+    """Initialize the RAG stack once, when the first RAG question needs it."""
+    global _rag_chain
+    if _rag_chain is None:
+        with _rag_lock:
+            if _rag_chain is None:
+                db = _load_or_build_vector_store()
+                print("4. Setting up RetrievalQA chain...")
+                _rag_chain = setup_retrieval_qa(db)
+                print(f"✅ {BOT_NAME} is ready!")
+    return _rag_chain
 
 
 # =================================================================
@@ -70,9 +87,24 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/healthz")
+def healthz():
+    return jsonify({
+        "ok": True,
+        "bot": BOT_NAME,
+        "rag_ready": _rag_chain is not None,
+    })
+
+
 @app.route("/ask", methods=["POST"])
 def ask():
-    query = request.form["messageText"].strip()
+    query = request.form.get("messageText", "").strip()
+    if not query:
+        return jsonify({
+            "answer": "Veuillez écrire une question agricole avant d'envoyer.",
+            "sources": [],
+            "audio_url": "",
+        }), 400
 
     # Bot self-identification (French + English triggers)
     identity_triggers = [
@@ -92,15 +124,16 @@ def ask():
     # doses (never LLM-invented); everything else falls through to RAG.
     if classify(query) == INTENT_FERTILIZER:
         advice = get_fertilizer_advice(query)
-        audio_url = text_to_speech_to_static(advice["answer"])
-        return jsonify({
-            "answer": advice["answer"],
-            "sources": advice["sources"],
-            "audio_url": audio_url,
-        })
+        if advice is not None:
+            audio_url = text_to_speech_to_static(advice["answer"])
+            return jsonify({
+                "answer": advice["answer"],
+                "sources": advice["sources"],
+                "audio_url": audio_url,
+            })
 
     try:
-        response = chain.invoke(query)
+        response = get_rag_chain().invoke(query)
         answer = response["result"]
 
         # Surface the documents the answer was grounded in (unique filenames).
@@ -132,11 +165,11 @@ def screen():
 
     file = request.files.get("image")
     if file is None or not file.filename:
-        return jsonify({"error": "no image"}), 400
+        return jsonify({"error": "Aucune image n'a été envoyée."}), 400
 
     image_bytes = file.read()
     if not image_bytes:
-        return jsonify({"error": "empty image"}), 400
+        return jsonify({"error": "L'image envoyée est vide."}), 400
 
     mime_type = file.mimetype or "image/jpeg"
     result = screen_leaf_image(image_bytes, mime_type)

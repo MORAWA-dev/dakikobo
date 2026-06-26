@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.DS_Store
+.env
+chroma_db
+data/feedback.csv
+static/audio/*.mp3
