@@ -19,6 +19,10 @@ Status legend: `[ ]` todo · `[x]` done.
   - *Done when:* asking a question (even one phrased in English) returns the answer — and the
     "I don't know" fallback — in French. **(S)**
 
+- [x] **1c. Translate UI strings to French** — `static/js/index.js`, `app.py`
+  - *Done when:* the welcome message, the bot self-identity reply (also triggered by French
+    phrasing), and the error message all appear in French. **(S)**
+
 - [x] **1. Fix broken avatar + favicon/logo paths** — `static/js/index.js`, `templates/index.html`
   - *Done when:* the page loads with the DakiKobo logo, bot avatar, user avatar, and browser-tab
     icon all visible — no broken-image icons. **(S)**
@@ -35,81 +39,154 @@ Status legend: `[ ]` todo · `[x]` done.
   - *Done when:* enabling audio on a ~90-word French answer plays speech that reaches the end of
     the sentence instead of cutting off mid-word. **(S)**
 
-- [ ] **5. Enable the similarity-score threshold** — `core/llm_chain.py`
+- [x] **5. Enable the similarity-score threshold** — `core/llm_chain.py`, `config.py`
   - *Done when:* asking an off-topic question (e.g. "comment réparer un moteur de voiture ?")
     returns the "information not available" fallback instead of a confident answer. **(S)**
 
-- [ ] **6. Recursive PDF ingestion** — `core/rag_pipeline.py`
+- [x] **6. Recursive PDF ingestion** — `core/rag_pipeline.py`, `config.py`
   - *Done when:* the startup log prints a higher PDF count than before (subfolders included), and
     one unreadable PDF does not crash startup. **(S)**
 
-- [ ] **7. Remove dead files** — delete `chat1.py`, `chat2.py`, `static/css/broken.css`, `static/js/broken.js`
+- [x] **7. Remove dead files** — delete `chat1.py`, `chat2.py`, `static/css/broken.css`, `static/js/broken.js`
   - *Done when:* those files are gone and `python app.py` still starts normally. **(S)**
 
 ---
 
 ## Tier 2 — RAG quality & trust (medium)
 
-- [ ] **8. Attach source metadata at ingestion** — `core/rag_pipeline.py`
+- [x] **8. Attach source metadata at ingestion** — `core/rag_pipeline.py`, `app.py`
   - *Done when:* a retrieved chunk carries its originating PDF filename in `metadata["source"]`
     (verified by a quick print/check). **(M)**
 
-- [ ] **9. Return + render source citations** — `app.py`, `static/js/index.js`, `static/css/style.css`
+- [x] **9. Return + render source citations** — `app.py`, `static/js/index.js`, `static/css/style.css`
   - *Done when:* under each bot answer the UI shows the document name(s) the answer drew from;
     answers with no retrieved source show none. **(M)**
 
-- [ ] **10. Persistent Chroma vector store** — `config.py`, `core/rag_pipeline.py`, `app.py`
+- [x] **10. Persistent Chroma vector store** — `config.py`, `core/rag_pipeline.py`, `app.py`
   - *Done when:* the second `python app.py` starts noticeably faster and logs "loading existing
     index" instead of re-embedding (rebuild only when `REBUILD_VECTORSTORE=true`). **(M)**
 
-- [ ] **11. Multilingual embeddings upgrade** — `config.py` (+ one-time reindex)
-  - *Done when:* after rebuilding the index with `paraphrase-multilingual-mpnet-base-v2`, the same
-    French question returns visibly more on-topic source chips. **(M)**
+- [x] **11. Multilingual embeddings upgrade** — `config.py`, `core/rag_pipeline.py` (+ one-time reindex)
+  - *Done when:* after rebuilding the index with a multilingual model, the same French question
+    returns on-topic source chips while off-topic queries still hit the fallback. **(M)**
+  - Switched `EMBEDDING_MODEL` to `paraphrase-multilingual-MiniLM-L12-v2` (chosen over the heavier
+    `mpnet` variant: ~470MB and far faster to embed on CPU, while still multilingual/good French).
+  - Switching the model changed the relevance-score scale (Chroma's default L2 produced large
+    negative scores → the 0.2 threshold rejected everything). Fixed by setting the Chroma collection
+    to **cosine** space (`collection_metadata={"hnsw:space": "cosine"}`), which normalizes scores so
+    the existing `SIMILARITY_THRESHOLD = 0.2` keeps working across models.
+  - Verified end-to-end on the real code path (build → persist → load → threshold retriever):
+    on-topic French queries return source docs; off-topic ("moteur de voiture", "capital of France")
+    return 0 → fallback. Cosine scores: on-topic top ~0.32–0.53, off-topic top ~0.03–0.11.
+  - **Requires a one-time reindex:** no `chroma_db/` existed, so the next `python app.py` builds fresh
+    with the new model (slower first build on CPU, then fast loads via the Task 10 persistence). If a
+    stale index ever exists after a future model change, delete `chroma_db/` or set
+    `REBUILD_VECTORSTORE=true`.
 
 ---
 
 ## Tier 3 — Mobile UX (medium)
 
-- [ ] **12. Mobile-first responsive layout** — `templates/index.html`, `static/css/style.css`
+- [x] **12. Mobile-first responsive layout** — `templates/index.html`, `static/css/style.css`
   - *Done when:* at 360px width (Chrome device toolbar) the chat fills the screen, the input bar
     is pinned to the bottom, and there is no horizontal scroll. **(M)**
+  - Added global `box-sizing: border-box` so padding can't cause overflow; made `.chat-container`
+    responsive (`max-width: 100%`, `max-height: 100%`) and switched body height to `100dvh` for
+    correct sizing under mobile browser chrome.
+  - Added a `@media (max-width: 480px)` block: container goes full-screen (`width: 100%`,
+    `height: 100dvh`, square corners), tightened header/messages/input/footer padding, widened
+    message bubbles to 90%, and let the footer wrap so the clear button + voice toggle never overflow.
+  - Input bar stays pinned to the bottom via the existing flex column (`.chat-messages { flex: 1 }`)
+    now that the container fills the viewport height. Long source filenames already wrap
+    (`word-break`), so no horizontal scroll at 360px.
+  - Also set `<html lang="fr">` (was `en`) to match the app's French UI.
 
-- [ ] **13. Quick-action chips + active mic state** — `templates/index.html`, `static/js/index.js`, `static/css/style.css`
+- [x] **13. Quick-action chips + active mic state** — `templates/index.html`, `static/js/index.js`, `static/css/style.css`
   - *Done when:* tapping a French chip (e.g. "Semis du mil") sends that question and gets an
     answer, and the mic button visibly pulses while listening. **(M)**
+  - Added a horizontal, scrollable `.quick-chips` row above the input with 5 French crop chips
+    (Semis du mil, Fertiliser le sorgho, Maladies du niébé, Culture du maïs, Rotation des cultures);
+    each carries the full question in `data-question`.
+  - JS delegates `.chip` clicks: sets `#messageText` to the question and calls `sendMessage()`
+    (guarded by `isProcessing`).
+  - Mic button now pulses while listening: `recognition.onstart` adds a `.listening` class
+    (red pulsing `box-shadow` animation), `onend`/error removes it. Also localized the STT failure
+    alert to French.
 
-- [ ] **14. Feedback capture (👍 / 👎)** — `app.py`, `static/js/index.js`, `static/css/style.css`
+- [x] **14. Feedback capture (👍 / 👎)** — `app.py`, `static/js/index.js`, `static/css/style.css`
   - *Done when:* clicking 👎 under an answer appends a new row to `data/feedback.csv`
     (no database). **(M)**
+  - Added a `POST /feedback` route that appends `timestamp,rating,question,answer` to
+    `data/feedback.csv` (creates the file + header on first write; validates rating ∈ {up,down}).
+  - Frontend renders 👍/👎 buttons under each bot answer (after typing); clicking posts the
+    rating with the originating question + answer, disables the buttons, and shows "Merci !".
+  - Verified with Flask's test client: invalid rating → 400; up/down → rows appended with header.
+  - Added `data/feedback.csv` to `.gitignore` (runtime-generated, not committed).
 
 ---
 
 ## Tier 4 — Docs & tests (medium, low-risk)
 
-- [ ] **15. Rewrite `README.md`** — `README.md`
+- [x] **15. Rewrite `README.md`** — `README.md`
   - *Done when:* the README matches the current stack (Flask, Groq `llama-3.3-70b`, LangChain,
     Chroma, French TTS), uses `.env`, and contains no instruction to put API keys in source. **(M)**
+  - Full rewrite: accurate stack (Groq `llama-3.3-70b-versatile`, multilingual MiniLM embeddings,
+    persistent Chroma), `uv`/`.env` setup workflow (cp `.env.example` → `.env`), features list
+    (sources, TTS/STT, quick chips, feedback, mobile UI), config reference table, project layout,
+    and a first-run/rebuild note. Removed the old insecure "put your key in chat2.py" instruction
+    and the stale Mixtral references.
 
-- [ ] **16. First pytest smoke tests** — `tests/`
+- [x] **16. First pytest smoke tests** — `tests/`
   - *Done when:* `pytest` passes a test asserting ingestion finds the expected PDFs and a known
     French crop question returns a non-empty answer. **(S)**
+  - `tests/test_ingestion.py`: asserts expected PDFs are discoverable under `Data/` and that
+    `load_pdfs_from_folder` returns non-empty `Document`s with `source` metadata.
+  - `tests/test_rag.py`: live smoke test — builds a tiny in-memory Chroma (cosine), runs the
+    real `RetrievalQA` chain on "Quand semer le mil ?", asserts a non-empty answer. Auto-skips
+    when `GROQ_API_KEY` is unset (so CI without a key still passes).
+  - Added `pytest` to `requirements.txt` and `.pytest_cache/` to `.gitignore`.
+  - Result: `3 passed` (all three ran locally with the `.env` key present).
 
 ---
 
 ## Tier 5 — New modules (hardest / highest-risk, do last)
 
-- [ ] **17. Deterministic fertilizer tool + keyword branch** — `core/fertilizer.py`, `app.py`
+- [x] **17. Deterministic fertilizer tool + keyword branch** — `core/fertilizer.py`, `app.py`
   - *Done when:* asking "dose d'engrais pour le sorgho" returns a specific source-grounded dose
     with a French "confirmez avec votre agent" disclaimer (no invented numbers). **(L)**
+  - **Data check first:** the existing PDF corpus has NO per-crop dose tables (its `kg/ha` figures
+    are yields, plus one anecdotal maize line; `farmer_training_manual.pdf` is a generic India-
+    oriented handbook). So doses were sourced from **published Burkina/INERA research** (verified
+    via web search) rather than invented or pulled from anecdotes.
+  - `core/fertilizer.py`: fixed, cited per-crop doses for sorgho, mil, maïs, niébé, arachide
+    (e.g. cereals = 100 kg/ha NPK 14-23-14 + 50 kg/ha urée; maïs = 150 + 100; niébé = 100 NPK only;
+    arachide = légumineuse, ~14 kg N/ha + fumure organique). Includes microdose alternatives for
+    cereals. Every answer carries the "Confirmez toujours avec votre agent agricole" disclaimer and
+    cites its source(s). `is_fertilizer_query()` detects intent; `get_fertilizer_advice()` returns
+    `None` (→ RAG) when no supported crop is named.
+  - `app.py`: deterministic keyword branch in `/ask` runs before the LLM, so fertilizer questions
+    get grounded numbers (with TTS + source chips) and never hit the model's invention risk.
+  - Added `tests/test_fertilizer.py` (4 tests, no network): intent detection, grounded sorgho dose
+    + disclaimer, all 5 crops covered, and deferral to RAG when no crop is named. All pass.
 
-- [ ] **18. Intent router** — `core/router.py`, `app.py`
+- [x] **18. Intent router** — `core/router.py`, `app.py`
   - *Done when:* fertilizer questions hit the fertilizer tool, everything else hits RAG, and
     normal Q&A is unchanged. **(M)**
+  - `core/router.py`: `classify(query)` returns `INTENT_FERTILIZER` only when the question is a
+    fertilizer query AND names a supported crop; otherwise `INTENT_RAG`. Centralizes dispatch so a
+    future "disease" intent can be added without touching the route.
+  - `app.py`: `/ask` now dispatches via `classify()` (replacing the inline keyword branch). The RAG
+    path is untouched, so normal Q&A behaves exactly as before.
+  - Added `tests/test_router.py` (3 tests): fertilizer+crop → tool, fertilizer-without-crop → RAG,
+    normal/other questions → RAG. All pass.
 
 - [ ] **19. Disease screening via Gemini Vision + image upload** — `core/disease.py`, `app.py`, `templates/index.html`, `static/js/index.js`
   - *Done when:* uploading a leaf photo returns a hedged French screening with a "ceci n'est pas
     un diagnostic" disclaimer, and a blurry/random photo returns a polite "je ne peux pas dire,
     reprenez la photo". **(L)**
+  - **DEFERRED (blocked):** requires a Google Gemini Vision API key + a new dependency, which can't
+    be verified or tested without the key. Building untestable image-upload code now is low-value;
+    pick this up once a `GEMINI_API_KEY` is provided. (User skipped the prompt to supply one.)
 
 ---
 

@@ -10,7 +10,7 @@ $(function() {
     msg.rate = 1;
     msg.pitch = 1;
 
-    function appendMessage(message, isUser) {
+    function appendMessage(message, isUser, sources, question) {
         var messageClass = isUser ? 'user-message' : 'bot-message';
         // Updated logo reference to DakiKobo
         var logoHTML = isUser ? '' : '<div class="bot-logo"><img src="/static/images/bot_avatar.png" alt="DakiKobo Logo"></div>';
@@ -25,14 +25,56 @@ $(function() {
         if (isUser) {
             messageElement.find('.message').text(message);
         } else {
-            typeMessage(message, messageElement.find('.message'));
+            // Render source chips + feedback only once the answer has finished typing.
+            var bubble = messageElement.find('.message');
+            typeMessage(message, bubble, 15, function() {
+                renderSources(bubble, sources);
+                if (question) {
+                    renderFeedback(bubble, question, message);
+                }
+            });
         }
 
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
         return messageElement;
     }
 
-    function typeMessage(message, element, speed = 15) {
+    function renderFeedback(bubble, question, answer) {
+        var $fb = $('<div class="feedback"></div>');
+        var $up = $('<button type="button" class="fb-btn" data-rating="up" aria-label="Réponse utile">👍</button>');
+        var $down = $('<button type="button" class="fb-btn" data-rating="down" aria-label="Réponse pas utile">👎</button>');
+        $fb.append($up).append($down);
+
+        $fb.on('click', '.fb-btn', function() {
+            var rating = $(this).data('rating');
+            $fb.find('.fb-btn').prop('disabled', true);
+            $.post('/feedback', { rating: rating, question: question, answer: answer })
+                .done(function() {
+                    $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
+                })
+                .fail(function() {
+                    $fb.find('.fb-btn').prop('disabled', false);
+                });
+        });
+
+        bubble.append($fb);
+        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
+    }
+
+    function renderSources(bubble, sources) {
+        if (!sources || sources.length === 0) {
+            return;
+        }
+        var $box = $('<div class="sources"></div>');
+        $box.append($('<span class="sources-label"></span>').text('Sources :'));
+        sources.forEach(function(src) {
+            $box.append($('<span class="source-chip"></span>').text(src));
+        });
+        bubble.append($box);
+        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
+    }
+
+    function typeMessage(message, element, speed = 15, onComplete) {
         let i = 0;
         element.html('');
         const typingInterval = setInterval(() => {
@@ -41,6 +83,9 @@ $(function() {
                 i++;
             } else {
                 clearInterval(typingInterval);
+                if (typeof onComplete === 'function') {
+                    onComplete();
+                }
             }
             $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
         }, speed);
@@ -58,6 +103,17 @@ $(function() {
 
     $('#chatbot-form-btn').click(function(e) {
         e.preventDefault();
+        sendMessage();
+    });
+
+    // Quick-action chips: tap a French chip to ask that question.
+    $('.quick-chips').on('click', '.chip', function(e) {
+        e.preventDefault();
+        if (isProcessing) {
+            return;
+        }
+        var question = $(this).data('question');
+        $('#messageText').val(question);
         sendMessage();
     });
 
@@ -104,9 +160,10 @@ $(function() {
                     } else {
                         var answer = response.answer;
                         var audioUrl = response.audio_url; // <-- Retrieve the audio URL from Flask
+                        var sources = response.sources;    // <-- Source filenames from RAG
 
-                        // Append bot message 
-                        appendMessage(answer, false);
+                        // Append bot message (with source chips + feedback)
+                        appendMessage(answer, false, sources, message);
 
                         // --- NEW AUDIO PLAYBACK LOGIC ---
                         if ($('#voiceReadingCheckbox').is(':checked') && audioUrl) {
@@ -130,8 +187,8 @@ $(function() {
         }
     }
 
-    // Updated welcome message to DakiKobo and French
-    var welcomeMessage = "🌾 Bienvenue à DakiKobo ! 💡 I'm DakiKobo, your expert advisor for agriculture in Burkina Faso. Ask me anything about millet, cowpea, or local soil and climate!";
+    // Welcome message (French — primary language for Burkina Faso farmers)
+    var welcomeMessage = "🌾 Bienvenue à DakiKobo ! 💡 Je suis DakiKobo, votre conseiller agricole pour le Burkina Faso. Posez-moi vos questions sur le mil, le sorgho, le maïs, le niébé, l'arachide, les sols et le climat.";
 
     $('#chatbot-form-btn-clear').click(function(e) {
         e.preventDefault();
@@ -149,7 +206,13 @@ $(function() {
             recognition.interimResults = false;
             recognition.maxAlternatives = 1;
 
+            var $micBtn = $('#chatbot-form-btn-voice');
+
             recognition.start();
+
+            recognition.onstart = function() {
+                $micBtn.addClass('listening');
+            };
 
             recognition.onresult = function(event) {
                 var speechResult = event.results[0][0].transcript;
@@ -159,7 +222,11 @@ $(function() {
 
             recognition.onerror = function(event) {
                 console.error('Speech recognition error:', event.error);
-                alert('Voice input failed. Please try typing your question.');
+                alert('La saisie vocale a échoué. Veuillez taper votre question.');
+            };
+
+            recognition.onend = function() {
+                $micBtn.removeClass('listening');
             };
         } else {
             alert('Speech recognition is not supported in this browser or processing is in progress. Try typing.');

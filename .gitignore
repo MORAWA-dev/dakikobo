@@ -11,12 +11,16 @@ env/
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
 
 # Generated audio files (TTS output)
 static/audio/*.mp3
 
 # ChromaDB persisted data (if you switch to persistent storage later)
 chroma_db/
+
+# User feedback log (runtime-generated)
+data/feedback.csv
 
 # macOS junk
 .DS_Store

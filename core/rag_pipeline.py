@@ -4,7 +4,6 @@ import os
 import glob
 import random
 import string
-from itertools import chain
 
 import requests
 import PyPDF2
@@ -13,6 +12,7 @@ from flask import url_for
 
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 from langchain_community.embeddings.sentence_transformer import (
     SentenceTransformerEmbeddings,
 )
@@ -24,6 +24,7 @@ from config import (
     TTS_LANGUAGE,
     TTS_MAX_CHARS,
     AUDIO_OUTPUT_DIR,
+    VECTORSTORE_DIR,
 )
 
 
@@ -31,16 +32,19 @@ from config import (
 # WEB SCRAPING
 # =================================================================
 
-def fetch_website_content(url: str) -> str:
-    """Fetch raw HTML from a URL. Returns empty string on failure."""
+def fetch_website_content(url: str) -> list[Document]:
+    """Fetch raw HTML from a URL as a Document tagged with its source URL.
+
+    Returns an empty list on failure.
+    """
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-        return response.text
+        return [Document(page_content=response.text, metadata={"source": url})]
     except requests.exceptions.RequestException as e:
         print(f"Warning: Could not fetch {url}. Error: {e}")
-        return ""
+        return []
 
 
 # =================================================================
@@ -60,37 +64,77 @@ def extract_pdf_text(pdf_file: str) -> str:
         return ""
 
 
-def load_pdfs_from_folder(folder_path: str) -> list[str]:
-    """Return extracted text from every PDF found in folder_path."""
-    pdf_files = glob.glob(os.path.join(folder_path, "*.pdf"))
-    print(f"Found {len(pdf_files)} PDF(s) in {folder_path}")
-    return [extract_pdf_text(f) for f in pdf_files]
+def load_pdfs_from_folder(folder_path: str) -> list[Document]:
+    """Return a Document per readable PDF found recursively under folder_path.
+
+    Each Document carries metadata["source"] = the PDF filename, so retrieved
+    chunks can be cited. Subfolders are included. An unreadable or empty PDF is
+    logged and skipped (never crashes startup).
+    """
+    pdf_files = sorted(
+        glob.glob(os.path.join(folder_path, "**", "*.pdf"), recursive=True)
+    )
+    print(f"Found {len(pdf_files)} PDF(s) in and under {folder_path}")
+    docs = []
+    for f in pdf_files:
+        text = extract_pdf_text(f)
+        if text.strip():
+            docs.append(
+                Document(page_content=text, metadata={"source": os.path.basename(f)})
+            )
+            status = "ok"
+        else:
+            status = "EMPTY — skipped"
+        print(f"  - {os.path.relpath(f, folder_path)} ({status})")
+    return docs
 
 
 # =================================================================
 # TEXT SPLITTING & VECTOR STORE
 # =================================================================
 
-def split_text(text: str) -> list[str]:
+def split_documents(documents: list[Document]) -> list[Document]:
+    """Split Documents into chunks, preserving each chunk's source metadata."""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
     )
-    return splitter.split_text(text)
+    return splitter.split_documents(documents)
 
 
-def initialize_vector_store(contents: list[str]):
+def _embeddings():
+    return SentenceTransformerEmbeddings(model_name=EMBEDDING_MODEL)
+
+
+def vector_store_exists() -> bool:
+    """True if a persisted Chroma store already exists on disk."""
+    return os.path.isdir(VECTORSTORE_DIR) and bool(os.listdir(VECTORSTORE_DIR))
+
+
+def load_vector_store():
+    """Load the persisted Chroma store from disk (no re-embedding)."""
+    return Chroma(persist_directory=VECTORSTORE_DIR, embedding_function=_embeddings())
+
+
+def initialize_vector_store(documents: list[Document]):
     """
-    Build a ChromaDB vector store from a list of text strings.
-    Returns None if no valid content is provided.
+    Build a persistent ChromaDB vector store from a list of Documents and save it
+    to VECTORSTORE_DIR. Each chunk keeps its source metadata.
+    Returns None if there is no content.
     """
-    valid = [c for c in contents if c and c.strip()]
+    valid = [d for d in documents if d.page_content and d.page_content.strip()]
     if not valid:
         print("FATAL: No valid content to initialize vector store.")
         return None
 
-    embedding_fn = SentenceTransformerEmbeddings(model_name=EMBEDDING_MODEL)
-    chunks = list(chain.from_iterable(split_text(c) for c in valid))
-    db = Chroma.from_texts(chunks, embedding_fn)
+    chunks = split_documents(valid)
+    db = Chroma.from_documents(
+        chunks,
+        _embeddings(),
+        persist_directory=VECTORSTORE_DIR,
+        # Cosine keeps relevance scores in a stable, model-independent range so
+        # SIMILARITY_THRESHOLD works regardless of the embedding model.
+        collection_metadata={"hnsw:space": "cosine"},
+    )
     return db
 
 

@@ -47,3 +47,6 @@ tiktoken
 openai
 rich
 Pygments
+
+# Testing
+pytest

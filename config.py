@@ -13,14 +13,26 @@ LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 512))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1))
 
 # --- Embeddings & Vector Store ---
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-SIMILARITY_THRESHOLD = 0.6
+# Multilingual model — much better for French queries/corpus than all-MiniLM
+# (English) while staying light/fast enough to embed on CPU.
+# NOTE: changing this model changes the vector dimension; rebuild the store
+# (delete chroma_db/ or run with REBUILD_VECTORSTORE=true).
+EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+SIMILARITY_THRESHOLD = 0.2  # on-topic FR queries score ~0.3-0.4, off-topic <=0.0 (measured)
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100
 
+# Persistent Chroma store: built once, then loaded on restart (folder is git-ignored).
+# Set REBUILD_VECTORSTORE=true to force a fresh rebuild (e.g. after changing the
+# embedding model or adding documents).
+VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "chroma_db")
+REBUILD_VECTORSTORE = os.getenv("REBUILD_VECTORSTORE", "false").lower() == "true"
+
 # --- Knowledge Base ---
-# Relative path from app.py to the folder containing your PDF files
-DATA_FOLDER = os.path.join("Data", "knowledge_base")
+# Root folder ingested recursively (**/*.pdf) at startup. Points at the whole
+# Data/ tree so PDFs in subfolders (knowledge_base, New Folder With Items, ...)
+# are all picked up.
+DATA_FOLDER = "Data"
 
 # External URLs to scrape at startup (add URLs here, uncomment to activate)
 KNOWLEDGE_URLS = [

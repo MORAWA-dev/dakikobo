@@ -1,153 +1,164 @@
-DakiKobo: AI-Powered Agricultural Advisor for Burkina Faso 🌾
+# DakiKobo — AI Agricultural Advisor for Burkina Faso 🌾
 
-Project Overview
+DakiKobo is a French-language AI assistant for smallholder farmers in Burkina Faso.
+It uses a **Retrieval-Augmented Generation (RAG)** pipeline grounded in agricultural
+reference documents (FAO, AGRA, WFP and technical guides for the Sahel and Sudanian
+Savanna zones) so answers stay accurate and source-backed rather than invented.
 
-DakiKobo (named for "knowledge or advice farm" in local languages) is a specialized AI chatbot designed to empower smallholder farmers in Burkina Faso.
+The focus crops are **mil (millet), sorgho (sorghum), maïs (maize), niébé (cowpea)
+and arachide (groundnut)**. All output — answers, UI labels and voice — is in French,
+and the interface is mobile-first for use on phones.
 
-This Python web application leverages a Retrieval-Augmented Generation (RAG) architecture to provide timely, accurate, and localized advice. The bot's knowledge base is grounded in official Burkina Faso agricultural reports, regional policy documents (FAO, AGRA, WFP), and technical guides tailored to the Sahel and Sudanian Savanna zones.
+---
 
-The application includes Text-to-Speech (TTS) capability to ensure accessibility for users with limited literacy.
+## Features
 
-Features
+- **Grounded French answers** — RAG over a local document corpus; off-topic questions
+  fall back to an honest "je ne sais pas" instead of hallucinating.
+- **Source citations** — each answer shows which document(s) it was drawn from.
+- **Fast inference** — Groq-hosted `llama-3.3-70b-versatile`.
+- **Multilingual retrieval** — `paraphrase-multilingual-MiniLM-L12-v2` embeddings for
+  good French matching, stored in a **persistent ChromaDB** (built once, fast on restart).
+- **Voice output (TTS)** — answers can be read aloud in French via gTTS.
+- **Voice input (STT)** — optional French speech-to-text in supported browsers, with a
+  visible "listening" indicator.
+- **Quick-action chips** — one-tap common questions (semis du mil, fertilisation, etc.).
+- **Feedback capture** — 👍 / 👎 under each answer, logged to `data/feedback.csv` (no database).
+- **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
 
-Localized Knowledge Base: RAG retrieval from custom documents focusing on Burkina Faso crops (Sorghum, Millet, Niébé, Cotton).
+---
 
-High-Speed Inference: Uses Groq (Mixtral 8x7b) for ultra-low latency, ensuring fast, real-time responses in the chat.
+## Tech stack
 
-Multilingual Support: Frontend is configured for French (Français), and the LLM is primed to handle regional terminology.
+| Component        | Technology                                            |
+| ---------------- | ----------------------------------------------------- |
+| Web framework    | Flask                                                 |
+| LLM inference    | Groq — `llama-3.3-70b-versatile`                       |
+| RAG orchestration| LangChain (core + community)                          |
+| Embeddings       | `sentence-transformers` — multilingual MiniLM L12     |
+| Vector store     | ChromaDB (persistent)                                 |
+| PDF ingestion    | PyPDF2                                                 |
+| Text-to-speech   | gTTS (French)                                         |
 
-Voice Output (TTS): Converts text answers into spoken French audio using gtts.
+---
 
-Modularity: Built on a robust Flask backend with LangChain and ChromaDB for easy expansion and maintenance.
+## Setup
 
-Installation and Setup (Optimized for macOS)
+### Prerequisites
 
-Follow these steps to set up the DakiKobo project locally.
+- Python **3.10 or 3.11**
+- A **Groq API key** (from the [Groq console](https://console.groq.com))
+- [`uv`](https://github.com/astral-sh/uv) recommended for fast environments
+  (plain `venv` + `pip` also works)
 
-Prerequisites
+### 1. Create the environment and install dependencies
 
-Python 3.10 or 3.11: Recommended versions.
+Using `uv` (recommended):
 
-Groq API Key: Obtain a key from the Groq console.
+```bash
+uv venv .venv --python 3.11
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
 
-Installation Steps
+Or with standard tools:
 
-STEP 1: Clone the Repository
-
-# Assuming you already have the files
-
-cd /path/to/AgriGenius-main
-
-STEP 2: Create and Activate Virtual Environment
-
-python3 -m venv dakikobo_env
-source dakikobo_env/bin/activate
-
-STEP 3: Install Dependencies (Using Flexible Fixes)
-
-# This command installs all required packages (including the compatible versions for Mac Intel).
-
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
 
-STEP 4: Configure API Keys and Code
+### 2. Configure your API key
 
-Groq API Key: Open chat2.py and replace "xxxx" with your actual Groq API key.
+Secrets are loaded from a `.env` file — **never put keys in source code**.
 
-File Placement: Place your Burkina Faso PDF documents directly inside the /Data folder.
+```bash
+cp .env.example .env
+```
 
-STEP 5: Run the Flask Web Application
+Then edit `.env` and set your key:
 
-Ensure your (dakikobo_env) is active, and run the main application file.
+```dotenv
+GROQ_API_KEY=your_real_key_here
+```
 
+Optional overrides (defaults in `config.py` are fine for development):
+
+```dotenv
+# LLM_MODEL=llama-3.3-70b-versatile
+# LLM_MAX_TOKENS=512
+# LLM_TEMPERATURE=0.1
+# FLASK_DEBUG=true
+# REBUILD_VECTORSTORE=true   # force a fresh index rebuild
+```
+
+### 3. Add knowledge documents
+
+Place your Burkina Faso agriculture PDFs anywhere under the `Data/` folder
+(subfolders are ingested recursively).
+
+### 4. Run
+
+```bash
 python app.py
+```
 
-Usage
+Open <http://127.0.0.1:5000> in your browser.
 
-Access: Open your web browser (Chrome recommended) and navigate to http://127.0.0.1:5000 to use DakiKobo.
+> **First run:** DakiKobo builds the vector index from your PDFs and saves it to
+> `chroma_db/`. On CPU this one-time build can take several minutes. Subsequent
+> starts load the saved index and are fast. To rebuild later (e.g. after adding
+> documents or changing the embedding model), delete `chroma_db/` or start with
+> `REBUILD_VECTORSTORE=true`.
 
-Query: Ask a question specific to Burkina Faso agriculture.
+---
 
-Voice Output: Check the "Activer la lecture vocale" box to hear DakiKobo speak the answer in French.
+## Usage
 
-Technology Stack
+- **Ask a question** about Burkina Faso agriculture in French.
+- **Quick chips** above the input send common questions in one tap.
+- **Voice output:** tick *"Activer la lecture vocale"* to hear answers read aloud.
+- **Voice input:** tap the microphone (Chrome/supported browsers); it pulses while listening.
+- **Feedback:** use 👍 / 👎 under an answer — entries are appended to `data/feedback.csv`.
 
-Component
+---
 
-Role
+## Configuration reference
 
-Used Library/Platform
+All tunables live in `config.py` (overridable via environment variables where shown):
 
-LLM Inference
+| Setting                | Default                                  | Purpose                                  |
+| ---------------------- | ---------------------------------------- | ---------------------------------------- |
+| `LLM_MODEL`            | `llama-3.3-70b-versatile`                | Groq chat model                          |
+| `EMBEDDING_MODEL`      | `paraphrase-multilingual-MiniLM-L12-v2`  | Sentence-transformer for retrieval       |
+| `SIMILARITY_THRESHOLD` | `0.2`                                    | Min relevance to use a chunk (else fallback) |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `500` / `100`                    | Document splitting                       |
+| `VECTORSTORE_DIR`      | `chroma_db`                              | Persisted index location (git-ignored)   |
+| `DATA_FOLDER`          | `Data`                                   | Root folder ingested recursively         |
+| `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 
-High-speed answer generation
+---
 
-Groq (using Mixtral 8x7b)
+## Project layout
 
-RAG Orchestration
+```
+dakikobo/
+├── app.py               # Flask entry point + routes (/ , /ask , /feedback)
+├── config.py            # Central configuration
+├── core/
+│   ├── llm_chain.py     # LLM + RetrievalQA setup and French prompt
+│   └── rag_pipeline.py  # PDF ingestion, embeddings, Chroma, TTS
+├── templates/index.html # Chat UI
+├── static/              # CSS, JS, images, generated audio
+├── Data/                # Knowledge-base PDFs (recursive)
+└── requirements.txt
+```
 
-Pipeline for knowledge retrieval
+---
 
-LangChain (Core, Community)
+## Notes
 
-Vector Store
-
-Indexing and retrieval of documents
-
-ChromaDB
-
-Web Framework
-
-Frontend and API routing
-
-Flask (Python)
-
-TTS (Voice)
-
-Generating audio response
-
-gTTS (Google Text-to-Speech)
-Core Web/Flask
-
-Flask==3.0.3
-Werkzeug==3.0.3
-Jinja2==3.1.4
-itsdangerous==2.2.0
-
-RAG/LangChain Core (Use the versions from the original project)
-
-langchain==0.2.0
-langchain-community==0.2.0
-langchain-core==0.2.0
-
-Specific RAG/LLM Connectors we are using
-
-langchain-groq # Groq connector
-langchain-text-splitters # The fix for the ModuleNotFoundError: No module named 'langchain.text_splitter'
-chromadb==0.5.0
-PyPDF2==3.0.1
-sentence-transformers==2.7.0
-
-Dependencies related to Scientific Computing (Flexible versions to fix Mac/Intel issues)
-
-numpy
-scipy
-torch
-tokenizers
-transformers
-safetensors
-onnxruntime
-
-Dependencies for Text-to-Speech (TTS)
-
-gtts # For voice output
-
-Other required packages
-
-requests==2.31.0
-Pygments
-rich
-openai
-tiktoken
-pydantic
-tenacity
-httpx
+- `.env`, `chroma_db/`, generated audio and `data/feedback.csv` are git-ignored.
+- This tool gives general guidance; users should confirm specifics (e.g. fertilizer
+  doses) with a local agricultural extension agent.
