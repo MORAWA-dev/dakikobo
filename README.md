@@ -23,6 +23,10 @@ and the interface is mobile-first for use on phones.
 - **Voice input (STT)** — optional French speech-to-text in supported browsers, with a
   visible "listening" indicator.
 - **Quick-action chips** — one-tap common questions (semis du mil, fertilisation, etc.).
+- **Deterministic fertilizer doses** — source-grounded INERA/Burkina recommendations (never
+  invented), with a "confirmez avec votre agent" disclaimer.
+- **Leaf disease screening (optional)** — upload a leaf photo for a hedged French screening via
+  Gemini Vision, with a "ceci n'est pas un diagnostic" disclaimer (requires a Gemini API key).
 - **Feedback capture** — 👍 / 👎 under each answer, logged to `data/feedback.csv` (no database).
 - **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
 
@@ -83,12 +87,26 @@ Then edit `.env` and set your key:
 GROQ_API_KEY=your_real_key_here
 ```
 
+Optional — leaf disease screening needs a Google Gemini key (from
+[Google AI Studio](https://aistudio.google.com/apikey)):
+
+```dotenv
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Verify it works anytime with:
+
+```bash
+python scripts/test_gemini.py
+```
+
 Optional overrides (defaults in `config.py` are fine for development):
 
 ```dotenv
 # LLM_MODEL=llama-3.3-70b-versatile
 # LLM_MAX_TOKENS=512
 # LLM_TEMPERATURE=0.1
+# GEMINI_MODEL=gemini-2.0-flash
 # FLASK_DEBUG=true
 # REBUILD_VECTORSTORE=true   # force a fresh index rebuild
 ```

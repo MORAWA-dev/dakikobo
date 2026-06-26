@@ -130,12 +130,14 @@ $(function() {
         $('#messageText').prop('disabled', true);
         $('#chatbot-form-btn').prop('disabled', true);
         $('#chatbot-form-btn-voice').prop('disabled', true);
+        $('#chatbot-form-btn-image').prop('disabled', true);
     }
 
     function enableInput() {
         $('#messageText').prop('disabled', false);
         $('#chatbot-form-btn').prop('disabled', false);
         $('#chatbot-form-btn-voice').prop('disabled', false);
+        $('#chatbot-form-btn-image').prop('disabled', false);
     }
 
     function sendMessage() {
@@ -186,6 +188,73 @@ $(function() {
             });
         }
     }
+
+    function appendImageMessage(dataUrl) {
+        var el = $('<div class="message-container user-container">' +
+                   '<div class="message user-message"></div>' +
+                   '<div class="user-image"><img src="/static/images/user_avatar.png" alt="User"></div>' +
+                   '</div>');
+        el.find('.message').append($('<img class="msg-image" alt="photo">').attr('src', dataUrl));
+        $('.chat-messages').append(el);
+        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
+    }
+
+    // Leaf-photo disease screening (Gemini Vision via /screen)
+    $('#chatbot-form-btn-image').click(function(e) {
+        e.preventDefault();
+        if (!isProcessing) {
+            $('#imageInput').click();
+        }
+    });
+
+    $('#imageInput').change(function() {
+        var file = this.files[0];
+        this.value = '';  // allow re-selecting the same file later
+        if (!file || isProcessing) {
+            return;
+        }
+        isProcessing = true;
+        disableInput();
+
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            appendImageMessage(ev.target.result);
+        };
+        reader.readAsDataURL(file);
+
+        var formData = new FormData();
+        formData.append('image', file);
+        showTypingIndicator();
+
+        $.ajax({
+            type: "POST",
+            url: "/screen",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                removeTypingIndicator();
+                if (response.error) {
+                    appendMessage("Erreur : " + response.error, false);
+                } else {
+                    appendMessage(response.answer, false, response.sources);
+                    if ($('#voiceReadingCheckbox').is(':checked') && response.audio_url) {
+                        new Audio(response.audio_url).play().catch(function(err) {
+                            console.error("Audio playback error:", err);
+                        });
+                    }
+                }
+                isProcessing = false;
+                enableInput();
+            },
+            error: function() {
+                removeTypingIndicator();
+                appendMessage("Désolé, l'analyse de l'image a échoué. Veuillez réessayer.", false);
+                isProcessing = false;
+                enableInput();
+            }
+        });
+    });
 
     // Welcome message (French — primary language for Burkina Faso farmers)
     var welcomeMessage = "🌾 Bienvenue à DakiKobo ! 💡 Je suis DakiKobo, votre conseiller agricole pour le Burkina Faso. Posez-moi vos questions sur le mil, le sorgho, le maïs, le niébé, l'arachide, les sols et le climat.";

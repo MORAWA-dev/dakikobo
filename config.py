@@ -12,6 +12,10 @@ LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 512))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1))
 
+# --- Gemini Vision (leaf disease screening) ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
 # --- Embeddings & Vector Store ---
 # Multilingual model — much better for French queries/corpus than all-MiniLM
 # (English) while staying light/fast enough to embed on CPU.

@@ -16,6 +16,7 @@ from core.rag_pipeline import (
 from core.llm_chain import llm, setup_retrieval_qa
 from core.fertilizer import get_fertilizer_advice
 from core.router import classify, INTENT_FERTILIZER
+from core.disease import screen_leaf_image, is_configured as disease_configured
 from config import (
     KNOWLEDGE_URLS,
     DATA_FOLDER,
@@ -116,6 +117,32 @@ def ask():
             "sources": [],
             "audio_url": "",
         })
+
+
+@app.route("/screen", methods=["POST"])
+def screen():
+    """Leaf disease screening from an uploaded photo (Gemini Vision)."""
+    if not disease_configured():
+        return jsonify({
+            "answer": "L'analyse d'image n'est pas disponible (clé Gemini non "
+            "configurée).",
+            "sources": [],
+            "audio_url": "",
+        })
+
+    file = request.files.get("image")
+    if file is None or not file.filename:
+        return jsonify({"error": "no image"}), 400
+
+    image_bytes = file.read()
+    if not image_bytes:
+        return jsonify({"error": "empty image"}), 400
+
+    mime_type = file.mimetype or "image/jpeg"
+    result = screen_leaf_image(image_bytes, mime_type)
+    answer = result["answer"]
+    audio_url = text_to_speech_to_static(answer)
+    return jsonify({"answer": answer, "sources": [], "audio_url": audio_url})
 
 
 @app.route("/feedback", methods=["POST"])

@@ -180,13 +180,27 @@ Status legend: `[ ]` todo · `[x]` done.
   - Added `tests/test_router.py` (3 tests): fertilizer+crop → tool, fertilizer-without-crop → RAG,
     normal/other questions → RAG. All pass.
 
-- [ ] **19. Disease screening via Gemini Vision + image upload** — `core/disease.py`, `app.py`, `templates/index.html`, `static/js/index.js`
+- [x] **19. Disease screening via Gemini Vision + image upload** — `core/disease.py`, `app.py`, `templates/index.html`, `static/js/index.js`
   - *Done when:* uploading a leaf photo returns a hedged French screening with a "ceci n'est pas
     un diagnostic" disclaimer, and a blurry/random photo returns a polite "je ne peux pas dire,
     reprenez la photo". **(L)**
-  - **DEFERRED (blocked):** requires a Google Gemini Vision API key + a new dependency, which can't
-    be verified or tested without the key. Building untestable image-upload code now is low-value;
-    pick this up once a `GEMINI_API_KEY` is provided. (User skipped the prompt to supply one.)
+  - `core/disease.py`: calls Gemini Vision via the **REST API using `requests`** (no SDK dependency —
+    the `google-genai` install tried to compile a Rust wheel and hung). Prompt forces a hedged French
+    screening ("il pourrait s'agir de…") and returns a sentinel for unusable photos → polite
+    "reprenez la photo" message. Code guarantees the "Ceci n'est pas un diagnostic" disclaimer, and
+    gracefully handles missing key / network errors / 429 quota.
+  - `config.py`: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-2.0-flash`).
+  - `app.py`: `POST /screen` accepts an uploaded image, returns French screening + TTS.
+  - UI: camera button in the input bar (`accept="image/*" capture="environment"`), JS shows the
+    user's photo bubble, posts multipart to `/screen`, renders the answer (with optional voice).
+  - Added `scripts/test_gemini.py` — reusable key checker (`python scripts/test_gemini.py`).
+  - Tests: `tests/test_disease.py` (5, HTTP mocked) cover unclear photo, disclaimer append/no-dup,
+    429, and missing-key paths. Live wiring confirmed end-to-end (reached Gemini; returned the
+    friendly 429 message).
+  - **Live confirmed working:** the earlier 429 was model-specific — `gemini-2.0-flash` had no free
+    quota, but `gemini-2.5-flash` works. Default model switched to `gemini-2.5-flash`; a live vision
+    call returned the correct "unclear photo" response for a blank image. `scripts/test_gemini.py`
+    now tests the app's configured model and reports ✅.
 
 ---
 
