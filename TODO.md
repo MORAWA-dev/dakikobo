@@ -25,6 +25,7 @@ traceable sources.
 - [x] Weather and soil tools are tucked behind an `Outils` drawer so chat remains the first-screen focus.
 - [x] The demo UI uses the neutral DakiKobo logo avatar, compact wrapped examples, and clearer action controls.
 - [x] TTS has one global auto-play toggle plus per-answer `Réécouter` buttons when audio is available.
+- [x] A `Sources & limites` panel explains evidence, deterministic tools, and required field confirmation.
 - [x] Docker/Hugging Face deployment files exist.
 - [x] Route tests and offline tests are passing.
 
@@ -39,7 +40,7 @@ traceable sources.
 - [ ] No scheduled knowledge refresh from trusted web sources.
 - [ ] No benchmark suite for vision/photo diagnosis quality.
 - [ ] No weather, soil, or rainfall-onset intelligence.
-- [ ] No clear public demo story: sample cases, screenshots, data card, limitations.
+- [x] Clear public demo story: sample cases, citations, confidence, and a compact sources/limits panel.
 
 ## Product direction
 

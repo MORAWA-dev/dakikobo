@@ -40,6 +40,9 @@ def test_index_route_renders():
     assert response.content_type.startswith("text/html")
     assert b'data-example-id="semis_mil"' in response.data
     assert b'data-example-id="photo_mais"' in response.data
+    assert b'id="credibilityToggle"' in response.data
+    assert b'id="credibilityModal"' in response.data
+    assert b'Sources & limites' in response.data
     assert b'id="toolsDrawer"' in response.data
     assert b'id="toolsToggle"' in response.data
     assert b'id="weatherLocation"' in response.data

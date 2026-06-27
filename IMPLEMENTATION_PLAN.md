@@ -265,6 +265,14 @@ Status legend: `[ ]` todo · `[x]` done.
   - Centralized browser audio playback so starting a new answer stops the previous audio, and turning
     off the global voice checkbox stops current playback.
 
+- [x] **27. Sources and limits panel** — `templates/index.html`, `static/css/style.css`, `static/js/index.js`
+  - *Done when:* reviewers can inspect what evidence the app uses, what remains approximate, and
+    where human confirmation is required without crowding the chat. **(S)**
+  - Added a header `Sources` control that opens a compact `Sources & limites` dialog.
+  - Summarizes local RAG documents, deterministic fertilizer logic, Open-Meteo/SoilGrids signals,
+    and field-confirmation limits in French.
+  - Tests cover the modal markup and frontend wiring.
+
 ---
 
 ## Later / parked (do **not** attempt now)

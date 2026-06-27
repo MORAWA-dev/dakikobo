@@ -37,12 +37,136 @@ body {
     color: white;
     padding: 15px 20px;
     text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .chat-header h1 {
     margin: 0;
     font-size: 24px;
     font-weight: 500;
+}
+
+.header-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 17px;
+    background-color: rgba(255, 255, 255, 0.16);
+    color: white;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.header-info-btn:hover,
+.header-info-btn.active {
+    background-color: rgba(255, 255, 255, 0.26);
+    border-color: rgba(255, 255, 255, 0.9);
+}
+
+.credibility-modal {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background-color: rgba(3, 46, 18, 0.42);
+}
+
+.credibility-modal[hidden] {
+    display: none;
+}
+
+.credibility-panel {
+    width: min(390px, 100%);
+    max-height: min(560px, calc(100% - 24px));
+    overflow-y: auto;
+    border: 1px solid rgba(4, 55, 14, 0.14);
+    border-radius: 14px;
+    background-color: #fbfffd;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+
+.credibility-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #d9eee9;
+}
+
+.credibility-head h2 {
+    margin: 0;
+    color: #04370e;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#credibilityClose {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #bfe3dd;
+    border-radius: 50%;
+    background-color: #f4fbfa;
+    color: #04370e;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#credibilityClose:hover {
+    background-color: #e6f6f4;
+}
+
+.credibility-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px 16px;
+}
+
+.credibility-body section {
+    border-left: 4px solid #4fd1c5;
+    padding-left: 10px;
+}
+
+.credibility-body h3 {
+    margin: 0 0 4px;
+    color: #04370e;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.credibility-body p {
+    margin: 0;
+    color: #3b4b3b;
+    font-size: 13px;
+    line-height: 1.42;
+}
+
+.credibility-note {
+    border-radius: 8px;
+    background-color: #fff6d8;
+    color: #5a4a00;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    padding: 9px 10px;
 }
 
 .chat-messages {
@@ -1136,6 +1260,19 @@ body {
 
     .chat-header h1 {
         font-size: 20px;
+    }
+
+    .header-info-btn span {
+        display: none;
+    }
+
+    .header-info-btn {
+        width: 34px;
+        padding: 0;
+    }
+
+    .credibility-modal {
+        padding: 12px;
     }
 
     .chat-messages {

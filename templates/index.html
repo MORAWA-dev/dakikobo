@@ -38,6 +38,71 @@
           </div>
           <h1>DakiKobo</h1>
         </div>
+        <button
+          id="credibilityToggle"
+          class="header-info-btn"
+          type="button"
+          aria-label="Voir les sources et limites"
+          aria-controls="credibilityModal"
+          aria-expanded="false"
+          title="Sources et limites"
+        >
+          <i class="fas fa-shield-alt"></i>
+          <span>Sources</span>
+        </button>
+      </div>
+      <div
+        class="credibility-modal"
+        id="credibilityModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="credibilityTitle"
+        hidden
+      >
+        <div class="credibility-panel">
+          <div class="credibility-head">
+            <h2 id="credibilityTitle">Sources & limites</h2>
+            <button
+              id="credibilityClose"
+              type="button"
+              aria-label="Fermer les sources et limites"
+              title="Fermer"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="credibility-body">
+            <section>
+              <h3>Base de preuves</h3>
+              <p>
+                Les réponses générales s'appuient sur les documents agricoles
+                locaux indexés dans DakiKobo. Les cartes affichent les sources
+                utilisées quand elles sont disponibles.
+              </p>
+            </section>
+            <section>
+              <h3>Outils déterministes</h3>
+              <p>
+                Les doses d'engrais viennent de l'outil interne, pas du modèle
+                de langage. La météo utilise Open-Meteo et le sol utilise
+                SoilGrids comme signaux indicatifs.
+              </p>
+            </section>
+            <section>
+              <h3>Limites terrain</h3>
+              <p>
+                Les photos, le sol et la météo ne remplacent pas une observation
+                de parcelle. Les maladies, doses exactes et décisions coûteuses
+                doivent être confirmées avec un agent agricole ou une analyse de
+                sol.
+              </p>
+            </section>
+            <div class="credibility-note">
+              DakiKobo privilégie une réponse prudente ou un refus honnête
+              plutôt qu'une précision inventée.
+            </div>
+          </div>
+        </div>
       </div>
       <div class="chat-messages" id="chatPanel">
         <!-- Messages will be appended here -->

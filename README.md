@@ -37,6 +37,8 @@ and the interface is mobile-first for use on phones.
   sample image case, without spending live API calls.
 - **Focused mobile UI** — examples stay visible, while weather and soil tools sit behind an
   `Outils` drawer so the conversation remains the main workspace.
+- **Trust panel** — a compact `Sources & limites` dialog explains evidence, approximate signals,
+  and required field confirmation.
 - **Deterministic fertilizer doses** — source-grounded INERA/Burkina recommendations (never
   invented), with a "confirmez avec votre agent" disclaimer.
 - **Leaf disease screening (optional)** — upload a leaf photo for a hedged French screening via

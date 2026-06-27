@@ -13,6 +13,43 @@ $(function() {
     msg.rate = 1;
     msg.pitch = 1;
     var currentAudio = null;
+    var credibilityLastFocus = null;
+
+    function setCredibilityOpen(open) {
+        var $modal = $('#credibilityModal');
+        var $toggle = $('#credibilityToggle');
+        $modal.prop('hidden', !open);
+        $toggle
+            .attr('aria-expanded', open ? 'true' : 'false')
+            .toggleClass('active', open);
+        if (open) {
+            credibilityLastFocus = document.activeElement;
+            $('#credibilityClose').trigger('focus');
+        } else if (credibilityLastFocus && document.contains(credibilityLastFocus)) {
+            credibilityLastFocus.focus();
+            credibilityLastFocus = null;
+        }
+    }
+
+    $('#credibilityToggle').on('click', function() {
+        setCredibilityOpen($('#credibilityModal').prop('hidden'));
+    });
+
+    $('#credibilityClose').on('click', function() {
+        setCredibilityOpen(false);
+    });
+
+    $('#credibilityModal').on('click', function(e) {
+        if (e.target === this) {
+            setCredibilityOpen(false);
+        }
+    });
+
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && !$('#credibilityModal').prop('hidden')) {
+            setCredibilityOpen(false);
+        }
+    });
 
     function stopCurrentAudio() {
         if (currentAudio) {
