@@ -26,6 +26,7 @@ traceable sources.
 - [x] The demo UI uses the neutral DakiKobo logo avatar, compact wrapped examples, and clearer action controls.
 - [x] TTS has one global auto-play toggle plus per-answer `Réécouter` buttons when audio is available.
 - [x] A `Sources & limites` panel explains evidence, deterministic tools, and required field confirmation.
+- [x] Hugging Face starts a background RAG warm-up so the first real question is not the warm-up trigger.
 - [x] Docker/Hugging Face deployment files exist.
 - [x] Route tests and offline tests are passing.
 

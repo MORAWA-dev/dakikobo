@@ -29,6 +29,8 @@ and the interface is mobile-first for use on phones.
 - **Fast inference** — Groq-hosted `llama-3.3-70b-versatile`.
 - **Multilingual retrieval** — `paraphrase-multilingual-MiniLM-L12-v2` embeddings for
   good French matching, stored in a **persistent ChromaDB** (built once, fast on restart).
+- **Hosted warm-up** — the Docker Space can prepare RAG in the background after startup so the
+  first public question is less likely to pay the full indexing cost.
 - **Voice output (TTS)** — answers can auto-play in French via gTTS and be replayed
   from their answer bubble.
 - **Voice input (STT)** — optional French speech-to-text in supported browsers, with a
@@ -175,6 +177,7 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `SIMILARITY_THRESHOLD` | `0.2`                                    | Min relevance to use a chunk (else fallback) |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `500` / `100`                    | Document splitting                       |
 | `VECTORSTORE_DIR`      | `chroma_db`                              | Persisted index location (git-ignored)   |
+| `RAG_WARMUP_ON_START`  | `false` locally, `true` in Docker        | Background RAG warm-up on hosted startup |
 | `DATA_FOLDER`          | `Data`                                   | Root folder ingested recursively         |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |

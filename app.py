@@ -4,7 +4,7 @@ import os
 import csv
 from math import ceil
 from time import time
-from threading import Lock
+from threading import Lock, Thread
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify, session
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -41,6 +41,7 @@ from config import (
     BOT_NAME,
     BOT_CREATOR,
     REBUILD_VECTORSTORE,
+    RAG_WARMUP_ON_START,
     REQUEST_COOLDOWN_SECONDS,
     IMAGE_COOLDOWN_SECONDS,
     MAX_IMAGE_UPLOAD_BYTES,
@@ -140,6 +141,15 @@ def _upload_too_large_response():
 
 _rag_chain = None
 _rag_lock = Lock()
+_rag_warmup_lock = Lock()
+_rag_warmup_started = False
+_rag_warmup_started_at = None
+_rag_warmup_finished_at = None
+_rag_warmup_error = None
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _load_or_build_vector_store():
@@ -177,6 +187,66 @@ def get_rag_chain():
     return _rag_chain
 
 
+def _rag_warmup_worker(reason: str):
+    global _rag_warmup_finished_at, _rag_warmup_error
+    try:
+        print(f"RAG warm-up started ({reason})...")
+        get_rag_chain()
+        with _rag_warmup_lock:
+            _rag_warmup_finished_at = _utc_now_iso()
+            _rag_warmup_error = None
+        print("RAG warm-up finished.")
+    except Exception as e:
+        with _rag_warmup_lock:
+            _rag_warmup_finished_at = _utc_now_iso()
+            _rag_warmup_error = str(e)
+        print(f"RAG warm-up failed: {e}")
+
+
+def start_rag_warmup(reason: str = "startup") -> bool:
+    """Start one background RAG initialization job.
+
+    Returns True when a new thread was started, False when RAG is already ready
+    or a warm-up job has already been requested.
+    """
+    global _rag_warmup_started, _rag_warmup_started_at
+    if _rag_chain is not None:
+        return False
+
+    with _rag_warmup_lock:
+        if _rag_warmup_started:
+            return False
+        _rag_warmup_started = True
+        _rag_warmup_started_at = _utc_now_iso()
+
+    Thread(target=_rag_warmup_worker, args=(reason,), daemon=True).start()
+    return True
+
+
+def _rag_runtime_status() -> dict:
+    with _rag_warmup_lock:
+        warmup_started = _rag_warmup_started
+        started_at = _rag_warmup_started_at
+        finished_at = _rag_warmup_finished_at
+        error = _rag_warmup_error
+
+    if _rag_chain is not None:
+        status = "ready"
+    elif error:
+        status = "error"
+    elif warmup_started:
+        status = "warming"
+    else:
+        status = "cold"
+
+    return {
+        "status": status,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "error": error,
+    }
+
+
 # =================================================================
 # FLASK ROUTES
 # =================================================================
@@ -188,10 +258,13 @@ def index():
 
 @app.route("/healthz")
 def healthz():
+    rag_runtime = _rag_runtime_status()
     return jsonify({
         "ok": True,
         "bot": BOT_NAME,
         "rag_ready": _rag_chain is not None,
+        "rag_status": rag_runtime["status"],
+        "rag_warmup": rag_runtime,
     })
 
 
@@ -430,6 +503,10 @@ def feedback():
     except Exception as e:
         print(f"ERROR — feedback write failed: {e}")
         return jsonify({"ok": False, "error": "write failed"}), 500
+
+
+if RAG_WARMUP_ON_START:
+    start_rag_warmup("startup")
 
 
 if __name__ == "__main__":

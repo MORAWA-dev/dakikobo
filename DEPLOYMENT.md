@@ -75,7 +75,7 @@ git push hf main
 ```
 
 9. Wait for the Space to build, then open `/healthz` to confirm the Flask process is alive.
-10. Ask one warm-up RAG question before sharing the link; the first real question may download/load embeddings and build `chroma_db`.
+10. Watch `/healthz` until `rag_status` is `ready`; the Docker image starts RAG warm-up in the background.
 
 Free Space caveats:
 
@@ -106,7 +106,11 @@ Health check path:
 
 ## Important Production Notes
 
-- The first real RAG question may be slow because the app loads the embedding model and vector store lazily.
+- The Docker image sets `RAG_WARMUP_ON_START=true`, so Hugging Face starts preparing RAG in the
+  background after the app boots. `/healthz` reports `rag_status` as `cold`, `warming`, `ready`,
+  or `error`.
+- A real RAG question can still be slow if it arrives before warm-up finishes; open `/healthz`
+  or ask one warm-up question before a live demo.
 - Keep `Data/` available on the deployed service if the vector store must be rebuilt.
 - Do not commit `.env`, `chroma_db/`, generated audio files, or feedback CSV files.
 - A serious production version should move feedback from CSV to a database and move generated audio to object storage.

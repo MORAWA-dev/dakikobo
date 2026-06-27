@@ -31,6 +31,7 @@ CHUNK_OVERLAP = 100
 # embedding model or adding documents).
 VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "chroma_db")
 REBUILD_VECTORSTORE = os.getenv("REBUILD_VECTORSTORE", "false").lower() == "true"
+RAG_WARMUP_ON_START = os.getenv("RAG_WARMUP_ON_START", "false").lower() == "true"
 
 # --- Knowledge Base ---
 # Root folder ingested recursively (**/*.pdf) at startup. Points at the whole

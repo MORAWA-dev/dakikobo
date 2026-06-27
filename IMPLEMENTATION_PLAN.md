@@ -273,6 +273,13 @@ Status legend: `[ ]` todo · `[x]` done.
     and field-confirmation limits in French.
   - Tests cover the modal markup and frontend wiring.
 
+- [x] **28. Hosted RAG warm-up** — `app.py`, `config.py`, `Dockerfile`
+  - *Done when:* the Hugging Face container starts preparing RAG in the background instead of waiting
+    for the first reviewer question to trigger the slow path. **(S)**
+  - Added `RAG_WARMUP_ON_START` (default off locally) and enabled it in the Docker image for Spaces.
+  - `/healthz` now reports `rag_status` and warm-up timestamps/errors while keeping `rag_ready`.
+  - Tests cover the one-shot background warm-up trigger without loading models.
+
 ---
 
 ## Later / parked (do **not** attempt now)

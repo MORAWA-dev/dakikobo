@@ -57,6 +57,37 @@ def test_health_route_is_lightweight():
     assert payload["ok"] is True
     assert payload["bot"] == "DakiKobo"
     assert payload["rag_ready"] is False
+    assert payload["rag_status"] in {"cold", "warming", "ready", "error"}
+    assert payload["rag_warmup"]["status"] == payload["rag_status"]
+
+
+def test_rag_warmup_starts_once(monkeypatch):
+    calls = []
+
+    class ImmediateThread:
+        def __init__(self, target, args=(), daemon=False):
+            self.target = target
+            self.args = args
+            self.daemon = daemon
+
+        def start(self):
+            self.target(*self.args)
+
+    monkeypatch.setattr(app_module, "_rag_chain", None)
+    monkeypatch.setattr(app_module, "_rag_warmup_started", False)
+    monkeypatch.setattr(app_module, "_rag_warmup_started_at", None)
+    monkeypatch.setattr(app_module, "_rag_warmup_finished_at", None)
+    monkeypatch.setattr(app_module, "_rag_warmup_error", None)
+    monkeypatch.setattr(app_module, "Thread", ImmediateThread)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: calls.append("warm"))
+
+    assert app_module.start_rag_warmup("test") is True
+    assert calls == ["warm"]
+    assert app_module._rag_warmup_started is True
+    assert app_module._rag_warmup_finished_at is not None
+
+    assert app_module.start_rag_warmup("again") is False
+    assert calls == ["warm"]
 
 
 def test_demo_example_route_returns_text_without_live_services(monkeypatch):
