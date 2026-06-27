@@ -17,6 +17,7 @@ langchain-core==0.2.0
 langchain-community==0.2.0
 langchain-text-splitters
 langchain-groq
+groq
 
 # Vector store & embeddings
 chromadb==0.5.0

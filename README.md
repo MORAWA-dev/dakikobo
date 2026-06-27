@@ -33,8 +33,8 @@ and the interface is mobile-first for use on phones.
   first public question is less likely to pay the full indexing cost.
 - **Voice output (TTS)** — answers can auto-play in French via gTTS and be replayed
   from their answer bubble.
-- **Voice input (STT)** — optional French speech-to-text in supported browsers, with a
-  visible "listening" indicator.
+- **Voice input (STT)** — records a short browser audio clip and transcribes it with
+  Groq Whisper, with native browser speech recognition as a fallback.
 - **Quota-safe public examples** — one-tap demo answers for text, fertilizer guidance and a
   sample image case, without spending live API calls.
 - **Focused mobile UI** — examples stay visible, while weather and soil tools sit behind an
@@ -130,6 +130,9 @@ Optional overrides (defaults in `config.py` are fine for development):
 # LLM_MODEL=llama-3.3-70b-versatile
 # LLM_MAX_TOKENS=512
 # LLM_TEMPERATURE=0.1
+# STT_MODEL=whisper-large-v3-turbo
+# STT_LANGUAGE=fr
+# MAX_AUDIO_UPLOAD_MB=5.0
 # GEMINI_MODEL=gemini-2.5-flash
 # FLASK_DEBUG=true
 # PREFER_MARKDOWN_KB=true # use Data/markdown before PDF fallback
@@ -164,7 +167,7 @@ Open <http://127.0.0.1:5000> in your browser.
 - **Ask a question** about Burkina Faso agriculture in French.
 - **Quick chips** above the input send common questions in one tap.
 - **Voice output:** tick *"Activer la lecture vocale"* to hear answers read aloud.
-- **Voice input:** tap the microphone (Chrome/supported browsers); it pulses while listening.
+- **Voice input:** tap the microphone, speak, then tap again to stop or wait for auto-stop.
 - **Feedback:** use 👍 / 👎 under an answer — entries are appended to `data/feedback.csv`.
 
 ---
@@ -186,7 +189,11 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `PREFER_MARKDOWN_KB`   | `true`                                   | Use Markdown first; fallback to PDFs if needed |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
+| `STT_MODEL`            | `whisper-large-v3-turbo`                 | Groq model for voice input transcription |
+| `STT_LANGUAGE`         | `fr`                                     | Voice input language hint                |
+| `MAX_AUDIO_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded voice recording size    |
 | `REQUEST_COOLDOWN_SECONDS` | `2.0`                                | Per-session cooldown for `/ask` requests |
+| `VOICE_COOLDOWN_SECONDS` | `2.0`                                  | Per-session cooldown for voice transcription |
 | `IMAGE_COOLDOWN_SECONDS` | `6.0`                                  | Per-session cooldown for image screening |
 | `MAX_IMAGE_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded image size              |
 

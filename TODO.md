@@ -19,7 +19,7 @@ traceable sources.
 - [x] Fertilizer answers include confirmation disclaimer.
 - [x] Gemini Vision photo screening endpoint and camera upload UI.
 - [x] Disease/photo answers include non-diagnosis disclaimer.
-- [x] Text-to-speech output and browser speech input.
+- [x] Text-to-speech output and server-side Groq Whisper voice input, with browser fallback.
 - [x] Feedback capture route and UI buttons.
 - [x] Mobile-first UI is usable on phones.
 - [x] Weather and soil tools are tucked behind an `Outils` drawer so chat remains the first-screen focus.

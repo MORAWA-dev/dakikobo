@@ -26,3 +26,13 @@ def test_credibility_modal_is_wired_in_frontend_assets():
     assert "Sources & limites" in html
     assert "function setCredibilityOpen" in js
     assert ".credibility-modal" in css
+
+
+def test_voice_input_uses_server_side_stt():
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert "url: \"/speech\"" in js
+    assert "navigator.mediaDevices.getUserMedia" in js
+    assert "new MediaRecorder" in js
+    assert "function startNativeSpeechRecognition" in js
+    assert "La saisie vocale a échoué" not in js

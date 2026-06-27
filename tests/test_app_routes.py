@@ -509,6 +509,122 @@ def test_rag_route_handles_chain_errors(monkeypatch):
     assert payload["confidence"] == "Faible"
 
 
+def test_speech_route_reports_unconfigured_service(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "speech_configured", lambda: False)
+
+    response = client.post(
+        "/speech",
+        data={"audio": (__import__("io").BytesIO(b"audio"), "question.webm")},
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 503
+    assert "dictée vocale" in payload["error"]
+    assert payload["confidence"] == "Faible"
+
+
+def test_speech_route_requires_audio(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "speech_configured", lambda: True)
+
+    response = client.post("/speech", data={})
+    payload = response.get_json()
+
+    assert response.status_code == 400
+    assert "Aucun enregistrement audio" in payload["error"]
+    assert payload["confidence"] == "Faible"
+
+
+def test_speech_route_transcribes_audio(monkeypatch):
+    client = app_module.app.test_client()
+    calls = []
+
+    monkeypatch.setattr(app_module, "speech_configured", lambda: True)
+    monkeypatch.setattr(app_module, "VOICE_COOLDOWN_SECONDS", 0)
+
+    def fake_transcribe(audio_bytes, *, filename, mime_type):
+        calls.append((audio_bytes, filename, mime_type))
+        return "Quand semer le mil ?"
+
+    monkeypatch.setattr(app_module, "transcribe_audio", fake_transcribe)
+
+    response = client.post(
+        "/speech",
+        data={
+            "audio": (
+                __import__("io").BytesIO(b"fake audio"),
+                "question.webm",
+                "audio/webm",
+            )
+        },
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["text"] == "Quand semer le mil ?"
+    assert payload["confidence"] == "Moyen"
+    assert calls == [(b"fake audio", "question.webm", "audio/webm")]
+
+
+def test_speech_route_rejects_empty_audio(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "speech_configured", lambda: True)
+
+    response = client.post(
+        "/speech",
+        data={"audio": (__import__("io").BytesIO(b""), "question.webm")},
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 400
+    assert "vide" in payload["error"]
+    assert payload["confidence"] == "Faible"
+
+
+def test_speech_route_rejects_large_audio(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "speech_configured", lambda: True)
+    monkeypatch.setitem(app_module.app.config, "MAX_AUDIO_UPLOAD_BYTES", 4)
+    monkeypatch.setitem(app_module.app.config, "MAX_AUDIO_UPLOAD_MB", 0.001)
+
+    response = client.post(
+        "/speech",
+        data={"audio": (__import__("io").BytesIO(b"too large"), "question.webm")},
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 413
+    assert "audio est trop lourd" in payload["error"]
+    assert payload["confidence"] == "Faible"
+
+
+def test_speech_route_handles_transcription_failure(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "speech_configured", lambda: True)
+    monkeypatch.setattr(app_module, "VOICE_COOLDOWN_SECONDS", 0)
+
+    def fail_transcribe(audio_bytes, *, filename, mime_type):
+        raise app_module.SpeechTranscriptionError("boom")
+
+    monkeypatch.setattr(app_module, "transcribe_audio", fail_transcribe)
+
+    response = client.post(
+        "/speech",
+        data={"audio": (__import__("io").BytesIO(b"fake audio"), "question.webm")},
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 502
+    assert "dictée vocale a échoué" in payload["error"]
+    assert payload["confidence"] == "Faible"
+
+
 def test_screen_reports_unconfigured_service(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setattr(app_module, "disease_configured", lambda: False)

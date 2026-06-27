@@ -469,6 +469,255 @@ $(function() {
     });
 
     var isProcessing = false;
+    var isRecordingVoice = false;
+    var voiceRecorder = null;
+    var voiceStream = null;
+    var voiceChunks = [];
+    var voiceStopTimer = null;
+    var VOICE_MAX_MS = 12000;
+
+    function showVoiceFailure(message) {
+        appendMessage(message, false, null, null, 'Faible');
+    }
+
+    function preferredAudioMimeType() {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) {
+            return '';
+        }
+        var types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/ogg',
+            'audio/mp4'
+        ];
+        for (var i = 0; i < types.length; i += 1) {
+            if (MediaRecorder.isTypeSupported(types[i])) {
+                return types[i];
+            }
+        }
+        return '';
+    }
+
+    function audioFilename(mimeType) {
+        if (mimeType.indexOf('mp4') !== -1) {
+            return 'question.m4a';
+        }
+        if (mimeType.indexOf('ogg') !== -1) {
+            return 'question.ogg';
+        }
+        return 'question.webm';
+    }
+
+    function releaseVoiceStream() {
+        if (voiceStream) {
+            voiceStream.getTracks().forEach(function(track) {
+                track.stop();
+            });
+            voiceStream = null;
+        }
+    }
+
+    function setVoiceRecording(active) {
+        isRecordingVoice = active;
+        $('#chatbot-form-btn-voice')
+            .toggleClass('listening', active)
+            .prop('disabled', false)
+            .attr('aria-label', active ? 'Arrêter la dictée' : 'Dicter une question')
+            .attr('title', active ? 'Arrêter la dictée' : 'Dicter une question');
+
+        if (active) {
+            $('#messageText').prop('disabled', true);
+            $('#chatbot-form-btn').prop('disabled', true);
+            $('#chatbot-form-btn-image').prop('disabled', true);
+            $('#toolsToggle').prop('disabled', true);
+            $('.example-card').prop('disabled', true);
+            $('#weatherLocation').prop('disabled', true);
+            $('#weatherBtn').prop('disabled', true);
+            $('#soilCrop').prop('disabled', true);
+            $('#soilLocation').prop('disabled', true);
+            $('#soilBtn').prop('disabled', true);
+        } else if (!isProcessing) {
+            enableInput();
+        }
+    }
+
+    function speechErrorMessage(errorCode) {
+        if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+            return "Le micro est bloqué. Autorisez le micro dans le navigateur, puis réessayez.";
+        }
+        if (errorCode === 'audio-capture') {
+            return "Aucun micro n'a été détecté. Vérifiez le micro, puis réessayez.";
+        }
+        if (errorCode === 'no-speech') {
+            return "Aucune parole n'a été détectée. Parlez plus près du micro ou tapez votre question.";
+        }
+        if (errorCode === 'network') {
+            return "La dictée du navigateur a échoué à cause du réseau. Veuillez réessayer ou taper votre question.";
+        }
+        return "La dictée vocale a échoué. Veuillez réessayer ou taper votre question.";
+    }
+
+    function startNativeSpeechRecognition() {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            showVoiceFailure("La dictée vocale n'est pas disponible dans ce navigateur. Veuillez taper votre question.");
+            return;
+        }
+
+        var recognition = new SpeechRecognition();
+        recognition.lang = 'fr-FR';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = function() {
+            setVoiceRecording(true);
+        };
+
+        recognition.onresult = function(event) {
+            var speechResult = event.results[0][0].transcript;
+            $('#messageText').val(speechResult);
+            setVoiceRecording(false);
+            sendMessage();
+        };
+
+        recognition.onerror = function(event) {
+            console.error('Speech recognition error:', event.error);
+            showVoiceFailure(speechErrorMessage(event.error));
+        };
+
+        recognition.onend = function() {
+            setVoiceRecording(false);
+        };
+
+        try {
+            recognition.start();
+        } catch (err) {
+            console.error('Speech recognition start failed:', err);
+            setVoiceRecording(false);
+            showVoiceFailure("La dictée vocale n'a pas pu démarrer. Veuillez taper votre question.");
+        }
+    }
+
+    function submitVoiceRecording(blob, mimeType) {
+        if (!blob || blob.size < 200) {
+            showVoiceFailure("L'enregistrement est trop court. Appuyez sur le micro et parlez clairement.");
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('audio', blob, audioFilename(mimeType));
+
+        isProcessing = true;
+        disableInput();
+        showTypingIndicator();
+
+        $.ajax({
+            type: "POST",
+            url: "/speech",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                removeTypingIndicator();
+                var transcript = (response.text || '').trim();
+                if (!transcript) {
+                    showVoiceFailure("Aucune parole claire n'a été détectée. Veuillez réessayer ou taper votre question.");
+                    isProcessing = false;
+                    enableInput();
+                    return;
+                }
+                $('#messageText').val(transcript);
+                isProcessing = false;
+                enableInput();
+                sendMessage();
+            },
+            error: function(jqXHR) {
+                removeTypingIndicator();
+                var response = jqXHR.responseJSON || {};
+                showVoiceFailure(response.error || "La dictée vocale a échoué. Veuillez réessayer ou taper votre question.");
+                isProcessing = false;
+                enableInput();
+            }
+        });
+    }
+
+    function stopVoiceRecording() {
+        if (voiceStopTimer) {
+            clearTimeout(voiceStopTimer);
+            voiceStopTimer = null;
+        }
+        if (voiceRecorder && voiceRecorder.state !== 'inactive') {
+            voiceRecorder.stop();
+            return;
+        }
+        releaseVoiceStream();
+        setVoiceRecording(false);
+    }
+
+    function startServerVoiceInput() {
+        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            showVoiceFailure("La dictée vocale demande une page HTTPS. Ouvrez l'application depuis son URL Hugging Face.");
+            return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+            startNativeSpeechRecognition();
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true
+            }
+        }).then(function(stream) {
+            var mimeType = preferredAudioMimeType();
+            var options = mimeType ? { mimeType: mimeType } : {};
+
+            voiceStream = stream;
+            voiceChunks = [];
+            voiceRecorder = new MediaRecorder(stream, options);
+
+            voiceRecorder.ondataavailable = function(event) {
+                if (event.data && event.data.size > 0) {
+                    voiceChunks.push(event.data);
+                }
+            };
+
+            voiceRecorder.onerror = function(event) {
+                console.error('MediaRecorder error:', event.error);
+                releaseVoiceStream();
+                setVoiceRecording(false);
+                showVoiceFailure("L'enregistrement vocal a échoué. Veuillez réessayer ou taper votre question.");
+            };
+
+            voiceRecorder.onstop = function() {
+                if (voiceStopTimer) {
+                    clearTimeout(voiceStopTimer);
+                    voiceStopTimer = null;
+                }
+                releaseVoiceStream();
+                setVoiceRecording(false);
+                var blob = new Blob(voiceChunks, { type: mimeType || 'audio/webm' });
+                voiceChunks = [];
+                submitVoiceRecording(blob, mimeType || 'audio/webm');
+            };
+
+            voiceRecorder.start();
+            setVoiceRecording(true);
+            voiceStopTimer = setTimeout(stopVoiceRecording, VOICE_MAX_MS);
+        }).catch(function(err) {
+            console.error('getUserMedia failed:', err);
+            var name = err && err.name ? err.name : '';
+            if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+                showVoiceFailure("Le micro est bloqué. Autorisez le micro dans le navigateur, puis réessayez.");
+            } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+                showVoiceFailure("Aucun micro n'a été détecté. Vérifiez le micro, puis réessayez.");
+            } else {
+                startNativeSpeechRecognition();
+            }
+        });
+    }
 
     function setToolsOpen(open) {
         $('#toolsDrawer').prop('hidden', !open);
@@ -833,39 +1082,15 @@ $(function() {
 
     $('#chatbot-form-btn-voice').click(function(e) {
         e.preventDefault();
-
-        // Note: Using webkitSpeechRecognition for simplicity, though real-world app would use Groq/OpenAI STT
-        if ('webkitSpeechRecognition' in window && !isProcessing) {
-            var recognition = new webkitSpeechRecognition();
-            recognition.lang = 'fr-FR'; // Use French for Burkina Faso context
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-
-            var $micBtn = $('#chatbot-form-btn-voice');
-
-            recognition.start();
-
-            recognition.onstart = function() {
-                $micBtn.addClass('listening');
-            };
-
-            recognition.onresult = function(event) {
-                var speechResult = event.results[0][0].transcript;
-                $('#messageText').val(speechResult);
-                sendMessage();
-            };
-
-            recognition.onerror = function(event) {
-                console.error('Speech recognition error:', event.error);
-                alert('La saisie vocale a échoué. Veuillez taper votre question.');
-            };
-
-            recognition.onend = function() {
-                $micBtn.removeClass('listening');
-            };
-        } else {
-            alert("La saisie vocale n'est pas disponible dans ce navigateur, ou une réponse est déjà en cours. Veuillez taper votre question.");
+        if (isRecordingVoice) {
+            stopVoiceRecording();
+            return;
         }
+        if (isProcessing) {
+            showVoiceFailure("Une réponse est déjà en cours. Attendez la fin avant de dicter une question.");
+            return;
+        }
+        startServerVoiceInput();
     });
 
     $('#voiceReadingCheckbox').change(function() {

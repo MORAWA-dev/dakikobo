@@ -23,6 +23,11 @@ from core.llm_chain import setup_retrieval_qa
 from core.fertilizer import get_fertilizer_advice
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
+from core.speech import (
+    SpeechTranscriptionError,
+    is_configured as speech_configured,
+    transcribe_audio,
+)
 from core.examples import get_demo_example
 from core.weather import (
     WeatherError,
@@ -50,13 +55,18 @@ from config import (
     IMAGE_COOLDOWN_SECONDS,
     MAX_IMAGE_UPLOAD_BYTES,
     MAX_IMAGE_UPLOAD_MB,
+    VOICE_COOLDOWN_SECONDS,
+    MAX_AUDIO_UPLOAD_BYTES,
+    MAX_AUDIO_UPLOAD_MB,
 )
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
-app.config["MAX_CONTENT_LENGTH"] = MAX_IMAGE_UPLOAD_BYTES
+app.config["MAX_CONTENT_LENGTH"] = max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES)
 app.config["MAX_IMAGE_UPLOAD_BYTES"] = MAX_IMAGE_UPLOAD_BYTES
 app.config["MAX_IMAGE_UPLOAD_MB"] = MAX_IMAGE_UPLOAD_MB
+app.config["MAX_AUDIO_UPLOAD_BYTES"] = MAX_AUDIO_UPLOAD_BYTES
+app.config["MAX_AUDIO_UPLOAD_MB"] = MAX_AUDIO_UPLOAD_MB
 
 # Lightweight feedback log (no database) — one CSV row per thumbs up/down.
 FEEDBACK_FILE = os.path.join("data", "feedback.csv")
@@ -106,6 +116,11 @@ def _limit_label_mb() -> str:
     return str(int(value)) if value.is_integer() else f"{value:.1f}"
 
 
+def _audio_limit_label_mb() -> str:
+    value = float(app.config["MAX_AUDIO_UPLOAD_MB"])
+    return str(int(value)) if value.is_integer() else f"{value:.1f}"
+
+
 def _rate_limit_response(action: str, cooldown_seconds: float):
     if cooldown_seconds <= 0:
         return None
@@ -134,6 +149,16 @@ def _upload_too_large_response():
         "error": (
             "Le fichier envoyé est trop lourd. "
             f"Pour les photos, utilisez une image de {_limit_label_mb()} Mo maximum."
+        ),
+        "confidence": "Faible",
+    }), 413
+
+
+def _audio_too_large_response():
+    return jsonify({
+        "error": (
+            "L'enregistrement audio est trop lourd. "
+            f"Utilisez une dictée courte de {_audio_limit_label_mb()} Mo maximum."
         ),
         "confidence": "Faible",
     }), 413
@@ -374,6 +399,8 @@ def soil_context():
 
 @app.errorhandler(RequestEntityTooLarge)
 def request_entity_too_large(error):
+    if request.path == "/speech":
+        return _audio_too_large_response()
     return _upload_too_large_response()
 
 
@@ -445,6 +472,60 @@ def ask():
             "confidence": "Faible",
             "audio_url": "",
         })
+
+
+@app.route("/speech", methods=["POST"])
+def speech():
+    """Transcribe a short voice question recorded by the browser."""
+    if not speech_configured():
+        return jsonify({
+            "error": "La dictée vocale n'est pas configurée sur ce serveur.",
+            "confidence": "Faible",
+        }), 503
+
+    file = request.files.get("audio")
+    if file is None or not file.filename:
+        return jsonify({
+            "error": "Aucun enregistrement audio n'a été envoyé.",
+            "confidence": "Faible",
+        }), 400
+
+    audio_bytes = file.read()
+    if not audio_bytes:
+        return jsonify({
+            "error": "L'enregistrement audio est vide.",
+            "confidence": "Faible",
+        }), 400
+    if len(audio_bytes) > app.config["MAX_AUDIO_UPLOAD_BYTES"]:
+        return _audio_too_large_response()
+
+    limited = _rate_limit_response("speech", VOICE_COOLDOWN_SECONDS)
+    if limited is not None:
+        return limited
+
+    try:
+        text = transcribe_audio(
+            audio_bytes,
+            filename=file.filename,
+            mime_type=file.mimetype or "audio/webm",
+        )
+    except SpeechTranscriptionError as e:
+        print(f"ERROR — speech transcription failed: {e}")
+        return jsonify({
+            "error": "La dictée vocale a échoué. Veuillez réessayer ou taper votre question.",
+            "confidence": "Faible",
+        }), 502
+
+    if not text:
+        return jsonify({
+            "error": "Aucune parole claire n'a été détectée. Veuillez réessayer plus près du micro.",
+            "confidence": "Faible",
+        }), 422
+
+    return jsonify({
+        "text": text,
+        "confidence": "Moyen",
+    })
 
 
 @app.route("/screen", methods=["POST"])

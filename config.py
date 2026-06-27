@@ -55,6 +55,14 @@ TTS_MAX_CHARS = 700           # answers run ~100 words (~600 chars); cover the f
 TTS_TIMEOUT_SECONDS = float(os.getenv("TTS_TIMEOUT_SECONDS", "8.0"))
 AUDIO_OUTPUT_DIR = os.path.join("static", "audio")
 
+# --- STT ---
+STT_MODEL = os.getenv("STT_MODEL", "whisper-large-v3-turbo")
+STT_LANGUAGE = os.getenv("STT_LANGUAGE", "fr")
+STT_TIMEOUT_SECONDS = float(os.getenv("STT_TIMEOUT_SECONDS", "30.0"))
+VOICE_COOLDOWN_SECONDS = float(os.getenv("VOICE_COOLDOWN_SECONDS", "2.0"))
+MAX_AUDIO_UPLOAD_MB = float(os.getenv("MAX_AUDIO_UPLOAD_MB", "5.0"))
+MAX_AUDIO_UPLOAD_BYTES = int(MAX_AUDIO_UPLOAD_MB * 1024 * 1024)
+
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
