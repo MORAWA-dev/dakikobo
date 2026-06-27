@@ -1,5 +1,5 @@
 ---
-title: Janvier 2010
+title: Burkina Faso - Profil des moyens d'existence (FEWS NET / USAID, 2010)
 source_file: New Folder With Items/bf_profile_fr.pdf
 doc_type: country_profile
 language: fr

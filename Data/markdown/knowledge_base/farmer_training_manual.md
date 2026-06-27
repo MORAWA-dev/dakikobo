@@ -1,5 +1,5 @@
 ---
-title: A holistic
+title: Farmer's Handbook on Basic Agriculture
 source_file: knowledge_base/farmer_training_manual.pdf
 doc_type: training_manual
 language: en

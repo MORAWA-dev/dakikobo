@@ -29,6 +29,21 @@ class _SingleSourceRagChain:
         }
 
 
+class _RefusalRagChain:
+    """Returns the grounded 'I don't know' fallback with off-topic chunks."""
+    def invoke(self, query):
+        return {
+            "result": (
+                "Je ne sais pas encore. Cette information n'est pas disponible "
+                "dans la base de données de DakiKobo pour le Burkina Faso."
+            ),
+            "source_documents": [
+                SimpleNamespace(metadata={"source": "agrobusiness.pdf"}),
+                SimpleNamespace(metadata={"source": "manuel.pdf"}),
+            ],
+        }
+
+
 def test_app_import_does_not_initialize_rag():
     assert app_module._rag_chain is None
 
@@ -490,6 +505,22 @@ def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):
 
     assert response.status_code == 200
     assert payload["confidence"] == "Moyen"
+
+
+def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _RefusalRagChain())
+    monkeypatch.setattr(
+        app_module, "text_to_speech_to_static", lambda text: ""
+    )
+
+    response = client.post("/ask", data={"messageText": "comment cultiver le riz ?"})
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "ne sais pas encore" in payload["answer"]
+    assert payload["sources"] == []
+    assert payload["confidence"] == "Faible"
 
 
 def test_rag_route_handles_chain_errors(monkeypatch):

@@ -1,5 +1,5 @@
 ---
-title: Agrobusiness
+title: Agrobusiness au Burkina Faso : effets sur le foncier et la modernisation agricole
 source_file: 1767_KIT_boek_Burkina_web-version.pdf
 doc_type: unknown
 language: fr

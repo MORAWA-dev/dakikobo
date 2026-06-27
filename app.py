@@ -123,6 +123,16 @@ def _confidence_from_sources(sources: list[dict]) -> str:
     return "Faible"
 
 
+def _is_refusal(answer: str) -> bool:
+    """True when the model returned the grounded 'I don't know' fallback.
+
+    A refusal must never show confidence or sources: retrieval may surface
+    weakly related chunks, but the model declined to answer from them.
+    """
+    text = (answer or "").lower()
+    return "ne sais pas encore" in text or "n'est pas disponible dans la base" in text
+
+
 def _confidence_from_score(top_score: float) -> str:
     """Map the best retrieval relevance score to a confidence label."""
     if top_score >= CONFIDENCE_STRONG_SCORE:
@@ -536,7 +546,11 @@ def ask():
         # by retrieval relevance score so confidence reflects match quality, not
         # how many chunks came back.
         source_docs = response.get("source_documents", [])
-        sources, confidence = _grounded_sources_and_confidence(query, source_docs)
+        if _is_refusal(answer):
+            # The model declined to answer; do not imply confidence or evidence.
+            sources, confidence = [], "Faible"
+        else:
+            sources, confidence = _grounded_sources_and_confidence(query, source_docs)
 
         audio_url = text_to_speech_to_static(answer)
         return jsonify({

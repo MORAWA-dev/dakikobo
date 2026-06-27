@@ -1,5 +1,5 @@
 ---
-title: State of Climate Change Adaptation and Mitigation Efforts for Agriculture in Burkina Faso    National Survey prepared fo
+title: State of Climate Change Adaptation and Mitigation Efforts for Agriculture in Burkina Faso (National Survey)
 source_file: knowledge_base/burkina_climate_adaptation_state_report.pdf
 doc_type: unknown
 language: en

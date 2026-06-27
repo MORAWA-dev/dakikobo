@@ -1,5 +1,5 @@
 ---
-title: •  Prioritized CSA investments include ﬁve
+title: Burkina Faso Climate-Smart Agriculture Investment Plan (Summary)
 source_file: knowledge_base/csa_investment_plan_burkina_final.pdf
 doc_type: csa_plan
 language: en

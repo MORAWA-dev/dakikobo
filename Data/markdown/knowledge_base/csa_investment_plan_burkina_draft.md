@@ -1,5 +1,5 @@
 ---
-title: Climate-Smart Agriculture
+title: Burkina Faso Climate-Smart Agriculture Investment Plan (Draft)
 source_file: knowledge_base/csa_investment_plan_burkina_draft.pdf
 doc_type: csa_plan
 language: en

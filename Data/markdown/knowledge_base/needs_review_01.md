@@ -1,5 +1,5 @@
 ---
-title: Vol.14(3), pp. 113-119 July-September 2022
+title: Journal of Agricultural Extension and Rural Development, Vol.14(3), 2022 (à vérifier)
 source_file: knowledge_base/needs_review_01.pdf
 doc_type: unknown
 language: en

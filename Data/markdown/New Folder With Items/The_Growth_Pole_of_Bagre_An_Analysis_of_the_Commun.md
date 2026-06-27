@@ -1,5 +1,5 @@
 ---
-title: Joachim
+title: The Growth Pole of Bagré: An Analysis of the Communities (INERA)
 source_file: New Folder With Items/The_Growth_Pole_of_Bagre_An_Analysis_of_the_Commun.pdf
 doc_type: research_article
 language: en

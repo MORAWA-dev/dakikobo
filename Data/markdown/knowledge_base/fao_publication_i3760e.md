@@ -1,5 +1,5 @@
 ---
-title: Socio-economic context and role of agriculture
+title: FAO - Country Fact Sheet on Food and Agriculture Policy Trends: Burkina Faso (2014)
 source_file: knowledge_base/fao_publication_i3760e.pdf
 doc_type: fao_report
 language: en

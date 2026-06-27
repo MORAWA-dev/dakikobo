@@ -1,5 +1,5 @@
 ---
-title: "Photo: © GIZ/PDA"
+title: GIZ 2023 - Programme de développement de l'agriculture au Burkina Faso (PDA)
 source_file: New Folder With Items/giz2023-fr-burkina-faso-programme-développement-de-l’agriculture.pdf
 doc_type: program_doc
 language: fr
