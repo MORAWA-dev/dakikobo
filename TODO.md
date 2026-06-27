@@ -9,7 +9,7 @@ traceable sources.
 
 - [x] Public Hugging Face Space is live: `https://kimcomehome-dakikobo.hf.space/`
 - [x] Flask app with French chat UI.
-- [x] RAG over local agricultural PDFs in `Data/`.
+- [x] RAG over reviewed local Markdown in `Data/markdown/`, with original PDFs kept as fallback/source files.
 - [x] Source citations rendered under answers.
 - [x] Off-topic fallback instead of confident hallucination.
 - [x] Persistent Chroma vector store locally, with lazy initialization for hosted startup.
@@ -27,6 +27,7 @@ traceable sources.
 - [x] TTS has one global auto-play toggle plus per-answer `Réécouter` buttons when audio is available.
 - [x] A `Sources & limites` panel explains evidence, deterministic tools, and required field confirmation.
 - [x] Hugging Face starts a background RAG warm-up so the first real question is not the warm-up trigger.
+- [x] Markdown corpus audit completed: 16/16 converted documents now match PDF text volume closely enough for RAG review.
 - [x] Docker/Hugging Face deployment files exist.
 - [x] Route tests and offline tests are passing.
 
@@ -41,6 +42,7 @@ traceable sources.
 - [ ] No scheduled knowledge refresh from trusted web sources.
 - [ ] No benchmark suite for vision/photo diagnosis quality.
 - [ ] No weather, soil, or rainfall-onset intelligence.
+- [x] Markdown is now the primary RAG source, with PDF fallback if Markdown is missing or disabled.
 - [x] Clear public demo story: sample cases, citations, confidence, and a compact sources/limits panel.
 
 ## Product direction
@@ -236,6 +238,8 @@ to prove what works, what fails, and why.
 
 - [ ] Add a `DATA_SOURCES.md` file with source, license, URL, date added, review status.
 - [ ] Add document-level metadata during ingestion.
+- [x] Regenerate `Data/markdown/New Folder With Items/Caractéristiques des ménages agricoles au Burkina Faso_0.md` from its PDF; current file has 128 page sections and about 216k extracted characters.
+- [x] Add Markdown-first RAG ingestion with PDF fallback once the converted corpus is complete and reviewed.
 - [ ] Keep scraped documents separate from manually reviewed PDFs.
 - [ ] Remove or quarantine any source with unclear rights.
 - [ ] Add a privacy note for uploaded images.

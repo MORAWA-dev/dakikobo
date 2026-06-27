@@ -83,6 +83,18 @@ Status legend: `[ ]` todo · `[x]` done.
     stale index ever exists after a future model change, delete `chroma_db/` or set
     `REBUILD_VECTORSTORE=true`.
 
+- [x] **11b. Markdown-first knowledge ingestion** — `config.py`, `core/rag_pipeline.py`, `app.py`
+  - *Done when:* startup loads reviewed documents from `Data/markdown/` by default, keeps source
+    metadata back to the original PDFs, and falls back to recursive PDF extraction only when
+    Markdown is missing or `PREFER_MARKDOWN_KB=false`. **(S)**
+  - Added a dependency-free Markdown frontmatter parser and loader. Converted documents carry
+    `source`, `source_file`, `markdown_file`, `data_format`, `doc_type`, `language`, and page-count
+    metadata where available.
+  - The converted corpus audit now passes for 16/16 PDFs; the formerly deferred
+    `Caractéristiques des ménages agricoles...` file was regenerated from its PDF.
+  - **Requires a one-time reindex:** set `REBUILD_VECTORSTORE=true` so the persisted Chroma store
+    is cleared and rebuilt from Markdown instead of the previous PDF extraction.
+
 ---
 
 ## Tier 3 — Mobile UX (medium)
@@ -137,10 +149,11 @@ Status legend: `[ ]` todo · `[x]` done.
     and the stale Mixtral references.
 
 - [x] **16. First pytest smoke tests** — `tests/`
-  - *Done when:* `pytest` passes a test asserting ingestion finds the expected PDFs and a known
-    French crop question returns a non-empty answer. **(S)**
-  - `tests/test_ingestion.py`: asserts expected PDFs are discoverable under `Data/` and that
-    `load_pdfs_from_folder` returns non-empty `Document`s with `source` metadata.
+  - *Done when:* `pytest` passes tests asserting ingestion finds the expected Markdown/PDF source
+    files and a known French crop question returns a non-empty answer. **(S)**
+  - `tests/test_ingestion.py`: asserts expected Markdown files are discoverable under
+    `Data/markdown/`, expected PDFs remain available under `Data/`, and both loaders return
+    non-empty `Document`s with source metadata.
   - `tests/test_rag.py`: live smoke test — builds a tiny in-memory Chroma (cosine), runs the
     real `RetrievalQA` chain on "Quand semer le mil ?", asserts a non-empty answer. Auto-skips
     when `GROQ_API_KEY` is unset (so CI without a key still passes).

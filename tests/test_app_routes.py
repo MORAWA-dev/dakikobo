@@ -90,6 +90,60 @@ def test_rag_warmup_starts_once(monkeypatch):
     assert calls == ["warm"]
 
 
+def test_local_knowledge_prefers_markdown(monkeypatch):
+    markdown_docs = [SimpleNamespace(page_content="markdown")]
+
+    def fail_pdf_loader(folder):
+        raise AssertionError("PDF fallback should not run when Markdown exists")
+
+    monkeypatch.setattr(app_module, "PREFER_MARKDOWN_KB", True)
+    monkeypatch.setattr(app_module, "load_markdown_from_folder", lambda folder: markdown_docs)
+    monkeypatch.setattr(app_module, "load_pdfs_from_folder", fail_pdf_loader)
+
+    docs, source = app_module._load_local_knowledge_documents()
+
+    assert docs == markdown_docs
+    assert source == "Markdown"
+
+
+def test_local_knowledge_falls_back_to_pdfs_when_markdown_missing(monkeypatch):
+    pdf_docs = [SimpleNamespace(page_content="pdf")]
+
+    monkeypatch.setattr(app_module, "PREFER_MARKDOWN_KB", True)
+    monkeypatch.setattr(app_module, "load_markdown_from_folder", lambda folder: [])
+    monkeypatch.setattr(app_module, "load_pdfs_from_folder", lambda folder: pdf_docs)
+
+    docs, source = app_module._load_local_knowledge_documents()
+
+    assert docs == pdf_docs
+    assert source == "PDF"
+
+
+def test_rebuild_clears_existing_vector_store(monkeypatch):
+    calls = []
+    local_docs = [SimpleNamespace(page_content="markdown")]
+
+    monkeypatch.setattr(app_module, "REBUILD_VECTORSTORE", True)
+    monkeypatch.setattr(app_module, "KNOWLEDGE_URLS", [])
+    monkeypatch.setattr(app_module, "vector_store_exists", lambda: True)
+    monkeypatch.setattr(app_module, "clear_vector_store", lambda: calls.append("clear"))
+    monkeypatch.setattr(
+        app_module,
+        "_load_local_knowledge_documents",
+        lambda: (local_docs, "Markdown"),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "initialize_vector_store",
+        lambda docs: {"doc_count": len(docs)},
+    )
+
+    db = app_module._load_or_build_vector_store()
+
+    assert calls == ["clear"]
+    assert db == {"doc_count": 1}
+
+
 def test_demo_example_route_returns_text_without_live_services(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setattr(

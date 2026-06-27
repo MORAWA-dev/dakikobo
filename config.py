@@ -34,10 +34,12 @@ REBUILD_VECTORSTORE = os.getenv("REBUILD_VECTORSTORE", "false").lower() == "true
 RAG_WARMUP_ON_START = os.getenv("RAG_WARMUP_ON_START", "false").lower() == "true"
 
 # --- Knowledge Base ---
-# Root folder ingested recursively (**/*.pdf) at startup. Points at the whole
-# Data/ tree so PDFs in subfolders (knowledge_base, New Folder With Items, ...)
-# are all picked up.
-DATA_FOLDER = "Data"
+# Root folder for source documents. The reviewed Markdown conversion is preferred
+# for RAG because it is smaller and cleaner than extracting PDFs at startup. PDFs
+# remain available as a fallback when Markdown is missing or explicitly disabled.
+DATA_FOLDER = os.getenv("DATA_FOLDER", "Data")
+MARKDOWN_FOLDER = os.getenv("MARKDOWN_FOLDER", os.path.join(DATA_FOLDER, "markdown"))
+PREFER_MARKDOWN_KB = os.getenv("PREFER_MARKDOWN_KB", "true").lower() == "true"
 
 # External URLs to scrape at startup (add URLs here, uncomment to activate)
 KNOWLEDGE_URLS = [

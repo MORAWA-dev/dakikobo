@@ -3,6 +3,7 @@
 import os
 import glob
 import random
+import shutil
 import string
 
 import requests
@@ -49,8 +50,102 @@ def fetch_website_content(url: str) -> list[Document]:
 
 
 # =================================================================
-# PDF EXTRACTION
+# LOCAL KNOWLEDGE EXTRACTION
 # =================================================================
+
+def _clean_frontmatter_value(value: str) -> str:
+    return value.strip().strip("\"'")
+
+
+def _split_markdown_frontmatter(raw_text: str) -> tuple[dict[str, str], str]:
+    """Return simple YAML-style frontmatter and markdown body.
+
+    The converted corpus uses flat `key: value` metadata. A small parser keeps
+    ingestion dependency-free and avoids requiring PyYAML in the public Space.
+    """
+    text = raw_text.lstrip("\ufeff")
+    if not text.startswith("---"):
+        return {}, raw_text
+
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}, raw_text
+
+    end_index = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            end_index = index
+            break
+
+    if end_index is None:
+        return {}, raw_text
+
+    metadata = {}
+    for line in lines[1:end_index]:
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        if key:
+            metadata[key] = _clean_frontmatter_value(value)
+
+    body = "\n".join(lines[end_index + 1 :]).strip()
+    return metadata, body
+
+
+def _source_label_for_markdown(md_file: str, metadata: dict[str, str]) -> str:
+    title = metadata.get("title", "").strip()
+    if title and len(title) >= 8:
+        return title
+
+    source_file = metadata.get("source_file", "").strip()
+    if source_file:
+        return os.path.basename(source_file)
+
+    return os.path.basename(md_file)
+
+
+def load_markdown_from_folder(folder_path: str) -> list[Document]:
+    """Return a Document per readable Markdown file under folder_path.
+
+    Files whose names begin with `_` are treated as manifests/indexes and skipped.
+    Each Document keeps traceability back to the converted file and original PDF.
+    """
+    md_files = [
+        f for f in sorted(
+            glob.glob(os.path.join(folder_path, "**", "*.md"), recursive=True)
+        )
+        if not os.path.basename(f).startswith("_")
+    ]
+    print(f"Found {len(md_files)} Markdown file(s) in and under {folder_path}")
+
+    docs = []
+    for f in md_files:
+        try:
+            with open(f, encoding="utf-8") as file:
+                raw_text = file.read()
+        except Exception as e:
+            print(f"Error reading Markdown {f}: {e}")
+            continue
+
+        metadata, body = _split_markdown_frontmatter(raw_text)
+        if body.strip():
+            doc_metadata = {
+                "source": _source_label_for_markdown(f, metadata),
+                "source_file": metadata.get("source_file", os.path.basename(f)),
+                "markdown_file": f,
+                "data_format": "markdown",
+            }
+            for key in ("title", "doc_type", "language", "country", "page_count"):
+                if metadata.get(key):
+                    doc_metadata[key] = metadata[key]
+            docs.append(Document(page_content=body, metadata=doc_metadata))
+            status = "ok"
+        else:
+            status = "EMPTY — skipped"
+        print(f"  - {os.path.relpath(f, folder_path)} ({status})")
+    return docs
+
 
 def extract_pdf_text(pdf_file: str) -> str:
     """Extract all text from a PDF file. Returns empty string on failure."""
@@ -109,6 +204,12 @@ def _embeddings():
 def vector_store_exists() -> bool:
     """True if a persisted Chroma store already exists on disk."""
     return os.path.isdir(VECTORSTORE_DIR) and bool(os.listdir(VECTORSTORE_DIR))
+
+
+def clear_vector_store() -> None:
+    """Remove the persisted Chroma store before a clean rebuild."""
+    if os.path.isdir(VECTORSTORE_DIR):
+        shutil.rmtree(VECTORSTORE_DIR)
 
 
 def load_vector_store():

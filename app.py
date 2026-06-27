@@ -11,8 +11,10 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from core.rag_pipeline import (
     fetch_website_content,
+    load_markdown_from_folder,
     load_pdfs_from_folder,
     initialize_vector_store,
+    clear_vector_store,
     vector_store_exists,
     load_vector_store,
     text_to_speech_to_static,
@@ -36,6 +38,8 @@ from core.soil import (
 from config import (
     KNOWLEDGE_URLS,
     DATA_FOLDER,
+    MARKDOWN_FOLDER,
+    PREFER_MARKDOWN_KB,
     DEBUG,
     SECRET_KEY,
     BOT_NAME,
@@ -152,10 +156,34 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _load_local_knowledge_documents() -> tuple[list, str]:
+    """Load reviewed Markdown first, with PDFs as a safety fallback."""
+    local_docs = []
+    local_source = "PDF"
+    if PREFER_MARKDOWN_KB:
+        print(f"2. Loading reviewed Markdown from {MARKDOWN_FOLDER}...")
+        local_docs = load_markdown_from_folder(MARKDOWN_FOLDER)
+        local_source = "Markdown"
+        if not local_docs:
+            print("Warning: No Markdown documents found; falling back to PDFs.")
+
+    if not local_docs:
+        print(f"2. Loading PDFs from {DATA_FOLDER}...")
+        local_docs = load_pdfs_from_folder(DATA_FOLDER)
+        local_source = "PDF"
+
+    return local_docs, local_source
+
+
 def _load_or_build_vector_store():
-    if vector_store_exists() and not REBUILD_VECTORSTORE:
+    store_exists = vector_store_exists()
+    if store_exists and not REBUILD_VECTORSTORE:
         print("1. Loading existing vector store (set REBUILD_VECTORSTORE=true to rebuild)...")
         return load_vector_store()
+
+    if store_exists and REBUILD_VECTORSTORE:
+        print("1. Clearing existing vector store for a clean rebuild...")
+        clear_vector_store()
 
     print("1. Fetching external content...")
     website_docs = []
@@ -166,11 +194,12 @@ def _load_or_build_vector_store():
         print(f"Warning: Web scraping failed: {e}")
         website_docs = []
 
-    print(f"2. Loading PDFs from {DATA_FOLDER}...")
-    pdf_docs = load_pdfs_from_folder(DATA_FOLDER)
-
-    print(f"3. Building & persisting vector store ({len(pdf_docs)} PDFs + {len(website_docs)} web sources)...")
-    all_docs = website_docs + pdf_docs
+    local_docs, local_source = _load_local_knowledge_documents()
+    print(
+        "3. Building & persisting vector store "
+        f"({len(local_docs)} {local_source} docs + {len(website_docs)} web sources)..."
+    )
+    all_docs = website_docs + local_docs
     return initialize_vector_store(all_docs)
 
 

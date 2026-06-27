@@ -63,7 +63,7 @@ and the interface is mobile-first for use on phones.
 | RAG orchestration| LangChain (core + community)                          |
 | Embeddings       | `sentence-transformers` — multilingual MiniLM L12     |
 | Vector store     | ChromaDB (persistent)                                 |
-| PDF ingestion    | PyPDF2                                                 |
+| Knowledge ingestion | Reviewed Markdown primary; PyPDF2 PDF fallback     |
 | Text-to-speech   | gTTS (French)                                         |
 | Weather data     | Open-Meteo Forecast API                               |
 | Soil indicators  | SoilGrids REST API                                    |
@@ -132,13 +132,16 @@ Optional overrides (defaults in `config.py` are fine for development):
 # LLM_TEMPERATURE=0.1
 # GEMINI_MODEL=gemini-2.5-flash
 # FLASK_DEBUG=true
+# PREFER_MARKDOWN_KB=true # use Data/markdown before PDF fallback
 # REBUILD_VECTORSTORE=true   # force a fresh index rebuild
 ```
 
 ### 3. Add knowledge documents
 
-Place your Burkina Faso agriculture PDFs anywhere under the `Data/` folder
-(subfolders are ingested recursively).
+Place reviewed Markdown documents under `Data/markdown/`. DakiKobo uses this
+Markdown corpus first because it is smaller and cleaner than extracting PDFs at
+startup. Keep original Burkina Faso agriculture PDFs anywhere under `Data/` as
+source files and as a fallback; subfolders are discovered recursively.
 
 ### 4. Run
 
@@ -148,11 +151,11 @@ python app.py
 
 Open <http://127.0.0.1:5000> in your browser.
 
-> **First run:** DakiKobo builds the vector index from your PDFs and saves it to
-> `chroma_db/`. On CPU this one-time build can take several minutes. Subsequent
-> starts load the saved index and are fast. To rebuild later (e.g. after adding
-> documents or changing the embedding model), delete `chroma_db/` or start with
-> `REBUILD_VECTORSTORE=true`.
+> **First run:** DakiKobo builds the vector index from the reviewed Markdown
+> corpus and saves it to `chroma_db/`. On CPU this one-time build can take
+> several minutes. Subsequent starts load the saved index and are fast. To
+> rebuild later (e.g. after adding documents or changing the embedding model),
+> start with `REBUILD_VECTORSTORE=true` to replace the saved index.
 
 ---
 
@@ -178,7 +181,9 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `500` / `100`                    | Document splitting                       |
 | `VECTORSTORE_DIR`      | `chroma_db`                              | Persisted index location (git-ignored)   |
 | `RAG_WARMUP_ON_START`  | `false` locally, `true` in Docker        | Background RAG warm-up on hosted startup |
-| `DATA_FOLDER`          | `Data`                                   | Root folder ingested recursively         |
+| `DATA_FOLDER`          | `Data`                                   | Root folder for source documents         |
+| `MARKDOWN_FOLDER`      | `Data/markdown`                          | Reviewed Markdown corpus for RAG         |
+| `PREFER_MARKDOWN_KB`   | `true`                                   | Use Markdown first; fallback to PDFs if needed |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
 | `REQUEST_COOLDOWN_SECONDS` | `2.0`                                | Per-session cooldown for `/ask` requests |
@@ -195,10 +200,10 @@ dakikobo/
 ├── config.py            # Central configuration
 ├── core/
 │   ├── llm_chain.py     # LLM + RetrievalQA setup and French prompt
-│   └── rag_pipeline.py  # PDF ingestion, embeddings, Chroma, TTS
+│   └── rag_pipeline.py  # Markdown/PDF ingestion, embeddings, Chroma, TTS
 ├── templates/index.html # Chat UI
 ├── static/              # CSS, JS, images, generated audio
-├── Data/                # Knowledge-base PDFs (recursive)
+├── Data/                # Source PDFs + reviewed Markdown knowledge corpus
 └── requirements.txt
 ```
 

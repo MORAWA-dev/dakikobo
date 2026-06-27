@@ -1,3 +1,17 @@
 source_file,output_file,doc_type,language,page_count,chars_extracted,status
 Data/1767_KIT_boek_Burkina_web-version.pdf,Data/markdown/1767_KIT_boek_Burkina_web-version.md,unknown,fr,77,178570,ok
 Data/New Folder With Items/26818.pdf,Data/markdown/New Folder With Items/26818.md,unknown,fr,14,27573,ok
+Data/New Folder With Items/Caractéristiques des ménages agricoles au Burkina Faso_0.pdf,Data/markdown/New Folder With Items/Caractéristiques des ménages agricoles au Burkina Faso_0.md,survey_report,fr,128,216361,ok
+Data/New Folder With Items/The_Growth_Pole_of_Bagre_An_Analysis_of_the_Commun.pdf,Data/markdown/New Folder With Items/The_Growth_Pole_of_Bagre_An_Analysis_of_the_Commun.md,research_article,en,14,56859,ok
+Data/New Folder With Items/bf_profile_fr.pdf,Data/markdown/New Folder With Items/bf_profile_fr.md,country_profile,fr,83,205421,ok
+Data/New Folder With Items/bl068f.pdf,Data/markdown/New Folder With Items/bl068f.md,unknown,fr,70,217573,ok
+Data/New Folder With Items/burkina_agri_report_nllm.pdf,Data/markdown/New Folder With Items/burkina_agri_report_nllm.md,unknown,en,24,52052,ok
+Data/New Folder With Items/giz2023-fr-burkina-faso-programme-développement-de-l’agriculture.pdf,Data/markdown/New Folder With Items/giz2023-fr-burkina-faso-programme-développement-de-l’agriculture.md,program_doc,fr,2,9604,ok
+Data/knowledge_base/burkina_climate_adaptation_state_report.pdf,Data/markdown/knowledge_base/burkina_climate_adaptation_state_report.md,unknown,en,28,50768,ok
+Data/knowledge_base/csa_investment_plan_burkina_draft.pdf,Data/markdown/knowledge_base/csa_investment_plan_burkina_draft.md,csa_plan,en,118,329981,ok
+Data/knowledge_base/csa_investment_plan_burkina_final.pdf,Data/markdown/knowledge_base/csa_investment_plan_burkina_final.md,csa_plan,en,2,6648,ok
+Data/knowledge_base/fao_publication_i3760e.pdf,Data/markdown/knowledge_base/fao_publication_i3760e.md,fao_report,en,4,20978,ok
+Data/knowledge_base/farmer_training_manual.pdf,Data/markdown/knowledge_base/farmer_training_manual.md,training_manual,en,154,282805,ok
+Data/knowledge_base/jaa_agronomy_article_2021.pdf,Data/markdown/knowledge_base/jaa_agronomy_article_2021.md,research_article,en,26,195987,ok
+Data/knowledge_base/needs_review_01.pdf,Data/markdown/knowledge_base/needs_review_01.md,unknown,en,7,38657,ok
+Data/knowledge_base/needs_review_02.pdf,Data/markdown/knowledge_base/needs_review_02.md,unknown,en,12,31384,ok
