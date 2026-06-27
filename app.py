@@ -49,6 +49,9 @@ from config import (
     SECRET_KEY,
     BOT_NAME,
     BOT_CREATOR,
+    CONFIDENCE_STRONG_SCORE,
+    CONFIDENCE_MEDIUM_SCORE,
+    CITATION_SCORE_MARGIN,
     REBUILD_VECTORSTORE,
     RAG_WARMUP_ON_START,
     REQUEST_COOLDOWN_SECONDS,
@@ -80,27 +83,103 @@ def _short_snippet(text: str, max_chars: int = 150) -> str:
     return f"{cut}..."
 
 
+_DOC_TYPE_LABELS = {
+    "fao_report": "Rapport FAO",
+    "csa_plan": "Plan CSA",
+    "training_manual": "Manuel de formation",
+    "research_article": "Article de recherche",
+    "country_profile": "Profil pays",
+    "program_doc": "Document de programme",
+    "survey_report": "Enquête agricole",
+}
+
+
 def _format_rag_sources(source_docs) -> list[dict]:
-    """Return unique, UI-friendly source cards from retrieved documents."""
+    """Return unique, UI-friendly source cards from retrieved documents.
+
+    The card type reflects the document's `doc_type` metadata when available
+    (e.g. "Rapport FAO"), and falls back to the generic "Base locale" label.
+    """
     by_title = {}
     for doc in source_docs:
         title = doc.metadata.get("source", "Inconnu")
         if title in by_title:
             continue
+        doc_type = doc.metadata.get("doc_type", "")
         by_title[title] = {
             "title": title,
-            "type": "Base locale",
+            "type": _DOC_TYPE_LABELS.get(doc_type, "Base locale"),
             "snippet": _short_snippet(getattr(doc, "page_content", "")),
         }
     return sorted(by_title.values(), key=lambda item: item["title"])
 
 
 def _confidence_from_sources(sources: list[dict]) -> str:
+    """Count-based fallback, used only when relevance scores are unavailable."""
     if len(sources) >= 2:
         return "Fort"
     if len(sources) == 1:
         return "Moyen"
     return "Faible"
+
+
+def _confidence_from_score(top_score: float) -> str:
+    """Map the best retrieval relevance score to a confidence label."""
+    if top_score >= CONFIDENCE_STRONG_SCORE:
+        return "Fort"
+    if top_score >= CONFIDENCE_MEDIUM_SCORE:
+        return "Moyen"
+    return "Faible"
+
+
+def _source_scores(query: str) -> dict:
+    """Best relevance score per source title for this query.
+
+    Returns an empty dict when the vector store is unavailable (e.g. unit tests
+    that mock the chain), which makes callers fall back to count-based logic.
+    """
+    if _rag_db is None:
+        return {}
+    try:
+        scored = _rag_db.similarity_search_with_relevance_scores(query, k=6)
+    except Exception as e:  # never let scoring break an answer
+        print(f"Score lookup failed; using count-based confidence: {e}")
+        return {}
+
+    best = {}
+    for doc, score in scored:
+        title = doc.metadata.get("source", "Inconnu")
+        if title not in best or score > best[title]:
+            best[title] = score
+    return best
+
+
+def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict], str]:
+    """Build the source cards and confidence from retrieval relevance scores.
+
+    Drops secondary citations that score far below the best match (the noisy
+    unrelated-card problem), and labels confidence from the top score. Falls back
+    to the count-based heuristic when no scores are available.
+    """
+    sources = _format_rag_sources(source_docs)
+    scores = _source_scores(query)
+
+    if not sources or not scores:
+        return sources, _confidence_from_sources(sources)
+
+    scored_known = [scores[s["title"]] for s in sources if s["title"] in scores]
+    if not scored_known:
+        return sources, _confidence_from_sources(sources)
+
+    top = max(scored_known)
+    floor = top - CITATION_SCORE_MARGIN
+    # Keep a source if it has no score (the chain grounded on it) or scores within
+    # the margin of the best. This removes weakly related cards next to the right one.
+    kept = [
+        s for s in sources
+        if s["title"] not in scores or scores[s["title"]] >= floor
+    ]
+    return (kept or sources), _confidence_from_score(top)
 
 
 def _confidence_for_screen(case: dict | None, has_context: bool) -> str:
@@ -169,6 +248,7 @@ def _audio_too_large_response():
 # =================================================================
 
 _rag_chain = None
+_rag_db = None
 _rag_lock = Lock()
 _rag_warmup_lock = Lock()
 _rag_warmup_started = False
@@ -230,13 +310,14 @@ def _load_or_build_vector_store():
 
 def get_rag_chain():
     """Initialize the RAG stack once, when the first RAG question needs it."""
-    global _rag_chain
+    global _rag_chain, _rag_db
     if _rag_chain is None:
         with _rag_lock:
             if _rag_chain is None:
                 db = _load_or_build_vector_store()
                 print("4. Setting up RetrievalQA chain...")
                 _rag_chain = setup_retrieval_qa(db)
+                _rag_db = db  # kept so /ask can read relevance scores
                 print(f"✅ {BOT_NAME} is ready!")
     return _rag_chain
 
@@ -451,10 +532,11 @@ def ask():
         response = get_rag_chain().invoke(query)
         answer = response["result"]
 
-        # Surface the documents the answer was grounded in.
+        # Surface the documents the answer was grounded in, ranked and filtered
+        # by retrieval relevance score so confidence reflects match quality, not
+        # how many chunks came back.
         source_docs = response.get("source_documents", [])
-        sources = _format_rag_sources(source_docs)
-        confidence = _confidence_from_sources(sources)
+        sources, confidence = _grounded_sources_and_confidence(query, source_docs)
 
         audio_url = text_to_speech_to_static(answer)
         return jsonify({

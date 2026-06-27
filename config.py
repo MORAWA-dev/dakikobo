@@ -24,6 +24,16 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 # (delete chroma_db/ or run with REBUILD_VECTORSTORE=true).
 EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 SIMILARITY_THRESHOLD = 0.2  # on-topic FR queries score ~0.3-0.4, off-topic <=0.0 (measured)
+
+# Confidence + citation filtering, driven by retrieval relevance score (not count).
+# On-topic FR queries measure ~0.3-0.4; the retriever already drops anything below
+# SIMILARITY_THRESHOLD, so a returned source is at least "Moyen".
+CONFIDENCE_STRONG_SCORE = float(os.getenv("CONFIDENCE_STRONG_SCORE", 0.35))
+CONFIDENCE_MEDIUM_SCORE = float(os.getenv("CONFIDENCE_MEDIUM_SCORE", 0.2))
+# A secondary citation is dropped when it scores this far below the best source,
+# which suppresses unrelated cards next to the correct one.
+CITATION_SCORE_MARGIN = float(os.getenv("CITATION_SCORE_MARGIN", 0.12))
+
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100
 

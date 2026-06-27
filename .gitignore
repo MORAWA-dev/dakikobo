@@ -22,6 +22,10 @@ chroma_db/
 # User feedback log (runtime-generated)
 data/feedback.csv
 
+# Rejected / unverified generated research — never commit, never ingest.
+# Model-gathered data that returned fabricated results; kept locally only.
+Data/_archive/
+
 # macOS junk
 .DS_Store
 

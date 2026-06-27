@@ -57,6 +57,19 @@ def _clean_frontmatter_value(value: str) -> str:
     return value.strip().strip("\"'")
 
 
+def _normalize_list_value(value: str) -> str:
+    """Flatten a YAML-ish list like '[sorghum, millet]' to 'sorghum, millet'.
+
+    Chroma metadata must be scalar, so list-valued frontmatter is stored as a
+    clean comma-separated string. Plain scalars pass through unchanged.
+    """
+    value = value.strip()
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    parts = [p.strip().strip("\"'") for p in value.split(",")]
+    return ", ".join(p for p in parts if p)
+
+
 def _split_markdown_frontmatter(raw_text: str) -> tuple[dict[str, str], str]:
     """Return simple YAML-style frontmatter and markdown body.
 
@@ -136,9 +149,14 @@ def load_markdown_from_folder(folder_path: str) -> list[Document]:
                 "markdown_file": f,
                 "data_format": "markdown",
             }
-            for key in ("title", "doc_type", "language", "country", "page_count"):
+            for key in ("title", "doc_type", "language", "country",
+                        "page_count", "year", "publisher"):
                 if metadata.get(key):
                     doc_metadata[key] = metadata[key]
+            # List-valued tags drive crop/zone-aware retrieval and richer cards.
+            for key in ("crops", "topics", "agroecological_zone"):
+                if metadata.get(key):
+                    doc_metadata[key] = _normalize_list_value(metadata[key])
             docs.append(Document(page_content=body, metadata=doc_metadata))
             status = "ok"
         else:
