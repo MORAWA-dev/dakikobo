@@ -6,6 +6,7 @@ from langchain.prompts import PromptTemplate
 
 from config import (
     GROQ_API_KEY,
+    GROQ_USER_AGENT,
     LLM_MODEL,
     LLM_MAX_TOKENS,
     LLM_TEMPERATURE,
@@ -31,6 +32,7 @@ def get_llm():
             max_tokens=LLM_MAX_TOKENS,
             temperature=LLM_TEMPERATURE,
             groq_api_key=GROQ_API_KEY,
+            default_headers={"User-Agent": GROQ_USER_AGENT},
         )
     return _llm
 

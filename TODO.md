@@ -136,6 +136,9 @@ Candidate source:
 
 ### 3. Firecrawl knowledge ingestion pipeline
 
+- [x] Add a Deep Research / iAskPro prompt for strict RAG-ready Markdown data curation.
+- [x] Add a source-first research prompt so models must verify title, publisher, year, country, and URL before generating RAG Markdown.
+- [x] Archive rejected deep-research outputs and keep a verification audit.
 - [ ] Add `scripts/crawl_sources.py` that uses `FIRECRAWL_API_KEY`.
 - [ ] Do not scrape at user request time. Scrape offline, review, then ingest.
 - [ ] Maintain an allowlist of trusted sources:
@@ -146,6 +149,7 @@ Candidate source:
 - [ ] Store crawled output as markdown under `Data/web/`.
 - [ ] Add metadata: URL, title, publisher, date crawled, language, license/usage note.
 - [ ] Add a review flag before documents enter RAG.
+- [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:
 - https://docs.firecrawl.dev/introduction
@@ -236,10 +240,12 @@ to prove what works, what fails, and why.
 
 ## Data governance
 
-- [ ] Add a `DATA_SOURCES.md` file with source, license, URL, date added, review status.
+- [x] Add a `DATA_SOURCES.md` file with source, license, URL, date added, review status.
 - [ ] Add document-level metadata during ingestion.
 - [x] Regenerate `Data/markdown/New Folder With Items/Caractéristiques des ménages agricoles au Burkina Faso_0.md` from its PDF; current file has 128 page sections and about 216k extracted characters.
 - [x] Add Markdown-first RAG ingestion with PDF fallback once the converted corpus is complete and reviewed.
+- [x] Extract ProSol 2020 into a curated Markdown source for Burkina Faso soil fertility, compost, organic manure, and CES preparation.
+- [x] Extract IITA 2018 into a curated regional Markdown source for niébé agronomy, symptoms, and storage, excluding chemical product tables.
 - [ ] Keep scraped documents separate from manually reviewed PDFs.
 - [ ] Remove or quarantine any source with unclear rights.
 - [ ] Add a privacy note for uploaded images.
