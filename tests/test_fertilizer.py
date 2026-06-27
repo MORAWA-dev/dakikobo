@@ -19,6 +19,8 @@ def test_sorgho_dose_is_grounded_with_disclaimer():
     # Mandatory French disclaimer.
     assert "Confirmez toujours avec votre agent agricole" in answer
     assert advice["sources"], "fertilizer advice must cite a source"
+    assert advice["sources"][0]["type"] == "Outil engrais"
+    assert advice["sources"][0]["snippet"]
 
 
 def test_each_supported_crop_returns_advice():

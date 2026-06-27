@@ -48,11 +48,16 @@ KNOWLEDGE_URLS = [
 # --- TTS ---
 TTS_LANGUAGE = "fr"           # French — official language of Burkina Faso
 TTS_MAX_CHARS = 700           # answers run ~100 words (~600 chars); cover the full reply
+TTS_TIMEOUT_SECONDS = float(os.getenv("TTS_TIMEOUT_SECONDS", "8.0"))
 AUDIO_OUTPUT_DIR = os.path.join("static", "audio")
 
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
+REQUEST_COOLDOWN_SECONDS = float(os.getenv("REQUEST_COOLDOWN_SECONDS", "2.0"))
+IMAGE_COOLDOWN_SECONDS = float(os.getenv("IMAGE_COOLDOWN_SECONDS", "6.0"))
+MAX_IMAGE_UPLOAD_MB = float(os.getenv("MAX_IMAGE_UPLOAD_MB", "5.0"))
+MAX_IMAGE_UPLOAD_BYTES = int(MAX_IMAGE_UPLOAD_MB * 1024 * 1024)
 
 # --- Bot Identity ---
 BOT_NAME = "DakiKobo"

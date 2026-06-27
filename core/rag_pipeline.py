@@ -23,6 +23,7 @@ from config import (
     CHUNK_OVERLAP,
     TTS_LANGUAGE,
     TTS_MAX_CHARS,
+    TTS_TIMEOUT_SECONDS,
     AUDIO_OUTPUT_DIR,
     VECTORSTORE_DIR,
 )
@@ -178,10 +179,14 @@ def text_to_speech_to_static(text: str) -> str:
         filename = _random_filename()
         output_path = os.path.join(AUDIO_OUTPUT_DIR, filename)
 
-        tts = gtts.gTTS(text=truncated, lang=TTS_LANGUAGE)
+        tts = gtts.gTTS(
+            text=truncated,
+            lang=TTS_LANGUAGE,
+            timeout=TTS_TIMEOUT_SECONDS,
+        )
         tts.save(output_path)
 
         return url_for("static", filename="audio/" + filename)
     except Exception as e:
-        print(f"Audio generation error: {e}")
+        print(f"Audio generation skipped: {e}")
         return ""

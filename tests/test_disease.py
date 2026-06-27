@@ -27,6 +27,8 @@ def test_unclear_photo_returns_polite_message(monkeypatch):
     _patch(monkeypatch, _FakeResp(200, _candidate("UNCLEAR")))
     out = screen_leaf_image(b"x", "image/jpeg")
     assert out["answer"] == UNCLEAR_MESSAGE
+    assert out["case"]["confidence"] == "Faible"
+    assert out["case"]["actions"]
 
 
 def test_normal_screening_gets_disclaimer_appended(monkeypatch):
@@ -36,6 +38,8 @@ def test_normal_screening_gets_disclaimer_appended(monkeypatch):
     out = screen_leaf_image(b"x", "image/jpeg")
     assert "carence en azote" in out["answer"]
     assert DISCLAIMER in out["answer"]
+    assert out["case"]["observations"]
+    assert out["case"]["needs_human_confirmation"] is True
 
 
 def test_existing_disclaimer_not_duplicated(monkeypatch):
@@ -75,3 +79,54 @@ def test_falls_back_to_next_model_on_429(monkeypatch):
     out = screen_leaf_image(b"x", "image/jpeg")
     assert "rouille" in out["answer"]
     assert calls["i"] >= 2, "should have tried a fallback model"
+
+
+def test_structured_json_response_builds_case(monkeypatch):
+    payload = {
+        "observations": ["Taches brunes visibles sur la feuille."],
+        "problemes_possibles": ["Il pourrait s'agir d'une maladie foliaire."],
+        "actions_immediates": ["Retirez les feuilles très atteintes."],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": "Agent agricole local.",
+        "reponse_courte": "Les taches brunes indiquent un probleme possible.",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(__import__("json").dumps(payload))))
+
+    out = screen_leaf_image(
+        b"x",
+        "image/jpeg",
+        crop="maïs",
+        growth_stage="fructification / épi",
+        location="Bobo-Dioulasso",
+    )
+
+    assert "probleme possible" in out["answer"]
+    assert out["case"]["crop"] == "maïs"
+    assert out["case"]["growth_stage"] == "fructification / épi"
+    assert out["case"]["location"] == "Bobo-Dioulasso"
+    assert out["case"]["observations"] == payload["observations"]
+    assert out["case"]["possible_causes"] == payload["problemes_possibles"]
+    assert out["case"]["actions"] == payload["actions_immediates"]
+
+
+def test_context_is_added_to_gemini_prompt(monkeypatch):
+    seen = {}
+
+    def fake_post(*args, **kwargs):
+        seen["prompt"] = kwargs["json"]["contents"][0]["parts"][0]["text"]
+        return _FakeResp(200, _candidate("UNCLEAR"))
+
+    monkeypatch.setattr(disease, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(disease.requests, "post", fake_post)
+
+    screen_leaf_image(
+        b"x",
+        "image/jpeg",
+        crop="niébé",
+        growth_stage="floraison",
+        location="Koudougou",
+    )
+
+    assert "culture: niébé" in seen["prompt"]
+    assert "stade: floraison" in seen["prompt"]
+    assert "localisation: Koudougou" in seen["prompt"]

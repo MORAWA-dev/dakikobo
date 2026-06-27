@@ -42,22 +42,97 @@
       <div class="chat-messages" id="chatPanel">
         <!-- Messages will be appended here -->
       </div>
-      <div class="quick-chips" id="quickChips">
-        <button type="button" class="chip" data-question="Quand semer le mil ?">
-          Semis du mil
-        </button>
-        <button type="button" class="chip" data-question="Comment fertiliser le sorgho ?">
-          Fertiliser le sorgho
-        </button>
-        <button type="button" class="chip" data-question="Quelles sont les maladies du niébé ?">
-          Maladies du niébé
-        </button>
-        <button type="button" class="chip" data-question="Comment bien cultiver le maïs ?">
-          Culture du maïs
-        </button>
-        <button type="button" class="chip" data-question="Pourquoi faire la rotation des cultures ?">
-          Rotation des cultures
-        </button>
+      <div class="examples-panel" id="examplesPanel" aria-label="Exemples">
+        <div class="examples-heading">Exemples</div>
+        <div class="examples-list">
+          <button
+            type="button"
+            class="example-card"
+            data-example-id="semis_mil"
+            data-prompt="Quand semer le mil ?"
+          >
+            <span class="example-type">Question</span>
+            <span class="example-title">Semis du mil</span>
+            <span class="example-text">Quand semer le mil ?</span>
+          </button>
+          <button
+            type="button"
+            class="example-card"
+            data-example-id="humidite_sorgho"
+            data-prompt="Comment garder l'humidité du sol pour le sorgho ?"
+          >
+            <span class="example-type">Question</span>
+            <span class="example-title">Humidité du sol</span>
+            <span class="example-text">Protéger le sorgho du stress hydrique</span>
+          </button>
+          <button
+            type="button"
+            class="example-card"
+            data-example-id="rotation_niebe"
+            data-prompt="Pourquoi faire une rotation niébé-céréales ?"
+          >
+            <span class="example-type">Question</span>
+            <span class="example-title">Rotation</span>
+            <span class="example-text">Niébé et céréales</span>
+          </button>
+          <button
+            type="button"
+            class="example-card"
+            data-example-id="fumure_sorgho"
+            data-prompt="Quelle dose d'engrais pour le sorgho ?"
+          >
+            <span class="example-type">Engrais</span>
+            <span class="example-title">Fumure sorgho</span>
+            <span class="example-text">Dose vulgarisée et microdose</span>
+          </button>
+          <button
+            type="button"
+            class="example-card"
+            data-example-id="photo_mais"
+            data-prompt="[Exemple photo] Taches sur feuille de maïs"
+          >
+            <span class="example-type">Photo</span>
+            <span class="example-title">Feuille de maïs</span>
+            <span class="example-text">Carte de dépistage</span>
+          </button>
+        </div>
+      </div>
+      <div class="tools-drawer" id="toolsDrawer" hidden>
+        <div class="weather-panel" aria-label="Météo agricole">
+          <label class="weather-label" for="weatherLocation">Météo agricole</label>
+          <div class="weather-controls">
+            <select id="weatherLocation" name="weatherLocation">
+              <option value="ouagadougou">Ouagadougou</option>
+              <option value="bobo">Bobo-Dioulasso</option>
+              <option value="kaya">Kaya</option>
+              <option value="ouahigouya">Ouahigouya</option>
+              <option value="fada">Fada N'Gourma</option>
+              <option value="dori">Dori</option>
+            </select>
+            <button id="weatherBtn" type="button">Voir</button>
+          </div>
+        </div>
+        <div class="soil-panel" aria-label="Sol et engrais">
+          <label class="soil-label" for="soilCrop">Sol + engrais</label>
+          <div class="soil-controls">
+            <select id="soilCrop" name="soilCrop">
+              <option value="sorgho">Sorgho</option>
+              <option value="mil">Mil</option>
+              <option value="maïs">Maïs</option>
+              <option value="niébé">Niébé</option>
+              <option value="arachide">Arachide</option>
+            </select>
+            <select id="soilLocation" name="soilLocation">
+              <option value="ouagadougou">Ouagadougou</option>
+              <option value="bobo">Bobo-Dioulasso</option>
+              <option value="kaya">Kaya</option>
+              <option value="ouahigouya">Ouahigouya</option>
+              <option value="fada">Fada N'Gourma</option>
+              <option value="dori">Dori</option>
+            </select>
+            <button id="soilBtn" type="button">Voir</button>
+          </div>
+        </div>
       </div>
       <div class="chat-input">
         <form id="chatbot-form">
@@ -65,18 +140,40 @@
             type="text"
             id="messageText"
             name="messageText"
-            placeholder="Posez votre question (Ask your question)..."
+            placeholder="Posez votre question..."
           />
-          <button id="chatbot-form-btn" type="submit">
+          <button
+            id="toolsToggle"
+            type="button"
+            aria-label="Afficher les outils météo et sol"
+            aria-controls="toolsDrawer"
+            aria-expanded="false"
+            title="Outils météo et sol"
+          >
+            <i class="fas fa-tools"></i>
+            <span>Outils</span>
+          </button>
+          <button
+            id="chatbot-form-btn"
+            type="submit"
+            aria-label="Envoyer la question"
+            title="Envoyer la question"
+          >
             <i class="fas fa-paper-plane"></i>
           </button>
-          <button id="chatbot-form-btn-voice" type="button">
-            <i class="fas fas fa-volume-up"></i>
+          <button
+            id="chatbot-form-btn-voice"
+            type="button"
+            aria-label="Dicter une question"
+            title="Dicter une question"
+          >
+            <i class="fas fa-microphone"></i>
           </button>
           <button
             id="chatbot-form-btn-image"
             type="button"
-            title="Analyser une photo de feuille"
+            aria-label="Analyser une photo de feuille malade"
+            title="Analyser une photo de feuille malade"
           >
             <i class="fas fa-camera"></i>
           </button>

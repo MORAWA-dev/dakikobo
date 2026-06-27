@@ -16,9 +16,21 @@ Sources:
     recommandée.
 """
 
-SRC_IJBCS = "Recherche INERA — Int. J. Biol. Chem. Sci. (microdose Burkina)"
-SRC_RSTB_MAIS = "Rev. Sciences et Techniques du Burkina (dose vulgarisée maïs)"
-SRC_RSTB_LEG = "Rev. Sciences et Techniques du Burkina (fertilisation légumineuses)"
+SRC_IJBCS = {
+    "title": "Recherche INERA - microdose Burkina",
+    "type": "Outil engrais",
+    "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose.",
+}
+SRC_RSTB_MAIS = {
+    "title": "Sciences et Techniques du Burkina - maïs",
+    "type": "Outil engrais",
+    "snippet": "Dose vulgarisée du maïs: NPK au semis et urée en couverture.",
+}
+SRC_RSTB_LEG = {
+    "title": "Sciences et Techniques du Burkina - légumineuses",
+    "type": "Outil engrais",
+    "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate.",
+}
 
 DISCLAIMER = (
     "⚠️ Ce sont des recommandations générales issues de la recherche (INERA). "
@@ -140,7 +152,7 @@ def _match_crop(text: str) -> str | None:
 def get_fertilizer_advice(text: str) -> dict | None:
     """Return grounded fertilizer advice for the crop in the question.
 
-    Returns a dict {"answer": str, "sources": list[str]} when a supported crop is
+    Returns a dict {"answer": str, "sources": list[dict]} when a supported crop is
     detected, otherwise None (so the caller can fall back to RAG). The numbers are
     fixed/cited — never generated — and the answer always carries the disclaimer.
     """
@@ -155,4 +167,4 @@ def get_fertilizer_advice(text: str) -> dict | None:
         f"{body}\n\n"
         f"{DISCLAIMER}"
     )
-    return {"answer": answer, "sources": list(rec["sources"])}
+    return {"answer": answer, "sources": [dict(src) for src in rec["sources"]]}

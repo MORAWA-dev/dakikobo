@@ -85,7 +85,8 @@ body {
 
 #chatbot-form-btn,
 #chatbot-form-btn-voice,
-#chatbot-form-btn-image {
+#chatbot-form-btn-image,
+#toolsToggle {
     background-color: #4fd1c5;
     color: white;
     border: none;
@@ -103,8 +104,28 @@ body {
 
 #chatbot-form-btn:hover,
 #chatbot-form-btn-voice:hover,
-#chatbot-form-btn-image:hover {
+#chatbot-form-btn-image:hover,
+#toolsToggle:hover,
+#toolsToggle.active {
     background-color: #3cb3a7;
+}
+
+#chatbot-form-btn:disabled,
+#chatbot-form-btn-voice:disabled,
+#chatbot-form-btn-image:disabled,
+#toolsToggle:disabled {
+    cursor: default;
+    opacity: 0.58;
+}
+
+#toolsToggle {
+    width: auto;
+    min-width: 40px;
+    padding: 0 10px;
+    gap: 6px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 /* Uploaded leaf photo shown in the chat */
@@ -286,12 +307,47 @@ body {
     object-fit: cover;
 }
 
+/* Confidence label shown under grounded bot answers */
+.confidence-line {
+    display: flex;
+    margin-top: 8px;
+}
+
+.confidence-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 3px 8px;
+}
+
+.confidence-pill.confidence-fort,
+.case-badge.confidence.confidence-fort {
+    background-color: #dff3d8;
+    color: #214a22;
+}
+
+.confidence-pill.confidence-moyen,
+.case-badge.confidence.confidence-moyen {
+    background-color: #fff1c7;
+    color: #704900;
+}
+
+.confidence-pill.confidence-faible,
+.case-badge.confidence.confidence-faible {
+    background-color: #fde2dc;
+    color: #7b2d20;
+}
+
 /* Source citation chips under bot answers */
 .sources {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 5px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
     margin-top: 8px;
     padding-top: 6px;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
@@ -304,6 +360,7 @@ body {
 }
 
 .source-chip {
+    align-self: flex-start;
     font-size: 11px;
     line-height: 1.3;
     background-color: #d8e8d0;
@@ -311,6 +368,259 @@ body {
     padding: 2px 8px;
     border-radius: 10px;
     word-break: break-word;
+}
+
+.source-card {
+    background-color: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(4, 55, 14, 0.12);
+    border-radius: 8px;
+    padding: 7px 8px;
+}
+
+.source-card-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.source-type {
+    background-color: #d8e8d0;
+    border-radius: 10px;
+    color: #2f4f2f;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 2px 7px;
+    text-transform: uppercase;
+}
+
+.source-title {
+    color: #243b2a;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.source-snippet {
+    color: #5a6b5a;
+    font-size: 11px;
+    line-height: 1.35;
+    margin: 5px 0 0;
+}
+
+/* Per-answer audio replay */
+.audio-actions {
+    display: flex;
+    margin-top: 8px;
+}
+
+.audio-replay {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    border: 1px solid #bfe3dd;
+    border-radius: 14px;
+    background-color: #f4fbfa;
+    color: #04370e;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 5px 10px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.audio-replay:hover {
+    background-color: #e6f6f4;
+    border-color: #4fd1c5;
+}
+
+.audio-replay:active {
+    background-color: #cfeee9;
+}
+
+/* Structured field-case response for image screening */
+.case-message {
+    width: min(360px, calc(100vw - 90px));
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 14px;
+}
+
+.diagnostic-case {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.case-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.case-title {
+    color: #04370e;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.case-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.case-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 600;
+}
+
+.case-badge.confidence {
+    background-color: #fff1c7;
+    color: #704900;
+}
+
+.case-badge.risk {
+    background-color: #fff1c7;
+    color: #704900;
+}
+
+.case-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.case-meta span {
+    background-color: #f4fbfa;
+    border: 1px solid #c9e9e5;
+    border-radius: 10px;
+    color: #275c55;
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 3px 7px;
+}
+
+.case-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.case-section-title {
+    color: #5a6b5a;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.case-section ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.case-section li {
+    margin-bottom: 3px;
+}
+
+.case-disclaimer {
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    color: #5a4a00;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Context controls shown after a leaf photo is selected */
+.context-message {
+    width: min(360px, calc(100vw - 90px));
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 14px;
+}
+
+.image-context-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.context-title {
+    color: #04370e;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.context-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.context-grid select,
+.context-grid input {
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid #bfe3dd;
+    border-radius: 8px;
+    background-color: white;
+    color: #243b2a;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 9px;
+}
+
+.context-grid select:focus,
+.context-grid input:focus {
+    outline: none;
+    border-color: #4fd1c5;
+    box-shadow: 0 0 0 3px rgba(79, 209, 197, 0.25);
+}
+
+.context-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.context-submit,
+.context-skip {
+    min-height: 34px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 7px 12px;
+}
+
+.context-submit {
+    background-color: #04370e;
+    color: white;
+}
+
+.context-skip {
+    background-color: #e6f6f4;
+    color: #04370e;
+    border: 1px solid #bfe3dd;
+}
+
+.image-context-form.submitted {
+    opacity: 0.68;
 }
 
 /* Feedback (thumbs up/down) under bot answers */
@@ -350,42 +660,439 @@ body {
     color: #5a6b5a;
 }
 
-/* Quick-action chips */
-.quick-chips {
-    display: flex;
-    gap: 8px;
-    padding: 10px 20px 0;
+/* Public demo examples */
+.examples-panel {
     background-color: #f9f9f9;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    border-top: 1px solid #eef3f1;
+    padding: 10px 20px 0;
 }
 
-.quick-chips::-webkit-scrollbar {
-    display: none;
+.examples-heading {
+    color: #243b2a;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-transform: uppercase;
 }
 
-.chip {
-    flex: 0 0 auto;
-    white-space: nowrap;
-    background-color: #e6f6f4;
-    color: #04370e;
+.examples-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow: visible;
+    padding-bottom: 0;
+}
+
+.example-card {
+    flex: 1 1 126px;
+    min-height: 54px;
+    min-width: 120px;
+    background-color: #ffffff;
     border: 1px solid #bfe3dd;
-    border-radius: 16px;
-    padding: 6px 12px;
-    font-family: inherit;
-    font-size: 13px;
+    border-radius: 8px;
+    color: #04370e;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-family: inherit;
+    padding: 8px;
+    text-align: left;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.chip:hover {
+.example-card:hover:not(:disabled) {
+    background-color: #e6f6f4;
+    border-color: #4fd1c5;
+}
+
+.example-card:active:not(:disabled) {
     background-color: #cfeee9;
 }
 
-.chip:active {
-    background-color: #4fd1c5;
+.example-card:disabled {
+    cursor: default;
+    opacity: 0.58;
+}
+
+.example-type {
+    color: #2f7b70;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.example-title {
+    color: #04370e;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.example-text {
+    color: #5a6b5a;
+    font-size: 11px;
+    line-height: 1.25;
+    display: none;
+}
+
+/* Optional tool drawer: keeps the first screen focused on the conversation. */
+.tools-drawer {
+    background-color: #f9f9f9;
+    border-top: 1px solid #eef3f1;
+    display: grid;
+    gap: 10px;
+    padding: 10px 20px 0;
+}
+
+.tools-drawer[hidden] {
+    display: none;
+}
+
+/* Weather context controls */
+.weather-panel {
+    background-color: transparent;
+    border-top: 0;
+    display: grid;
+    gap: 6px;
+    padding: 0;
+}
+
+.weather-label {
+    color: #243b2a;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.weather-controls {
+    display: flex;
+    gap: 8px;
+}
+
+#weatherLocation {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #bfe3dd;
+    border-radius: 8px;
+    background-color: white;
+    color: #04370e;
+    font-family: inherit;
+    font-size: 13px;
+    min-height: 34px;
+    padding: 6px 8px;
+}
+
+#weatherBtn {
+    min-width: 62px;
+    border: none;
+    border-radius: 8px;
+    background-color: #04370e;
     color: white;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 10px;
+}
+
+#weatherLocation:disabled,
+#weatherBtn:disabled {
+    cursor: default;
+    opacity: 0.58;
+}
+
+/* Weather context card */
+.weather-message {
+    width: min(380px, calc(100vw - 90px));
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 14px;
+}
+
+.weather-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.weather-head {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.weather-title {
+    color: #04370e;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.weather-updated {
+    color: #5a6b5a;
+    font-size: 11px;
+}
+
+.weather-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.weather-metric {
+    background-color: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(4, 55, 14, 0.1);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 48px;
+    padding: 7px;
+}
+
+.weather-metric span {
+    color: #5a6b5a;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.weather-metric strong {
+    color: #04370e;
+    font-size: 15px;
+}
+
+.weather-insights {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.weather-insight {
+    border-left: 4px solid #bfe3dd;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.66);
+    padding: 7px 8px;
+}
+
+.weather-insight.weather-good {
+    border-left-color: #46a65c;
+}
+
+.weather-insight.weather-watch {
+    border-left-color: #e1a600;
+}
+
+.weather-insight.weather-risk {
+    border-left-color: #d9534f;
+}
+
+.weather-insight-label {
+    color: #04370e;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.weather-insight p {
+    color: #3b4b3b;
+    font-size: 12px;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.weather-disclaimer {
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    color: #5a4a00;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Soil context controls */
+.soil-panel {
+    background-color: transparent;
+    border-top: 0;
+    display: grid;
+    gap: 6px;
+    padding: 0;
+}
+
+.soil-label {
+    color: #243b2a;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.soil-controls {
+    display: grid;
+    grid-template-columns: 0.85fr 1fr auto;
+    gap: 8px;
+}
+
+#soilCrop,
+#soilLocation {
+    min-width: 0;
+    border: 1px solid #bfe3dd;
+    border-radius: 8px;
+    background-color: white;
+    color: #04370e;
+    font-family: inherit;
+    font-size: 13px;
+    min-height: 34px;
+    padding: 6px 8px;
+}
+
+#soilBtn {
+    min-width: 62px;
+    border: none;
+    border-radius: 8px;
+    background-color: #04370e;
+    color: white;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 10px;
+}
+
+#soilCrop:disabled,
+#soilLocation:disabled,
+#soilBtn:disabled {
+    cursor: default;
+    opacity: 0.58;
+}
+
+/* Soil context card */
+.soil-message {
+    width: min(390px, calc(100vw - 90px));
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 14px;
+}
+
+.soil-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.soil-head {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.soil-title {
+    color: #04370e;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.soil-subtitle {
+    color: #5a6b5a;
+    font-size: 11px;
+}
+
+.soil-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.soil-metric {
+    background-color: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(4, 55, 14, 0.1);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 48px;
+    padding: 7px;
+}
+
+.soil-metric span {
+    color: #5a6b5a;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.soil-metric strong {
+    color: #04370e;
+    font-size: 15px;
+}
+
+.soil-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.soil-indicator {
+    border-left: 4px solid #bfe3dd;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.66);
+    padding: 7px 8px;
+}
+
+.soil-indicator.weather-good {
+    border-left-color: #46a65c;
+}
+
+.soil-indicator.weather-watch {
+    border-left-color: #e1a600;
+}
+
+.soil-indicator.weather-risk {
+    border-left-color: #d9534f;
+}
+
+.soil-indicator-label,
+.soil-section-title {
+    color: #04370e;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.soil-indicator strong {
+    color: #243b2a;
+    display: block;
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+
+.soil-indicator p,
+.soil-fertilizer p {
+    color: #3b4b3b;
+    font-size: 12px;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.soil-fertilizer {
+    background-color: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(4, 55, 14, 0.12);
+    border-radius: 8px;
+    padding: 8px;
+    white-space: pre-line;
+}
+
+.soil-disclaimer {
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    color: #5a4a00;
+    font-size: 12px;
+    font-style: italic;
 }
 
 /* Active microphone (listening) state */
@@ -439,8 +1146,29 @@ body {
         max-width: 90%;
     }
 
-    .quick-chips {
+    .examples-panel {
         padding: 10px 15px 0;
+    }
+
+    .example-card {
+        flex-basis: 136px;
+    }
+
+    .tools-drawer {
+        padding: 10px 15px 0;
+    }
+
+    .soil-controls {
+        grid-template-columns: 1fr;
+    }
+
+    #toolsToggle span {
+        display: none;
+    }
+
+    #toolsToggle {
+        width: 40px;
+        padding: 0;
     }
 
     .chat-input {

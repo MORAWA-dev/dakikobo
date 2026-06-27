@@ -29,14 +29,22 @@ and the interface is mobile-first for use on phones.
 - **Fast inference** — Groq-hosted `llama-3.3-70b-versatile`.
 - **Multilingual retrieval** — `paraphrase-multilingual-MiniLM-L12-v2` embeddings for
   good French matching, stored in a **persistent ChromaDB** (built once, fast on restart).
-- **Voice output (TTS)** — answers can be read aloud in French via gTTS.
+- **Voice output (TTS)** — answers can auto-play in French via gTTS and be replayed
+  from their answer bubble.
 - **Voice input (STT)** — optional French speech-to-text in supported browsers, with a
   visible "listening" indicator.
-- **Quick-action chips** — one-tap common questions (semis du mil, fertilisation, etc.).
+- **Quota-safe public examples** — one-tap demo answers for text, fertilizer guidance and a
+  sample image case, without spending live API calls.
+- **Focused mobile UI** — examples stay visible, while weather and soil tools sit behind an
+  `Outils` drawer so the conversation remains the main workspace.
 - **Deterministic fertilizer doses** — source-grounded INERA/Burkina recommendations (never
   invented), with a "confirmez avec votre agent" disclaimer.
 - **Leaf disease screening (optional)** — upload a leaf photo for a hedged French screening via
   Gemini Vision, with a "ceci n'est pas un diagnostic" disclaimer (requires a Gemini API key).
+- **Weather-aware field signals** — Open-Meteo rainfall, ET0, soil moisture and short-term
+  forecast cards for selected Burkina Faso locations.
+- **Soil-aware fertilizer context** — SoilGrids texture, organic carbon, pH and retention-risk
+  classes combined with deterministic fertilizer guidance.
 - **Feedback capture** — 👍 / 👎 under each answer, logged to `data/feedback.csv` (no database).
 - **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
 
@@ -53,6 +61,8 @@ and the interface is mobile-first for use on phones.
 | Vector store     | ChromaDB (persistent)                                 |
 | PDF ingestion    | PyPDF2                                                 |
 | Text-to-speech   | gTTS (French)                                         |
+| Weather data     | Open-Meteo Forecast API                               |
+| Soil indicators  | SoilGrids REST API                                    |
 
 ---
 
@@ -116,7 +126,7 @@ Optional overrides (defaults in `config.py` are fine for development):
 # LLM_MODEL=llama-3.3-70b-versatile
 # LLM_MAX_TOKENS=512
 # LLM_TEMPERATURE=0.1
-# GEMINI_MODEL=gemini-2.0-flash
+# GEMINI_MODEL=gemini-2.5-flash
 # FLASK_DEBUG=true
 # REBUILD_VECTORSTORE=true   # force a fresh index rebuild
 ```
@@ -165,6 +175,10 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `VECTORSTORE_DIR`      | `chroma_db`                              | Persisted index location (git-ignored)   |
 | `DATA_FOLDER`          | `Data`                                   | Root folder ingested recursively         |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
+| `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
+| `REQUEST_COOLDOWN_SECONDS` | `2.0`                                | Per-session cooldown for `/ask` requests |
+| `IMAGE_COOLDOWN_SECONDS` | `6.0`                                  | Per-session cooldown for image screening |
+| `MAX_IMAGE_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded image size              |
 
 ---
 

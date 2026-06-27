@@ -32,8 +32,8 @@ Status legend: `[ ]` todo · `[x]` done.
     package list. **(S)**
 
 - [x] **3. Fix `DATA_FOLDER` casing** — `config.py`
-  - *Done when:* `DATA_FOLDER` points at `Data/knowledge_base`; startup log shows PDFs found
-    (works on Linux/Colab, not just macOS). **(S)**
+  - *Done when:* `DATA_FOLDER` points at the correctly-cased `Data` tree; startup log shows PDFs
+    found recursively (works on Linux/Colab, not just macOS). **(S)**
 
 - [x] **4. Fix TTS truncation** — `config.py`, `core/rag_pipeline.py`
   - *Done when:* enabling audio on a ~90-word French answer plays speech that reaches the end of
@@ -69,8 +69,8 @@ Status legend: `[ ]` todo · `[x]` done.
 - [x] **11. Multilingual embeddings upgrade** — `config.py`, `core/rag_pipeline.py` (+ one-time reindex)
   - *Done when:* after rebuilding the index with a multilingual model, the same French question
     returns on-topic source chips while off-topic queries still hit the fallback. **(M)**
-  - Switched `EMBEDDING_MODEL` to `paraphrase-multilingual-MiniLM-L12-v2` (chosen over the heavier
-    `mpnet` variant: ~470MB and far faster to embed on CPU, while still multilingual/good French).
+  - Switched `EMBEDDING_MODEL` to `paraphrase-multilingual-MiniLM-L12-v2` (chosen over heavier
+    multilingual alternatives because it is faster to embed on CPU while still good for French).
   - Switching the model changed the relevance-score scale (Chroma's default L2 produced large
     negative scores → the 0.2 threshold rejected everything). Fixed by setting the Chroma collection
     to **cosine** space (`collection_metadata={"hnsw:space": "cosine"}`), which normalizes scores so
@@ -189,7 +189,7 @@ Status legend: `[ ]` todo · `[x]` done.
     screening ("il pourrait s'agir de…") and returns a sentinel for unusable photos → polite
     "reprenez la photo" message. Code guarantees the "Ceci n'est pas un diagnostic" disclaimer, and
     gracefully handles missing key / network errors / 429 quota.
-  - `config.py`: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-2.0-flash`).
+  - `config.py`: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-2.5-flash`).
   - `app.py`: `POST /screen` accepts an uploaded image, returns French screening + TTS.
   - UI: camera button in the input bar (`accept="image/*" capture="environment"`), JS shows the
     user's photo bubble, posts multipart to `/screen`, renders the answer (with optional voice).
@@ -201,6 +201,69 @@ Status legend: `[ ]` todo · `[x]` done.
     quota, but `gemini-2.5-flash` works. Default model switched to `gemini-2.5-flash`; a live vision
     call returned the correct "unclear photo" response for a blank image. `scripts/test_gemini.py`
     now tests the app's configured model and reports ✅.
+
+- [x] **20. Public demo guardrails** — `config.py`, `app.py`, `tests/test_app_routes.py`
+  - *Done when:* repeated expensive requests are slowed per session, oversized image uploads are
+    rejected before Gemini, and users receive clear French errors. **(S)**
+  - `config.py`: added `REQUEST_COOLDOWN_SECONDS` (2s), `IMAGE_COOLDOWN_SECONDS` (6s), and
+    `MAX_IMAGE_UPLOAD_MB` (5 MB), all overridable via environment variables.
+  - `app.py`: `/ask` and `/screen` now return HTTP 429 with `retry_after` for rapid repeats; image
+    uploads over the configured limit return HTTP 413 before vision processing.
+  - Tests cover text cooldown, image cooldown, and oversized upload responses.
+
+- [x] **21. Quota-safe public examples** — `core/examples.py`, `app.py`, `templates/index.html`, `static/js/index.js`
+  - *Done when:* visitors can run 3 text examples, 1 fertilizer example, and 1 image-case example
+    without invoking Groq, Gemini, or TTS. **(S)**
+  - Added `/examples/<example_id>` with canned French demo responses using the same `answer`,
+    `sources`, `confidence`, and `case` JSON shape as live routes.
+  - Replaced quick chips with a compact examples panel that renders normal answers and case cards
+    through the existing chat UI.
+  - Tests cover text, fertilizer, image-case, missing-example, and index markup paths.
+
+- [x] **22. Weather-aware advice card** — `core/weather.py`, `app.py`, `templates/index.html`, `static/js/index.js`
+  - *Done when:* users can choose a Burkina Faso location and see a compact weather card with
+    rainfall, ET0, soil moisture signal, sowing-window guidance, and urea-before-rain warning. **(M)**
+  - `core/weather.py`: uses Open-Meteo forecast data for selected locations, derives four cautious
+    agronomic signals, and caches responses by location/date to protect the free Space.
+  - `app.py`: added `/weather/locations` and `/weather`, returning structured weather JSON plus
+    French error responses.
+  - UI: added a `Météo agricole` selector and a compact card renderer instead of a long paragraph.
+  - Tests cover API parsing/cache behavior, route success/failure paths, and page markup.
+
+- [x] **23. Soil-aware fertilizer context** — `core/soil.py`, `app.py`, `templates/index.html`, `static/js/index.js`
+  - *Done when:* users can choose crop + location and see SoilGrids-derived explanatory indicators
+    beside deterministic fertilizer guidance, with clear soil-test confirmation language. **(M)**
+  - `core/soil.py`: queries SoilGrids for clay, sand, organic carbon, pH, and CEC at 0-5 cm; converts
+    them into classes for texture tendency, organic carbon, pH, and nutrient-retention risk.
+  - `app.py`: added `/soil/locations` and `/soil`; `/soil` combines the soil context with the existing
+    deterministic fertilizer tool rather than asking the LLM for doses.
+  - UI: added a `Sol + engrais` selector and compact card renderer with metrics, indicators,
+    fertilizer text, source cards, and the required local-test disclaimer.
+  - Tests cover SoilGrids parsing/cache behavior, route success/failure paths, and page markup.
+
+- [x] **24. TTS timeout fallback** — `config.py`, `core/rag_pipeline.py`, `tests/test_tts.py`
+  - *Done when:* a slow or failing gTTS request returns the answer with `audio_url: ""` instead of
+    blocking the Flask worker. **(S)**
+  - `config.py`: added `TTS_TIMEOUT_SECONDS` (default 8s).
+  - `core/rag_pipeline.py`: passes the timeout to `gTTS` and treats audio generation as optional.
+  - Tests cover timeout propagation, failure fallback, and sentence-boundary truncation.
+
+- [x] **25. Credible mobile UX pass** — `templates/index.html`, `static/css/style.css`, `static/js/index.js`
+  - *Done when:* the first screen prioritizes the conversation, tools are available without crowding
+    the chat, and icon controls are understandable on phones. **(S)**
+  - Moved weather and soil selectors behind one `Outils` drawer beside the input.
+  - Replaced the cartoon bot avatar with the neutral DakiKobo logo in all bot messages.
+  - Added compact wrapped examples, higher-contrast section labels, and clearer labels/tooltips for
+    send, voice input, image screening, and tools.
+  - Tests cover the index markup hooks for the drawer and existing tool controls.
+
+- [x] **26. Per-answer audio replay** — `static/js/index.js`, `static/css/style.css`
+  - *Done when:* generated audio can be replayed from its answer bubble, while the footer checkbox
+    remains the single global auto-play toggle. **(S)**
+  - Added a `Réécouter` button for normal RAG answers and image screening answers when `audio_url`
+    is present.
+  - Centralized browser audio playback so starting a new answer stops the previous audio, and turning
+    off the global voice checkbox stops current playback.
 
 ---
 
@@ -219,7 +282,7 @@ Status legend: `[ ]` todo · `[x]` done.
 
 ---
 
-*Conflicts resolved by reading the code: embeddings → `paraphrase-multilingual-mpnet-base-v2`
+*Conflicts resolved by reading the code: embeddings → `paraphrase-multilingual-MiniLM-L12-v2`
 (lighter than `bge-m3` for a laptop on a 3-week timeline); persist dir → `chroma_db/` (already
 git-ignored); Gemini's session-2 source-chip JS diff has a string-concatenation bug, so task 9 is
 hand-written rather than pasted.*
