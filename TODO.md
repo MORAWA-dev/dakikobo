@@ -36,7 +36,7 @@ traceable sources.
 - [ ] The UI is still mostly a chat widget; it should feel like a real field workflow.
 - [ ] Image diagnosis answers are useful but not structured enough for inspection.
 - [ ] The app does not yet ask for crop, growth stage, location, or recent weather.
-- [ ] RAG citations show filenames, but not confidence, snippets, or "why this source".
+- [ ] RAG citations now show source cards and relevance filtering, but still need live tuning against noisy edge cases.
 - [ ] Feedback is stored as CSV, not a reusable case/evaluation dataset.
 - [ ] No observability dashboard for failures, quotas, slow responses, or bad answers.
 - [ ] No scheduled knowledge refresh from trusted web sources.
@@ -89,6 +89,11 @@ triage assistant that explains its evidence".
   - `Fort` when deterministic/tool or multiple good RAG sources agree
   - `Moyen` when one source or vision-only screening
   - `Faible` when context is missing or sources are weak
+
+- [x] Add relevance-score citation filtering:
+  - confidence now uses retrieval score when available
+  - weak secondary citations are dropped when far below the best match
+  - kept citations are ordered by relevance score
 
 - [x] Add rate-limit and abuse protection:
   - per-session request cooldown
@@ -253,7 +258,7 @@ to prove what works, what fails, and why.
 
 ## Engineering hardening
 
-- [ ] Add `/version` route with app version and Git commit.
+- [x] Add `/version` route with app version, host commit if available, and runtime config flags.
 - [ ] Add structured logging for `/ask`, `/screen`, errors, latency.
 - [x] Harden TTS fallback/timeouts so slow gTTS cannot block an answer.
 - [ ] Add timeout handling around Groq, Gemini, TTS, weather, Firecrawl.

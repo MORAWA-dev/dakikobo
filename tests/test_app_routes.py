@@ -29,6 +29,28 @@ class _SingleSourceRagChain:
         }
 
 
+class _NoisySourceRagChain:
+    def invoke(self, query):
+        assert query == "Comment stocker le niébé contre les bruches ?"
+        return {
+            "result": "Utilisez des sacs PICS avec des grains bien secs.",
+            "source_documents": [
+                SimpleNamespace(
+                    metadata={"source": "Source faible"},
+                    page_content="Contenu secondaire peu lié au niébé.",
+                ),
+                SimpleNamespace(
+                    metadata={"source": "IITA 2018 - Production du niebe"},
+                    page_content="Les sacs PICS permettent un stockage hermétique non chimique du niébé.",
+                ),
+                SimpleNamespace(
+                    metadata={"source": "Source moyenne"},
+                    page_content="Stockage et séchage des grains.",
+                ),
+            ],
+        }
+
+
 class _RefusalRagChain:
     """Returns the grounded 'I don't know' fallback with off-topic chunks."""
     def invoke(self, query):
@@ -74,6 +96,23 @@ def test_health_route_is_lightweight():
     assert payload["rag_ready"] is False
     assert payload["rag_status"] in {"cold", "warming", "ready", "error"}
     assert payload["rag_warmup"]["status"] == payload["rag_status"]
+
+
+def test_version_route_reports_runtime_metadata(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setenv("APP_COMMIT_SHA", "abc123")
+
+    response = client.get("/version")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["bot"] == "DakiKobo"
+    assert payload["app_version"]
+    assert payload["commit"] == "abc123"
+    assert payload["rag_status"] in {"cold", "warming", "ready", "error"}
+    assert payload["config"]["llm_model"]
+    assert payload["config"]["embedding_model"] == "paraphrase-multilingual-MiniLM-L12-v2"
+    assert payload["config"]["prefer_markdown_kb"] is True
 
 
 def test_rag_warmup_starts_once(monkeypatch):
@@ -505,6 +544,53 @@ def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):
 
     assert response.status_code == 200
     assert payload["confidence"] == "Moyen"
+
+
+def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
+    client = app_module.app.test_client()
+
+    class FakeDb:
+        def similarity_search_with_relevance_scores(self, query, k):
+            assert query == "Comment stocker le niébé contre les bruches ?"
+            assert k == 6
+            return [
+                (
+                    SimpleNamespace(
+                        metadata={"source": "IITA 2018 - Production du niebe"}
+                    ),
+                    0.43,
+                ),
+                (
+                    SimpleNamespace(metadata={"source": "Source moyenne"}),
+                    0.35,
+                ),
+                (
+                    SimpleNamespace(metadata={"source": "Source faible"}),
+                    0.18,
+                ),
+            ]
+
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _NoisySourceRagChain())
+    monkeypatch.setattr(app_module, "_rag_db", FakeDb())
+    monkeypatch.setattr(
+        app_module,
+        "text_to_speech_to_static",
+        lambda text: "/static/audio/rag.mp3",
+    )
+
+    response = client.post(
+        "/ask",
+        data={"messageText": "Comment stocker le niébé contre les bruches ?"},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["confidence"] == "Fort"
+    assert [source["title"] for source in payload["sources"]] == [
+        "IITA 2018 - Production du niebe",
+        "Source moyenne",
+    ]
+    assert "Source faible" not in [source["title"] for source in payload["sources"]]
 
 
 def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):

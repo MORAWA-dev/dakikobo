@@ -42,9 +42,13 @@ from core.soil import (
 )
 from config import (
     KNOWLEDGE_URLS,
+    APP_VERSION,
     DATA_FOLDER,
     MARKDOWN_FOLDER,
     PREFER_MARKDOWN_KB,
+    LLM_MODEL,
+    EMBEDDING_MODEL,
+    VECTORSTORE_DIR,
     DEBUG,
     SECRET_KEY,
     BOT_NAME,
@@ -189,7 +193,12 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
         s for s in sources
         if s["title"] not in scores or scores[s["title"]] >= floor
     ]
-    return (kept or sources), _confidence_from_score(top)
+    ranked = sorted(
+        kept or sources,
+        key=lambda source: scores.get(source["title"], -1.0),
+        reverse=True,
+    )
+    return ranked, _confidence_from_score(top)
 
 
 def _confidence_for_screen(case: dict | None, has_context: bool) -> str:
@@ -269,6 +278,20 @@ _rag_warmup_error = None
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _runtime_commit() -> str:
+    for key in (
+        "APP_COMMIT_SHA",
+        "SPACE_COMMIT_SHA",
+        "COMMIT_SHA",
+        "GIT_COMMIT",
+        "SOURCE_VERSION",
+    ):
+        value = os.getenv(key, "").strip()
+        if value:
+            return value
+    return "unknown"
 
 
 def _load_local_knowledge_documents() -> tuple[list, str]:
@@ -410,6 +433,24 @@ def healthz():
         "rag_ready": _rag_chain is not None,
         "rag_status": rag_runtime["status"],
         "rag_warmup": rag_runtime,
+    })
+
+
+@app.route("/version")
+def version():
+    rag_runtime = _rag_runtime_status()
+    return jsonify({
+        "bot": BOT_NAME,
+        "app_version": APP_VERSION,
+        "commit": _runtime_commit(),
+        "rag_status": rag_runtime["status"],
+        "config": {
+            "llm_model": LLM_MODEL,
+            "embedding_model": EMBEDDING_MODEL,
+            "vectorstore_dir": VECTORSTORE_DIR,
+            "prefer_markdown_kb": PREFER_MARKDOWN_KB,
+            "rag_warmup_on_start": RAG_WARMUP_ON_START,
+        },
     })
 
 

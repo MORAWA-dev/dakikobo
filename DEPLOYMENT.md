@@ -35,6 +35,7 @@ REBUILD_VECTORSTORE=false
 Optional:
 
 ```text
+APP_VERSION=0.1.0
 LLM_MODEL=llama-3.3-70b-versatile
 STT_MODEL=whisper-large-v3-turbo
 VECTORSTORE_DIR=chroma_db
@@ -77,6 +78,7 @@ git push hf main
 
 9. Wait for the Space to build, then open `/healthz` to confirm the Flask process is alive.
 10. Watch `/healthz` until `rag_status` is `ready`; the Docker image starts RAG warm-up in the background.
+11. Open `/version` to confirm the deployed model/config flags.
 
 Free Space caveats:
 

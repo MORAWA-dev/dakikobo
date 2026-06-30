@@ -106,11 +106,13 @@ Source governance:
 - `Data/_archive/rejected_deep_research_2026-06-27/` contains rejected generated
   research outputs and is intentionally not part of active RAG.
 
-Known retrieval issue:
+Retrieval status:
 
-- Some RAG answers can still return noisy secondary citations beside the correct
-  source. Example: niébé storage may cite IITA correctly but include unrelated
-  source cards. This is a ranking/filtering issue, not a deployment failure.
+- Source cards are now filtered and ranked with retrieval relevance scores when
+  the Chroma store is available.
+- Weak secondary citations are dropped when they score far below the best match.
+- Live tuning is still recommended because edge cases can depend on the hosted
+  vector store contents and query wording.
 
 ### 3. Deterministic Fertilizer Guidance
 
@@ -290,6 +292,7 @@ Quota-safe examples:
 |---|---:|---|
 | `/` | GET | Main UI |
 | `/healthz` | GET | App and RAG warm-up status |
+| `/version` | GET | App version, host commit if exposed, and runtime config flags |
 | `/ask` | POST | Main text question endpoint |
 | `/speech` | POST | Voice transcription endpoint |
 | `/screen` | POST | Leaf image screening endpoint |
@@ -364,6 +367,8 @@ Latest HF worktree test run:
 Latest live HF checks:
 
 - `/healthz`: ready
+- `/version`: available locally after 2026-06-30 changes; deploy to HF before
+  expecting it on the public Space.
 - `/ask` compost question: returned ProSol source
 - `/speech` fake audio: returned expected French transcription failure, proving
   route is deployed and active
@@ -387,6 +392,7 @@ Optional but used by features:
 
 - `GEMINI_API_KEY`
 - `FLASK_SECRET_KEY`
+- `APP_VERSION`
 - `LLM_MODEL`
 - `GROQ_USER_AGENT`
 - `STT_MODEL`
@@ -424,7 +430,7 @@ Product:
 RAG and data:
 
 - Document-level metadata should be added during ingestion.
-- Retrieval source filtering needs improvement to suppress unrelated citations.
+- Retrieval source filtering exists, but needs more live evaluation and tuning.
 - Generated/scraped data should remain outside RAG until human review.
 - Firecrawl pipeline is planned but not implemented.
 
@@ -436,7 +442,7 @@ Vision:
 
 Operations:
 
-- No `/version` route yet.
+- `/version` exists locally and should be verified after the next HF deploy.
 - No structured logging dashboard yet.
 - No nightly HF smoke test yet.
 - No persistent database yet.
@@ -469,14 +475,13 @@ Evaluate in this order:
 
 Highest-impact next tasks:
 
-1. Add source filtering/reranking so unrelated citations are removed.
-2. Add `/version` with git commit, build time, and config flags.
-3. Add structured JSON logs for route, latency, status, model, and failure type.
-4. Add document-level metadata to ingestion and source cards.
-5. Add a privacy note for uploaded photos/audio.
-6. Convert `data/feedback.csv` into a small SQLite case log.
-7. Add a text-question context flow for crop, location, and growth stage.
-8. Add Firecrawl offline ingestion script with allowlist and review gate.
+1. Add structured JSON logs for route, latency, status, model, and failure type.
+2. Add document-level metadata to ingestion and source cards.
+3. Add a privacy note for uploaded photos/audio.
+4. Convert `data/feedback.csv` into a small SQLite case log.
+5. Add a text-question context flow for crop, location, and growth stage.
+6. Add Firecrawl offline ingestion script with allowlist and review gate.
+7. Continue live retrieval evaluation and tune citation thresholds if needed.
 
 ## Evaluation Principle
 
