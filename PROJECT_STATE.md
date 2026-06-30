@@ -105,6 +105,9 @@ Source governance:
 - PDFs remain under `Data/` as source material and fallback.
 - `Data/_archive/rejected_deep_research_2026-06-27/` contains rejected generated
   research outputs and is intentionally not part of active RAG.
+- Persisted Chroma stores are validated at startup. If the collection is missing
+  or contains zero chunks, the app clears `chroma_db/` and rebuilds from the
+  active Markdown/PDF corpus.
 
 Retrieval status:
 
@@ -114,6 +117,8 @@ Retrieval status:
   chunks, so mixed generic citations are suppressed for focused questions.
 - Weak secondary citations are dropped when they score far below the best match.
 - RAG answers show at most two source cards by default (`MAX_RAG_SOURCES=2`).
+- If retrieval returns zero documents, the app forces the grounded fallback
+  instead of returning an uncited LLM answer.
 - Live tuning is still recommended because edge cases can depend on the hosted
   vector store contents and query wording.
 

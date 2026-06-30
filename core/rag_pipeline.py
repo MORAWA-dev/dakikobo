@@ -235,6 +235,25 @@ def load_vector_store():
     return Chroma(persist_directory=VECTORSTORE_DIR, embedding_function=_embeddings())
 
 
+def load_vector_store_if_usable():
+    """Load a persisted Chroma store only when its collection has documents."""
+    if not vector_store_exists():
+        return None
+    try:
+        db = load_vector_store()
+        count = db._collection.count()
+    except Exception as e:
+        print(f"Warning: Existing vector store is not usable: {e}")
+        return None
+
+    if count <= 0:
+        print("Warning: Existing vector store has no documents; rebuilding.")
+        return None
+
+    print(f"1. Loaded existing vector store with {count} chunks.")
+    return db
+
+
 def initialize_vector_store(documents: list[Document]):
     """
     Build a persistent ChromaDB vector store from a list of Documents and save it

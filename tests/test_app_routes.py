@@ -68,6 +68,15 @@ class _RefusalRagChain:
         }
 
 
+class _NoSourceRagChain:
+    """Returns an answer even though retrieval found no documents."""
+    def invoke(self, query):
+        return {
+            "result": "Réponse non fondée.",
+            "source_documents": [],
+        }
+
+
 def test_app_import_does_not_initialize_rag():
     assert app_module._rag_chain is None
 
@@ -215,6 +224,47 @@ def test_local_knowledge_falls_back_to_pdfs_when_markdown_missing(monkeypatch):
 
     assert docs == pdf_docs
     assert source == "PDF"
+
+
+def test_existing_valid_vector_store_is_reused(monkeypatch):
+    db = object()
+
+    monkeypatch.setattr(app_module, "REBUILD_VECTORSTORE", False)
+    monkeypatch.setattr(app_module, "vector_store_exists", lambda: True)
+    monkeypatch.setattr(app_module, "load_vector_store_if_usable", lambda: db)
+    monkeypatch.setattr(
+        app_module,
+        "initialize_vector_store",
+        lambda docs: (_ for _ in ()).throw(AssertionError("valid store should load")),
+    )
+
+    assert app_module._load_or_build_vector_store() is db
+
+
+def test_invalid_existing_vector_store_is_rebuilt(monkeypatch):
+    calls = []
+    local_docs = [SimpleNamespace(page_content="markdown")]
+
+    monkeypatch.setattr(app_module, "REBUILD_VECTORSTORE", False)
+    monkeypatch.setattr(app_module, "KNOWLEDGE_URLS", [])
+    monkeypatch.setattr(app_module, "vector_store_exists", lambda: True)
+    monkeypatch.setattr(app_module, "load_vector_store_if_usable", lambda: None)
+    monkeypatch.setattr(app_module, "clear_vector_store", lambda: calls.append("clear"))
+    monkeypatch.setattr(
+        app_module,
+        "_load_local_knowledge_documents",
+        lambda: (local_docs, "Markdown"),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "initialize_vector_store",
+        lambda docs: {"doc_count": len(docs)},
+    )
+
+    db = app_module._load_or_build_vector_store()
+
+    assert calls == ["clear"]
+    assert db == {"doc_count": 1}
 
 
 def test_rebuild_clears_existing_vector_store(monkeypatch):
@@ -650,6 +700,22 @@ def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):
 
     assert response.status_code == 200
     assert "ne sais pas encore" in payload["answer"]
+    assert payload["sources"] == []
+    assert payload["confidence"] == "Faible"
+
+
+def test_rag_route_without_retrieved_docs_forces_refusal(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _NoSourceRagChain())
+    monkeypatch.setattr(
+        app_module, "text_to_speech_to_static", lambda text: ""
+    )
+
+    response = client.post("/ask", data={"messageText": "Quand semer le mil ?"})
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "Je ne sais pas encore" in payload["answer"]
     assert payload["sources"] == []
     assert payload["confidence"] == "Faible"
 

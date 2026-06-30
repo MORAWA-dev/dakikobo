@@ -20,7 +20,7 @@ from core.rag_pipeline import (
     initialize_vector_store,
     clear_vector_store,
     vector_store_exists,
-    load_vector_store,
+    load_vector_store_if_usable,
     text_to_speech_to_static,
 )
 from core.llm_chain import setup_retrieval_qa
@@ -261,6 +261,13 @@ def _is_refusal(answer: str) -> bool:
     return "ne sais pas encore" in text or "n'est pas disponible dans la base" in text
 
 
+def _no_rag_context_answer() -> str:
+    return (
+        "Je ne sais pas encore. Cette information n'est pas disponible "
+        f"dans la base de données de {BOT_NAME} pour le Burkina Faso."
+    )
+
+
 def _confidence_from_score(top_score: float) -> str:
     """Map the best retrieval relevance score to a confidence label."""
     if top_score >= CONFIDENCE_STRONG_SCORE:
@@ -479,7 +486,11 @@ def _load_or_build_vector_store():
     store_exists = vector_store_exists()
     if store_exists and not REBUILD_VECTORSTORE:
         print("1. Loading existing vector store (set REBUILD_VECTORSTORE=true to rebuild)...")
-        return load_vector_store()
+        db = load_vector_store_if_usable()
+        if db is not None:
+            return db
+        print("1. Clearing unusable vector store for a clean rebuild...")
+        clear_vector_store()
 
     if store_exists and REBUILD_VECTORSTORE:
         print("1. Clearing existing vector store for a clean rebuild...")
@@ -783,7 +794,11 @@ def ask():
         # by retrieval relevance score so confidence reflects match quality, not
         # how many chunks came back.
         source_docs = response.get("source_documents", [])
-        if _is_refusal(answer):
+        if not source_docs:
+            answer = _no_rag_context_answer()
+            sources, confidence = [], "Faible"
+            refusal = True
+        elif _is_refusal(answer):
             # The model declined to answer; do not imply confidence or evidence.
             sources, confidence = [], "Faible"
             refusal = True

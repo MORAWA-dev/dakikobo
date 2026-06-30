@@ -10,6 +10,7 @@ traceable sources.
 - [x] Public Hugging Face Space is live: `https://kimcomehome-dakikobo.hf.space/`
 - [x] Flask app with French chat UI.
 - [x] RAG over reviewed local Markdown in `Data/markdown/`, with original PDFs kept as fallback/source files.
+- [x] Chroma startup validation rebuilds the vector store when the persisted collection is missing or empty.
 - [x] Source citations rendered under answers.
 - [x] Off-topic fallback instead of confident hallucination.
 - [x] Persistent Chroma vector store locally, with lazy initialization for hosted startup.
@@ -96,6 +97,7 @@ triage assistant that explains its evidence".
   - source cards now require crop/topic overlap when the query contains those concepts
   - RAG source cards are capped by `MAX_RAG_SOURCES`
   - kept citations are ordered by relevance score
+  - zero-document retrieval forces the grounded fallback instead of an uncited answer
 
 - [x] Add rate-limit and abuse protection:
   - per-session request cooldown
