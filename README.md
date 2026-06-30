@@ -129,6 +129,7 @@ Optional overrides (defaults in `config.py` are fine for development):
 ```dotenv
 # LLM_MODEL=llama-3.3-70b-versatile
 # APP_VERSION=0.1.0
+# LOG_LEVEL=INFO
 # LLM_MAX_TOKENS=512
 # LLM_TEMPERATURE=0.1
 # STT_MODEL=whisper-large-v3-turbo
@@ -180,6 +181,7 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | Setting                | Default                                  | Purpose                                  |
 | ---------------------- | ---------------------------------------- | ---------------------------------------- |
 | `APP_VERSION`          | `0.1.0`                                  | Version string returned by `/version`    |
+| `LOG_LEVEL`            | `INFO`                                   | Structured JSON application log level    |
 | `LLM_MODEL`            | `llama-3.3-70b-versatile`                | Groq chat model                          |
 | `EMBEDDING_MODEL`      | `paraphrase-multilingual-MiniLM-L12-v2`  | Sentence-transformer for retrieval       |
 | `SIMILARITY_THRESHOLD` | `0.2`                                    | Min relevance to use a chunk (else fallback) |
@@ -223,5 +225,8 @@ dakikobo/
 - `.env`, `chroma_db/`, generated audio and `data/feedback.csv` are git-ignored.
 - `/healthz` reports readiness; `/version` reports app version, commit if exposed
   by the host, and key runtime config flags.
+- Runtime logs are JSON lines with route, status, latency, model/feature, failure
+  type and confidence where available. Raw questions, answers, images and audio
+  are not logged.
 - This tool gives general guidance; users should confirm specifics (e.g. fertilizer
   doses) with a local agricultural extension agent.

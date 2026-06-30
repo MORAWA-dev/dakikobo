@@ -36,6 +36,7 @@ Optional:
 
 ```text
 APP_VERSION=0.1.0
+LOG_LEVEL=INFO
 LLM_MODEL=llama-3.3-70b-versatile
 STT_MODEL=whisper-large-v3-turbo
 VECTORSTORE_DIR=chroma_db

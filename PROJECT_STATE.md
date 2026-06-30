@@ -286,6 +286,24 @@ Quota-safe examples:
 - fertilizer case
 - image screening case
 
+### 10. Structured Logs
+
+The Flask app emits privacy-safe JSON logs for request observability.
+
+Implementation:
+
+- Logger name: `dakikobo`
+- Config: `LOG_LEVEL`
+- General fields: event, timestamp, method, route, endpoint, status code,
+  latency in milliseconds
+- Route-specific fields where available: feature, model, outcome, failure type,
+  confidence, source count, upload byte size, refusal flag
+
+Privacy rule:
+
+- Logs do not include raw questions, answers, image bytes, audio bytes, API keys,
+  user photos, or user recordings.
+
 ## Main Routes
 
 | Route | Method | Purpose |
@@ -408,6 +426,7 @@ Optional but used by features:
 - `VOICE_COOLDOWN_SECONDS`
 - `IMAGE_COOLDOWN_SECONDS`
 - `MAX_IMAGE_UPLOAD_MB`
+- `LOG_LEVEL`
 
 Do not commit:
 
@@ -443,7 +462,7 @@ Vision:
 Operations:
 
 - `/version` exists locally and should be verified after the next HF deploy.
-- No structured logging dashboard yet.
+- Structured JSON logs exist; no dashboard or log aggregation exists yet.
 - No nightly HF smoke test yet.
 - No persistent database yet.
 
@@ -475,12 +494,12 @@ Evaluate in this order:
 
 Highest-impact next tasks:
 
-1. Add structured JSON logs for route, latency, status, model, and failure type.
-2. Add document-level metadata to ingestion and source cards.
-3. Add a privacy note for uploaded photos/audio.
-4. Convert `data/feedback.csv` into a small SQLite case log.
-5. Add a text-question context flow for crop, location, and growth stage.
-6. Add Firecrawl offline ingestion script with allowlist and review gate.
+1. Add document-level metadata to ingestion and source cards.
+2. Add a privacy note for uploaded photos/audio.
+3. Convert `data/feedback.csv` into a small SQLite case log.
+4. Add a text-question context flow for crop, location, and growth stage.
+5. Add Firecrawl offline ingestion script with allowlist and review gate.
+6. Add log aggregation or a simple observability dashboard.
 7. Continue live retrieval evaluation and tune citation thresholds if needed.
 
 ## Evaluation Principle

@@ -8,6 +8,7 @@ load_dotenv()  # Loads variables from a .env file if present
 
 # --- LLM ---
 APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_USER_AGENT = os.getenv("GROQ_USER_AGENT", "Mozilla/5.0 DakiKobo/1.0")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")

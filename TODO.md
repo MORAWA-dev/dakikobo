@@ -38,7 +38,7 @@ traceable sources.
 - [ ] The app does not yet ask for crop, growth stage, location, or recent weather.
 - [ ] RAG citations now show source cards and relevance filtering, but still need live tuning against noisy edge cases.
 - [ ] Feedback is stored as CSV, not a reusable case/evaluation dataset.
-- [ ] No observability dashboard for failures, quotas, slow responses, or bad answers.
+- [ ] Structured JSON logs exist, but there is no observability dashboard for failures, quotas, slow responses, or bad answers.
 - [ ] No scheduled knowledge refresh from trusted web sources.
 - [ ] No benchmark suite for vision/photo diagnosis quality.
 - [ ] No weather, soil, or rainfall-onset intelligence.
@@ -259,7 +259,7 @@ to prove what works, what fails, and why.
 ## Engineering hardening
 
 - [x] Add `/version` route with app version, host commit if available, and runtime config flags.
-- [ ] Add structured logging for `/ask`, `/screen`, errors, latency.
+- [x] Add privacy-safe structured JSON logging for route, status, latency, model/feature, confidence, source count, upload size, and failure type.
 - [x] Harden TTS fallback/timeouts so slow gTTS cannot block an answer.
 - [ ] Add timeout handling around Groq, Gemini, TTS, weather, Firecrawl.
 - [ ] Add simple request size limits.

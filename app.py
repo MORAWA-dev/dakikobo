@@ -2,11 +2,13 @@
 
 import os
 import csv
+import json
+import logging
 from math import ceil
-from time import time
+from time import perf_counter, time
 from threading import Lock, Thread
 from datetime import datetime, timezone
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, g, has_request_context
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from core.rag_pipeline import (
@@ -43,10 +45,13 @@ from core.soil import (
 from config import (
     KNOWLEDGE_URLS,
     APP_VERSION,
+    LOG_LEVEL,
     DATA_FOLDER,
     MARKDOWN_FOLDER,
     PREFER_MARKDOWN_KB,
     LLM_MODEL,
+    GEMINI_MODEL,
+    STT_MODEL,
     EMBEDDING_MODEL,
     VECTORSTORE_DIR,
     DEBUG,
@@ -67,6 +72,12 @@ from config import (
     MAX_AUDIO_UPLOAD_MB,
 )
 
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
+    format="%(message)s",
+)
+logger = logging.getLogger("dakikobo")
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES)
@@ -77,6 +88,48 @@ app.config["MAX_AUDIO_UPLOAD_MB"] = MAX_AUDIO_UPLOAD_MB
 
 # Lightweight feedback log (no database) — one CSV row per thumbs up/down.
 FEEDBACK_FILE = os.path.join("data", "feedback.csv")
+
+
+def _set_log_fields(**fields) -> None:
+    if not has_request_context():
+        return
+    current = getattr(g, "log_fields", {})
+    current.update({key: value for key, value in fields.items() if value is not None})
+    g.log_fields = current
+
+
+def _log_payload(event: str, **fields) -> None:
+    payload = {
+        "event": event,
+        "timestamp": _utc_now_iso(),
+        **fields,
+    }
+    logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+@app.before_request
+def _request_log_start():
+    g.request_started_at = perf_counter()
+    g.log_fields = {}
+
+
+@app.after_request
+def _request_log_finish(response):
+    started_at = getattr(g, "request_started_at", None)
+    latency_ms = None
+    if started_at is not None:
+        latency_ms = round((perf_counter() - started_at) * 1000, 2)
+
+    payload = {
+        "method": request.method,
+        "route": request.path,
+        "endpoint": request.endpoint,
+        "status_code": response.status_code,
+        "latency_ms": latency_ms,
+    }
+    payload.update(getattr(g, "log_fields", {}))
+    _log_payload("http_request", **payload)
+    return response
 
 
 def _short_snippet(text: str, max_chars: int = 150) -> str:
@@ -229,6 +282,12 @@ def _rate_limit_response(action: str, cooldown_seconds: float):
     retry_after = ceil(cooldown_seconds - (now - last_at))
 
     if retry_after > 0:
+        _set_log_fields(
+            feature=action,
+            outcome="rate_limited",
+            failure_type="rate_limit",
+            retry_after=retry_after,
+        )
         return jsonify({
             "error": (
                 f"Veuillez patienter {retry_after} seconde"
@@ -472,19 +531,23 @@ def weather_locations():
 
 @app.route("/weather")
 def weather_context():
+    _set_log_fields(feature="weather")
     location_id = request.args.get("location", "ouagadougou").strip()
     try:
         weather = build_weather_context(location_id)
     except ValueError:
+        _set_log_fields(outcome="validation_error", failure_type="bad_location")
         return jsonify({
             "error": "Choisissez une localité disponible pour la météo agricole.",
             "confidence": "Faible",
         }), 400
     except WeatherError:
+        _set_log_fields(outcome="service_error", failure_type="weather_error")
         return jsonify({
             "error": "La météo agricole n'est pas disponible pour le moment.",
             "confidence": "Faible",
         }), 502
+    _set_log_fields(outcome="ok", location=location_id, confidence="Moyen")
     return jsonify({
         "weather": weather,
         "confidence": "Moyen",
@@ -501,16 +564,19 @@ def soil_locations():
 
 @app.route("/soil")
 def soil_context():
+    _set_log_fields(feature="soil")
     location_id = request.args.get("location", "ouagadougou").strip()
     crop = request.args.get("crop", "sorgho").strip()
     try:
         soil = build_soil_context(location_id, crop)
     except ValueError:
+        _set_log_fields(outcome="validation_error", failure_type="bad_selection")
         return jsonify({
             "error": "Choisissez une localité et une culture disponibles pour le contexte sol.",
             "confidence": "Faible",
         }), 400
     except SoilError:
+        _set_log_fields(outcome="service_error", failure_type="soil_error")
         return jsonify({
             "error": "Le contexte sol n'est pas disponible pour le moment.",
             "confidence": "Faible",
@@ -521,6 +587,14 @@ def soil_context():
         "sources": [],
     }
     confidence = "Moyen" if soil.get("data_available") else "Faible"
+    _set_log_fields(
+        outcome="ok",
+        location=location_id,
+        crop=crop,
+        confidence=confidence,
+        soil_data_available=bool(soil.get("data_available")),
+        source_count=len(soil["sources"] + fertilizer["sources"]),
+    )
     return jsonify({
         "soil": soil,
         "fertilizer": fertilizer,
@@ -538,8 +612,11 @@ def request_entity_too_large(error):
 
 @app.route("/ask", methods=["POST"])
 def ask():
+    _set_log_fields(feature="ask", model=LLM_MODEL)
     query = request.form.get("messageText", "").strip()
+    _set_log_fields(input_chars=len(query))
     if not query:
+        _set_log_fields(outcome="validation_error", failure_type="empty_question", confidence="Faible")
         return jsonify({
             "answer": "Veuillez écrire une question agricole avant d'envoyer.",
             "sources": [],
@@ -559,6 +636,14 @@ def ask():
         "qui es-tu ?", "qui es-tu?", "qui es tu ?", "qui es tu?",
     ]
     if query.lower() in identity_triggers:
+        _set_log_fields(
+            intent="identity",
+            model="static",
+            outcome="ok",
+            confidence="Fort",
+            source_count=0,
+            audio_generated=False,
+        )
         return jsonify({
             "answer": f"Je suis {BOT_NAME}, un assistant agricole intelligent développé par {BOT_CREATOR}.",
             "sources": [],
@@ -572,6 +657,14 @@ def ask():
         advice = get_fertilizer_advice(query)
         if advice is not None:
             audio_url = text_to_speech_to_static(advice["answer"])
+            _set_log_fields(
+                intent="fertilizer",
+                model="deterministic",
+                outcome="ok",
+                confidence="Fort",
+                source_count=len(advice["sources"]),
+                audio_generated=bool(audio_url),
+            )
             return jsonify({
                 "answer": advice["answer"],
                 "sources": advice["sources"],
@@ -590,10 +683,21 @@ def ask():
         if _is_refusal(answer):
             # The model declined to answer; do not imply confidence or evidence.
             sources, confidence = [], "Faible"
+            refusal = True
         else:
             sources, confidence = _grounded_sources_and_confidence(query, source_docs)
+            refusal = False
 
         audio_url = text_to_speech_to_static(answer)
+        _set_log_fields(
+            intent="rag",
+            outcome="ok",
+            confidence=confidence,
+            source_count=len(sources),
+            retrieved_doc_count=len(source_docs),
+            refusal=refusal,
+            audio_generated=bool(audio_url),
+        )
         return jsonify({
             "answer": answer,
             "sources": sources,
@@ -603,6 +707,12 @@ def ask():
 
     except Exception as e:
         print(f"ERROR — LLM/RAG execution failed: {e}")
+        _set_log_fields(
+            intent="rag",
+            outcome="service_error",
+            failure_type=type(e).__name__,
+            confidence="Faible",
+        )
         return jsonify({
             "answer": f"Désolé, {BOT_NAME} a rencontré une erreur de traitement. Veuillez réessayer plus tard.",
             "sources": [],
@@ -614,7 +724,9 @@ def ask():
 @app.route("/speech", methods=["POST"])
 def speech():
     """Transcribe a short voice question recorded by the browser."""
+    _set_log_fields(feature="speech", model=STT_MODEL)
     if not speech_configured():
+        _set_log_fields(outcome="not_configured", failure_type="missing_groq_key", confidence="Faible")
         return jsonify({
             "error": "La dictée vocale n'est pas configurée sur ce serveur.",
             "confidence": "Faible",
@@ -622,18 +734,22 @@ def speech():
 
     file = request.files.get("audio")
     if file is None or not file.filename:
+        _set_log_fields(outcome="validation_error", failure_type="missing_audio", confidence="Faible")
         return jsonify({
             "error": "Aucun enregistrement audio n'a été envoyé.",
             "confidence": "Faible",
         }), 400
 
     audio_bytes = file.read()
+    _set_log_fields(audio_bytes=len(audio_bytes), audio_mime_type=file.mimetype or "audio/webm")
     if not audio_bytes:
+        _set_log_fields(outcome="validation_error", failure_type="empty_audio", confidence="Faible")
         return jsonify({
             "error": "L'enregistrement audio est vide.",
             "confidence": "Faible",
         }), 400
     if len(audio_bytes) > app.config["MAX_AUDIO_UPLOAD_BYTES"]:
+        _set_log_fields(outcome="validation_error", failure_type="audio_too_large", confidence="Faible")
         return _audio_too_large_response()
 
     limited = _rate_limit_response("speech", VOICE_COOLDOWN_SECONDS)
@@ -648,17 +764,20 @@ def speech():
         )
     except SpeechTranscriptionError as e:
         print(f"ERROR — speech transcription failed: {e}")
+        _set_log_fields(outcome="service_error", failure_type=type(e).__name__, confidence="Faible")
         return jsonify({
             "error": "La dictée vocale a échoué. Veuillez réessayer ou taper votre question.",
             "confidence": "Faible",
         }), 502
 
     if not text:
+        _set_log_fields(outcome="no_speech", failure_type="empty_transcript", confidence="Faible")
         return jsonify({
             "error": "Aucune parole claire n'a été détectée. Veuillez réessayer plus près du micro.",
             "confidence": "Faible",
         }), 422
 
+    _set_log_fields(outcome="ok", confidence="Moyen", transcript_chars=len(text))
     return jsonify({
         "text": text,
         "confidence": "Moyen",
@@ -668,7 +787,9 @@ def speech():
 @app.route("/screen", methods=["POST"])
 def screen():
     """Leaf disease screening from an uploaded photo (Gemini Vision)."""
+    _set_log_fields(feature="screen", model=GEMINI_MODEL)
     if not disease_configured():
+        _set_log_fields(outcome="not_configured", failure_type="missing_gemini_key", confidence="Faible")
         return jsonify({
             "answer": "L'analyse d'image n'est pas disponible (clé Gemini non "
             "configurée).",
@@ -679,18 +800,22 @@ def screen():
 
     file = request.files.get("image")
     if file is None or not file.filename:
+        _set_log_fields(outcome="validation_error", failure_type="missing_image", confidence="Faible")
         return jsonify({
             "error": "Aucune image n'a été envoyée.",
             "confidence": "Faible",
         }), 400
 
     image_bytes = file.read()
+    _set_log_fields(image_bytes=len(image_bytes), image_mime_type=file.mimetype or "image/jpeg")
     if not image_bytes:
+        _set_log_fields(outcome="validation_error", failure_type="empty_image", confidence="Faible")
         return jsonify({
             "error": "L'image envoyée est vide.",
             "confidence": "Faible",
         }), 400
     if len(image_bytes) > app.config["MAX_IMAGE_UPLOAD_BYTES"]:
+        _set_log_fields(outcome="validation_error", failure_type="image_too_large", confidence="Faible")
         return _upload_too_large_response()
 
     limited = _rate_limit_response("screen", IMAGE_COOLDOWN_SECONDS)
@@ -701,6 +826,11 @@ def screen():
     crop = request.form.get("crop", "").strip()[:80]
     growth_stage = request.form.get("growth_stage", "").strip()[:80]
     location = request.form.get("location", "").strip()[:120]
+    _set_log_fields(
+        crop_provided=bool(crop),
+        growth_stage_provided=bool(growth_stage),
+        location_provided=bool(location),
+    )
     result = screen_leaf_image(
         image_bytes,
         mime_type,
@@ -718,6 +848,12 @@ def screen():
         case = dict(case)
         case["confidence"] = confidence
     audio_url = text_to_speech_to_static(answer)
+    _set_log_fields(
+        outcome="ok",
+        confidence=confidence,
+        case_structured=case is not None,
+        audio_generated=bool(audio_url),
+    )
     return jsonify({
         "answer": answer,
         "case": case,
@@ -729,11 +865,13 @@ def screen():
 
 @app.route("/feedback", methods=["POST"])
 def feedback():
+    _set_log_fields(feature="feedback")
     rating = request.form.get("rating", "").strip()
     question = request.form.get("question", "").strip()
     answer = request.form.get("answer", "").strip()
 
     if rating not in ("up", "down"):
+        _set_log_fields(outcome="validation_error", failure_type="invalid_rating")
         return jsonify({"ok": False, "error": "invalid rating"}), 400
 
     try:
@@ -746,9 +884,11 @@ def feedback():
             writer.writerow(
                 [datetime.now(timezone.utc).isoformat(), rating, question, answer]
             )
+        _set_log_fields(outcome="ok", rating=rating)
         return jsonify({"ok": True})
     except Exception as e:
         print(f"ERROR — feedback write failed: {e}")
+        _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
         return jsonify({"ok": False, "error": "write failed"}), 500
 
 

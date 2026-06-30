@@ -1,5 +1,7 @@
 """Flask route smoke tests with live services mocked out."""
 
+import json
+import logging
 from types import SimpleNamespace
 
 import app as app_module
@@ -113,6 +115,48 @@ def test_version_route_reports_runtime_metadata(monkeypatch):
     assert payload["config"]["llm_model"]
     assert payload["config"]["embedding_model"] == "paraphrase-multilingual-MiniLM-L12-v2"
     assert payload["config"]["prefer_markdown_kb"] is True
+
+
+def test_ask_route_emits_privacy_safe_structured_log(caplog):
+    client = app_module.app.test_client()
+    caplog.set_level(logging.INFO, logger="dakikobo")
+
+    response = client.post("/ask", data={"messageText": "qui es-tu ?"})
+
+    records = [record for record in caplog.records if record.name == "dakikobo"]
+    payload = json.loads(records[-1].message)
+
+    assert response.status_code == 200
+    assert payload["event"] == "http_request"
+    assert payload["route"] == "/ask"
+    assert payload["method"] == "POST"
+    assert payload["status_code"] == 200
+    assert payload["feature"] == "ask"
+    assert payload["intent"] == "identity"
+    assert payload["model"] == "static"
+    assert payload["confidence"] == "Fort"
+    assert payload["source_count"] == 0
+    assert isinstance(payload["latency_ms"], float)
+    assert "qui es-tu" not in payload.values()
+    assert "answer" not in payload
+    assert "question" not in payload
+
+
+def test_validation_error_log_includes_failure_type(caplog):
+    client = app_module.app.test_client()
+    caplog.set_level(logging.INFO, logger="dakikobo")
+
+    response = client.post("/ask", data={})
+
+    records = [record for record in caplog.records if record.name == "dakikobo"]
+    payload = json.loads(records[-1].message)
+
+    assert response.status_code == 400
+    assert payload["route"] == "/ask"
+    assert payload["status_code"] == 400
+    assert payload["outcome"] == "validation_error"
+    assert payload["failure_type"] == "empty_question"
+    assert payload["confidence"] == "Faible"
 
 
 def test_rag_warmup_starts_once(monkeypatch):
