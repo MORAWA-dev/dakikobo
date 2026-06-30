@@ -110,7 +110,10 @@ Retrieval status:
 
 - Source cards are now filtered and ranked with retrieval relevance scores when
   the Chroma store is available.
+- Source cards also use a crop/topic lexical guard against the full retrieved
+  chunks, so mixed generic citations are suppressed for focused questions.
 - Weak secondary citations are dropped when they score far below the best match.
+- RAG answers show at most two source cards by default (`MAX_RAG_SOURCES=2`).
 - Live tuning is still recommended because edge cases can depend on the hosted
   vector store contents and query wording.
 

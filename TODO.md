@@ -93,6 +93,8 @@ triage assistant that explains its evidence".
 - [x] Add relevance-score citation filtering:
   - confidence now uses retrieval score when available
   - weak secondary citations are dropped when far below the best match
+  - source cards now require crop/topic overlap when the query contains those concepts
+  - RAG source cards are capped by `MAX_RAG_SOURCES`
   - kept citations are ordered by relevance score
 
 - [x] Add rate-limit and abuse protection:

@@ -4,6 +4,8 @@ import os
 import csv
 import json
 import logging
+import re
+import unicodedata
 from math import ceil
 from time import perf_counter, time
 from threading import Lock, Thread
@@ -61,6 +63,7 @@ from config import (
     CONFIDENCE_STRONG_SCORE,
     CONFIDENCE_MEDIUM_SCORE,
     CITATION_SCORE_MARGIN,
+    MAX_RAG_SOURCES,
     REBUILD_VECTORSTORE,
     RAG_WARMUP_ON_START,
     REQUEST_COOLDOWN_SECONDS,
@@ -150,6 +153,74 @@ _DOC_TYPE_LABELS = {
     "survey_report": "Enquête agricole",
 }
 
+_CITATION_STOPWORDS = {
+    "avec", "dans", "pour", "contre", "comment", "quelle", "quand", "quoi",
+    "vous", "votre", "cette", "cela", "faire", "avoir", "etre", "sont",
+    "plus", "bien", "agricole", "agriculture", "burkina", "faso", "les",
+    "des", "sur", "aux", "une", "est", "son", "ses", "mes", "vos", "nos",
+    "par", "pas", "que", "qui", "quel", "elle", "ils", "elles", "leur",
+}
+
+_CROP_TOKENS = {
+    "arachide", "coton", "fonio", "mais", "mil", "niebe", "riz",
+    "sesame", "sorgho",
+}
+
+_CITATION_ALIASES = {
+    "bruche": {"bruches", "insecte", "insectes", "ravageur", "ravageurs"},
+    "bruches": {"bruche", "insecte", "insectes", "ravageur", "ravageurs"},
+    "conservation": {"conserver", "stockage", "stocker"},
+    "conserver": {"conservation", "stockage", "stocker"},
+    "engrais": {"fertilisation", "fertiliser", "fumure"},
+    "fertilisation": {"engrais", "fertiliser", "fumure"},
+    "fertiliser": {"engrais", "fertilisation", "fumure"},
+    "fumure": {"engrais", "fertilisation", "fertiliser"},
+    "maladie": {"maladies", "symptome", "symptomes"},
+    "maladies": {"maladie", "symptome", "symptomes"},
+    "semer": {"semis"},
+    "semis": {"semer"},
+    "stockage": {"conservation", "conserver", "stocker"},
+    "stocker": {"conservation", "conserver", "stockage"},
+    "symptome": {"maladie", "maladies", "symptomes"},
+    "symptomes": {"maladie", "maladies", "symptome"},
+}
+
+
+def _normalize_for_match(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text or "")
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return text.lower()
+
+
+def _citation_tokens(text: str) -> set[str]:
+    normalized = _normalize_for_match(text)
+    tokens = set(re.findall(r"[a-z0-9]{3,}", normalized))
+    filtered = {token for token in tokens if token not in _CITATION_STOPWORDS}
+    expanded = set()
+    for token in filtered:
+        expanded.add(token)
+        expanded.update(_CITATION_ALIASES.get(token, set()))
+    return expanded
+
+
+def _source_match_texts(source_docs) -> dict[str, str]:
+    by_title = {}
+    for doc in source_docs:
+        title = doc.metadata.get("source", "Inconnu")
+        by_title.setdefault(title, []).append(getattr(doc, "page_content", ""))
+    return {title: " ".join(texts) for title, texts in by_title.items()}
+
+
+def _source_tokens(source: dict, match_text: str) -> set[str]:
+    source_text = f"{source.get('title', '')} {source.get('snippet', '')} {match_text}"
+    return _citation_tokens(source_text)
+
+
+def _source_overlap(source: dict, query_tokens: set[str], match_text: str = "") -> int:
+    if not query_tokens:
+        return 0
+    return len(query_tokens.intersection(_source_tokens(source, match_text)))
+
 
 def _format_rag_sources(source_docs) -> list[dict]:
     """Return unique, UI-friendly source cards from retrieved documents.
@@ -224,9 +295,9 @@ def _source_scores(query: str) -> dict:
 def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict], str]:
     """Build the source cards and confidence from retrieval relevance scores.
 
-    Drops secondary citations that score far below the best match (the noisy
-    unrelated-card problem), and labels confidence from the top score. Falls back
-    to the count-based heuristic when no scores are available.
+    Drops secondary citations that either miss the query's crop/topic concepts
+    or score far below the best match. Falls back to the count-based heuristic
+    when no scores are available.
     """
     sources = _format_rag_sources(source_docs)
     scores = _source_scores(query)
@@ -234,24 +305,56 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
     if not sources or not scores:
         return sources, _confidence_from_sources(sources)
 
+    query_tokens = _citation_tokens(query)
+    match_texts = _source_match_texts(source_docs)
+    source_tokens = {
+        s["title"]: _source_tokens(s, match_texts.get(s["title"], ""))
+        for s in sources
+    }
+    query_crop_tokens = query_tokens.intersection(_CROP_TOKENS)
+    query_topic_tokens = query_tokens - query_crop_tokens
+
+    crop_overlaps = {
+        title: len(tokens.intersection(query_crop_tokens))
+        for title, tokens in source_tokens.items()
+    }
+    if query_crop_tokens and any(crop_overlaps.values()):
+        sources = [s for s in sources if crop_overlaps.get(s["title"], 0) > 0]
+
+    topic_overlaps = {
+        title: len(tokens.intersection(query_topic_tokens))
+        for title, tokens in source_tokens.items()
+    }
+    if query_topic_tokens and any(topic_overlaps.get(s["title"], 0) > 0 for s in sources):
+        sources = [s for s in sources if topic_overlaps.get(s["title"], 0) > 0]
+
+    overlaps = {
+        s["title"]: _source_overlap(s, query_tokens, match_texts.get(s["title"], ""))
+        for s in sources
+    }
+    if any(overlaps.values()):
+        max_overlap = max(overlaps.values())
+        min_overlap = max(1, max_overlap - 1) if max_overlap >= 3 else 1
+        sources = [s for s in sources if overlaps.get(s["title"], 0) >= min_overlap]
+
     scored_known = [scores[s["title"]] for s in sources if s["title"] in scores]
     if not scored_known:
         return sources, _confidence_from_sources(sources)
 
     top = max(scored_known)
     floor = top - CITATION_SCORE_MARGIN
-    # Keep a source if it has no score (the chain grounded on it) or scores within
-    # the margin of the best. This removes weakly related cards next to the right one.
     kept = [
         s for s in sources
-        if s["title"] not in scores or scores[s["title"]] >= floor
+        if s["title"] in scores and scores[s["title"]] >= floor
     ]
+    if not kept:
+        kept = [s for s in sources if s["title"] in scores and scores[s["title"]] == top]
     ranked = sorted(
-        kept or sources,
+        kept,
         key=lambda source: scores.get(source["title"], -1.0),
         reverse=True,
     )
-    return ranked, _confidence_from_score(top)
+    return ranked[:MAX_RAG_SOURCES], _confidence_from_score(top)
 
 
 def _confidence_for_screen(case: dict | None, has_context: bool) -> str:

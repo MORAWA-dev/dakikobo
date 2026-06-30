@@ -632,9 +632,10 @@ def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
     assert payload["confidence"] == "Fort"
     assert [source["title"] for source in payload["sources"]] == [
         "IITA 2018 - Production du niebe",
-        "Source moyenne",
     ]
-    assert "Source faible" not in [source["title"] for source in payload["sources"]]
+    titles = [source["title"] for source in payload["sources"]]
+    assert "Source moyenne" not in titles
+    assert "Source faible" not in titles
 
 
 def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):

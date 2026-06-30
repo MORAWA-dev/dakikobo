@@ -185,6 +185,8 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `LLM_MODEL`            | `llama-3.3-70b-versatile`                | Groq chat model                          |
 | `EMBEDDING_MODEL`      | `paraphrase-multilingual-MiniLM-L12-v2`  | Sentence-transformer for retrieval       |
 | `SIMILARITY_THRESHOLD` | `0.2`                                    | Min relevance to use a chunk (else fallback) |
+| `CITATION_SCORE_MARGIN` | `0.12`                                  | Drop secondary source cards far below the best match |
+| `MAX_RAG_SOURCES`      | `2`                                      | Maximum RAG source cards shown per answer |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `500` / `100`                    | Document splitting                       |
 | `VECTORSTORE_DIR`      | `chroma_db`                              | Persisted index location (git-ignored)   |
 | `RAG_WARMUP_ON_START`  | `false` locally, `true` in Docker        | Background RAG warm-up on hosted startup |
