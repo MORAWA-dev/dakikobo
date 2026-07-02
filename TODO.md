@@ -149,16 +149,16 @@ Candidate source:
 - [x] Add a Deep Research / iAskPro prompt for strict RAG-ready Markdown data curation.
 - [x] Add a source-first research prompt so models must verify title, publisher, year, country, and URL before generating RAG Markdown.
 - [x] Archive rejected deep-research outputs and keep a verification audit.
-- [ ] Add `scripts/crawl_sources.py` that uses `FIRECRAWL_API_KEY`.
-- [ ] Do not scrape at user request time. Scrape offline, review, then ingest.
+- [x] Add `scripts/firecrawl_ingest.py` that uses `FIRECRAWL_API_KEY`.
+- [x] Do not scrape at user request time. Scrape offline, review, then ingest.
 - [ ] Maintain an allowlist of trusted sources:
   - Burkina Faso agriculture ministry pages
   - FAO Burkina Faso pages
   - WASCAL / AGRHYMET / CILSS climate-agriculture resources
   - INERA / extension manuals where accessible
-- [ ] Store crawled output as markdown under `Data/web/`.
-- [ ] Add metadata: URL, title, publisher, date crawled, language, license/usage note.
-- [ ] Add a review flag before documents enter RAG.
+- [x] Store crawled output as pending Markdown under `Data/scraped/pending/`.
+- [x] Add metadata: URL, title, publisher, date crawled, language, license/usage note.
+- [x] Add a review flag before documents enter RAG.
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:
@@ -257,6 +257,7 @@ to prove what works, what fails, and why.
 - [x] Extract ProSol 2020 into a curated Markdown source for Burkina Faso soil fertility, compost, organic manure, and CES preparation.
 - [x] Extract IITA 2018 into a curated regional Markdown source for niébé agronomy, symptoms, and storage, excluding chemical product tables.
 - [ ] Keep scraped documents separate from manually reviewed PDFs.
+- [x] Keep Firecrawl scraped candidates outside active RAG until promotion.
 - [ ] Remove or quarantine any source with unclear rights.
 - [ ] Add a privacy note for uploaded images.
 - [ ] Never commit API keys, `.env`, generated audio, feedback logs, or user photos.
@@ -268,7 +269,7 @@ to prove what works, what fails, and why.
 - [x] Add `scripts/evaluate_rag.py` for public Space RAG/tool/safety smoke reports.
 - [x] Harden TTS fallback/timeouts so slow gTTS cannot block an answer.
 - [x] Add timeout/retry handling around Groq chat, Groq STT, Gemini, TTS, weather, soil, and web fetches.
-- [ ] Add Firecrawl ingestion script with timeout/retry handling and review workflow.
+- [x] Add Firecrawl ingestion script with timeout/retry handling and review workflow.
 - [ ] Add simple request size limits.
 - [ ] Add SQLite for local/dev case logs.
 - [x] Add Docker build test in CI.
@@ -279,7 +280,7 @@ to prove what works, what fails, and why.
 1. Structured case cards for image and text answers.
 2. Weather context card.
 3. Better source/citation cards.
-4. Firecrawl ingestion script with review workflow.
+4. Firecrawl allowlist and first curated source batch.
 5. Case log and follow-up feedback.
 6. Colab evaluation notebooks for vision.
 7. Soil context.

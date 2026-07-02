@@ -66,6 +66,21 @@ KNOWLEDGE_URLS = [
 ]
 WEB_FETCH_TIMEOUT_SECONDS = float(os.getenv("WEB_FETCH_TIMEOUT_SECONDS", "15.0"))
 
+# --- Firecrawl candidate source ingestion ---
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
+FIRECRAWL_API_URL = os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v2/scrape")
+FIRECRAWL_HTTP_TIMEOUT_SECONDS = float(os.getenv("FIRECRAWL_HTTP_TIMEOUT_SECONDS", "45.0"))
+FIRECRAWL_SCRAPE_TIMEOUT_MS = int(os.getenv("FIRECRAWL_SCRAPE_TIMEOUT_MS", "60000"))
+FIRECRAWL_MAX_RETRIES = int(os.getenv("FIRECRAWL_MAX_RETRIES", "2"))
+FIRECRAWL_PENDING_DIR = os.getenv(
+    "FIRECRAWL_PENDING_DIR",
+    os.path.join(DATA_FOLDER, "scraped", "pending"),
+)
+FIRECRAWL_REVIEWED_DIR = os.getenv(
+    "FIRECRAWL_REVIEWED_DIR",
+    os.path.join(MARKDOWN_FOLDER, "scraped_reviewed"),
+)
+
 # --- TTS ---
 TTS_LANGUAGE = "fr"           # French — official language of Burkina Faso
 TTS_MAX_CHARS = 700           # answers run ~100 words (~600 chars); cover the full reply

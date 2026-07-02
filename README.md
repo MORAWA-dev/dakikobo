@@ -144,6 +144,10 @@ Optional overrides (defaults in `config.py` are fine for development):
 # WEATHER_TIMEOUT_SECONDS=10.0
 # SOIL_TIMEOUT_SECONDS=12.0
 # WEB_FETCH_TIMEOUT_SECONDS=15.0
+# FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+# FIRECRAWL_HTTP_TIMEOUT_SECONDS=45.0
+# FIRECRAWL_SCRAPE_TIMEOUT_MS=60000
+# FIRECRAWL_MAX_RETRIES=2
 # FLASK_DEBUG=true
 # PREFER_MARKDOWN_KB=true # use Data/markdown before PDF fallback
 # REBUILD_VECTORSTORE=true   # force a fresh index rebuild
@@ -206,6 +210,31 @@ python scripts/evaluate_rag.py --base-url http://127.0.0.1:8005
 python scripts/evaluate_rag.py --strict
 ```
 
+## Offline Source Ingestion
+
+Firecrawl is available for collecting candidate web pages, but scraped output is
+not ingested directly. It is written to `Data/scraped/pending/` with source
+metadata and a review checklist.
+
+```bash
+python scripts/firecrawl_ingest.py \
+  --url https://example.org/agriculture-page \
+  --publisher "Publisher name" \
+  --topics "semis, fertilite" \
+  --crops "mil, sorgho"
+```
+
+After human review and cleanup, promote the pending file into the active Markdown
+corpus:
+
+```bash
+python scripts/firecrawl_ingest.py \
+  --promote Data/scraped/pending/20260702_example_abc12345.md \
+  --reviewer your_name
+```
+
+Then rebuild the vector store with `REBUILD_VECTORSTORE=true`.
+
 ---
 
 ## Configuration reference
@@ -240,6 +269,10 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `WEATHER_TIMEOUT_SECONDS` | `10.0`                                | Max wait for Open-Meteo requests         |
 | `SOIL_TIMEOUT_SECONDS` | `12.0`                                   | Max wait for SoilGrids requests          |
 | `WEB_FETCH_TIMEOUT_SECONDS` | `15.0`                              | Max wait for web knowledge fetches       |
+| `FIRECRAWL_API_KEY`    | empty                                    | Firecrawl key for offline source scraping |
+| `FIRECRAWL_HTTP_TIMEOUT_SECONDS` | `45.0`                         | Max wait for Firecrawl API requests      |
+| `FIRECRAWL_SCRAPE_TIMEOUT_MS` | `60000`                            | Firecrawl page scrape timeout            |
+| `FIRECRAWL_MAX_RETRIES` | `2`                                    | Retry count for retryable Firecrawl failures |
 | `MAX_AUDIO_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded voice recording size    |
 | `REQUEST_COOLDOWN_SECONDS` | `2.0`                                | Per-session cooldown for `/ask` requests |
 | `VOICE_COOLDOWN_SECONDS` | `2.0`                                  | Per-session cooldown for voice transcription |

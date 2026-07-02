@@ -343,6 +343,30 @@ GitHub Actions:
 - Installs only `requests`, runs `scripts/evaluate_rag.py`, and uploads
   `reports/rag_eval_results.md` as an artifact.
 
+### 12. Firecrawl Candidate Source Ingestion
+
+Firecrawl is wired for offline candidate collection, not runtime answering.
+
+Implementation:
+
+- Script: `scripts/firecrawl_ingest.py`
+- Pending output: `Data/scraped/pending/`
+- Reviewed active output: `Data/markdown/scraped_reviewed/`
+- Config: `FIRECRAWL_API_KEY`, timeout, scrape-timeout, and retry env vars
+
+Workflow:
+
+1. Scrape selected trusted URLs into pending Markdown.
+2. Review title, publisher, date, scope, license, crop facts, and risky advice.
+3. Promote reviewed files with `--promote ... --reviewer ...`.
+4. Rebuild the vector store before using promoted sources in RAG.
+
+Safety:
+
+- Scraped files carry `review_status: pending_human_review`.
+- Pending files live outside `Data/markdown/`, so they do not enter active RAG.
+- Promoted files remove the review checklist before ingestion.
+
 ## Main Routes
 
 | Route | Method | Purpose |
@@ -471,6 +495,13 @@ Optional but used by features:
 - `WEATHER_TIMEOUT_SECONDS`
 - `SOIL_TIMEOUT_SECONDS`
 - `WEB_FETCH_TIMEOUT_SECONDS`
+- `FIRECRAWL_API_KEY`
+- `FIRECRAWL_API_URL`
+- `FIRECRAWL_HTTP_TIMEOUT_SECONDS`
+- `FIRECRAWL_SCRAPE_TIMEOUT_MS`
+- `FIRECRAWL_MAX_RETRIES`
+- `FIRECRAWL_PENDING_DIR`
+- `FIRECRAWL_REVIEWED_DIR`
 - `PREFER_MARKDOWN_KB`
 - `REBUILD_VECTORSTORE`
 - `RAG_WARMUP_ON_START`
@@ -501,10 +532,12 @@ Product:
 
 RAG and data:
 
-- Document-level metadata should be added during ingestion.
+- Document-level metadata exists for reviewed Markdown but source cards could
+  expose more of it in the UI.
 - Retrieval source filtering exists, but needs more live evaluation and tuning.
 - Generated/scraped data should remain outside RAG until human review.
-- Firecrawl pipeline is planned but not implemented.
+- Firecrawl ingestion exists; trusted-source allowlists and first curated source
+  batches are still needed.
 
 Vision:
 
@@ -555,7 +588,7 @@ Highest-impact next tasks:
 2. Add a privacy note for uploaded photos/audio.
 3. Convert `data/feedback.csv` into a small SQLite case log.
 4. Add a text-question context flow for crop, location, and growth stage.
-5. Add Firecrawl offline ingestion script with allowlist and review gate.
+5. Add a Firecrawl trusted-source allowlist and scrape the first curated batch.
 6. Add log aggregation or a simple observability dashboard.
 7. Continue live retrieval evaluation and tune citation thresholds if needed.
 

@@ -63,6 +63,44 @@ def test_load_markdown_returns_documents():
     assert "farmer_training_manual.pdf" in original_sources
 
 
+def test_load_markdown_preserves_review_metadata(tmp_path):
+    source = tmp_path / "reviewed_web.md"
+    source.write_text(
+        """---
+title: "Guide web revu"
+source_file: "https://example.test/guide"
+source_url: "https://example.test/guide"
+doc_type: "scraped_web"
+language: "fr"
+country: "Burkina Faso"
+publisher: "Source officielle"
+license: "unknown"
+review_status: "reviewed_by_codex"
+scraped_at: "2026-07-02T10:00:00+00:00"
+reviewed_at: "2026-07-02T11:00:00+00:00"
+topics: "semis, pluie"
+crops: "mil, sorgho"
+---
+# Guide web revu
+
+Contenu agricole vérifié.
+""",
+        encoding="utf-8",
+    )
+
+    docs = load_markdown_from_folder(str(tmp_path))
+
+    assert len(docs) == 1
+    metadata = docs[0].metadata
+    assert metadata["source"] == "Guide web revu"
+    assert metadata["source_url"] == "https://example.test/guide"
+    assert metadata["doc_type"] == "scraped_web"
+    assert metadata["review_status"] == "reviewed_by_codex"
+    assert metadata["license"] == "unknown"
+    assert metadata["topics"] == "semis, pluie"
+    assert metadata["crops"] == "mil, sorgho"
+
+
 def test_load_pdfs_returns_documents():
     folder = os.path.join("Data", "knowledge_base")
     docs = load_pdfs_from_folder(folder)

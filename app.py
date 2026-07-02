@@ -151,6 +151,7 @@ _DOC_TYPE_LABELS = {
     "country_profile": "Profil pays",
     "program_doc": "Document de programme",
     "survey_report": "Enquête agricole",
+    "scraped_web": "Source web revue",
 }
 
 _CITATION_STOPWORDS = {

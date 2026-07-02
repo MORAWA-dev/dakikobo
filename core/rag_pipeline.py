@@ -150,8 +150,20 @@ def load_markdown_from_folder(folder_path: str) -> list[Document]:
                 "markdown_file": f,
                 "data_format": "markdown",
             }
-            for key in ("title", "doc_type", "language", "country",
-                        "page_count", "year", "publisher"):
+            for key in (
+                "title",
+                "doc_type",
+                "language",
+                "country",
+                "page_count",
+                "year",
+                "publisher",
+                "source_url",
+                "review_status",
+                "license",
+                "scraped_at",
+                "reviewed_at",
+            ):
                 if metadata.get(key):
                     doc_metadata[key] = metadata[key]
             # List-valued tags drive crop/zone-aware retrieval and richer cards.

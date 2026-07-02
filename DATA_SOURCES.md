@@ -50,8 +50,10 @@ path until reviewed.
 3. Exact fertilizer doses, pesticide names, crop calendars, and disease treatment advice need source-backed extraction plus human review.
 4. Firecrawl output is raw material, not truth. Scraped Markdown must keep URL, crawl date, publisher, and review status.
 5. Accepted documents move into `Data/markdown/` only after review.
+6. Firecrawl candidates belong in `Data/scraped/pending/`; reviewed promoted copies belong in `Data/markdown/scraped_reviewed/`.
 
 ## Next Source Work
 
 1. Extract verified Burkina sections from CIRAD ProPulse 2025.
 2. Search for original official arachide and climate sources to replace weak citations.
+3. Use `scripts/firecrawl_ingest.py` only for offline candidate collection, never during user requests.
