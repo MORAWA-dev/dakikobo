@@ -174,6 +174,26 @@ Open <http://127.0.0.1:5000> in your browser.
 
 ---
 
+## Evaluation
+
+Run a repeatable public demo check against the Hugging Face Space:
+
+```bash
+python scripts/evaluate_rag.py
+```
+
+The script waits for `/healthz`, exercises RAG, fertilizer, weather, soil, and
+off-topic safety cases, then writes `reports/rag_eval_results.md`.
+
+Useful options:
+
+```bash
+python scripts/evaluate_rag.py --base-url http://127.0.0.1:8005
+python scripts/evaluate_rag.py --strict
+```
+
+---
+
 ## Configuration reference
 
 All tunables live in `config.py` (overridable via environment variables where shown):
@@ -216,6 +236,8 @@ dakikobo/
 │   └── rag_pipeline.py  # Markdown/PDF ingestion, embeddings, Chroma, TTS
 ├── templates/index.html # Chat UI
 ├── static/              # CSS, JS, images, generated audio
+├── scripts/             # Utility scripts, including public RAG evaluation
+├── reports/             # Generated evaluation reports
 ├── Data/                # Source PDFs + reviewed Markdown knowledge corpus
 └── requirements.txt
 ```

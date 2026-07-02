@@ -31,6 +31,7 @@ traceable sources.
 - [x] Markdown corpus audit completed: 16/16 converted documents now match PDF text volume closely enough for RAG review.
 - [x] Docker/Hugging Face deployment files exist.
 - [x] Route tests and offline tests are passing.
+- [x] Repeatable public demo evaluation script writes `reports/rag_eval_results.md`.
 
 ## Current gaps
 
@@ -264,6 +265,7 @@ to prove what works, what fails, and why.
 
 - [x] Add `/version` route with app version, host commit if available, and runtime config flags.
 - [x] Add privacy-safe structured JSON logging for route, status, latency, model/feature, confidence, source count, upload size, and failure type.
+- [x] Add `scripts/evaluate_rag.py` for public Space RAG/tool/safety smoke reports.
 - [x] Harden TTS fallback/timeouts so slow gTTS cannot block an answer.
 - [ ] Add timeout handling around Groq, Gemini, TTS, weather, Firecrawl.
 - [ ] Add simple request size limits.

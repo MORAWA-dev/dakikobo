@@ -1,6 +1,6 @@
 # DakiKobo Project State
 
-Last updated: 2026-06-27
+Last updated: 2026-06-30
 
 This file is a compact state report for another model, reviewer, or engineer to
 evaluate what already exists before proposing new work.
@@ -19,21 +19,20 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `abef3a32`
-- Live health verified on 2026-06-27:
+- Latest HF runtime commit verified: `aa7b4b35`
+- Live health verified on 2026-06-30:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-06-27T12:30:41+00:00`
+  - warm-up finished at `2026-06-30T11:11:33+00:00`
 
 Local git note:
 
-- Local `main` latest commit: `18a5dac2`
-- HF `main` latest commit: `abef3a32`
-- These represent the same latest feature set, but HF has a separate history, so
-  deploys are applied through a temporary HF worktree and cherry-pick.
-- Local `main` is ahead of `origin/main`; GitHub may not have the newest local/HF
-  work unless pushed separately.
+- GitHub `origin/main` is the primary source history.
+- Hugging Face `hf/main` has a separate history for the Space repo, so runtime
+  deploys are applied through a temporary HF worktree.
+- Do not assume GitHub and HF commit hashes match; compare feature state, not
+  only commit IDs.
 
 ## Target Users
 
@@ -312,6 +311,27 @@ Privacy rule:
 - Logs do not include raw questions, answers, image bytes, audio bytes, API keys,
   user photos, or user recordings.
 
+### 11. Evaluation Tooling
+
+The project includes a repeatable public demo evaluator.
+
+Implementation:
+
+- `scripts/evaluate_rag.py`
+- Default target: `https://kimcomehome-dakikobo.hf.space`
+- Default output: `reports/rag_eval_results.md`
+
+Coverage:
+
+- RAG questions for mil, niébé, maïs, and arachide
+- deterministic fertilizer routing
+- off-topic fallback
+- weather context
+- soil + fertilizer context
+
+The evaluator records HTTP status, latency, confidence, source count, source
+cards, answer/context snippets, and pass/fail checks.
+
 ## Main Routes
 
 | Route | Method | Purpose |
@@ -366,6 +386,7 @@ Tests:
 
 - `tests/test_app_routes.py`
 - `tests/test_disease.py`
+- `tests/test_evaluate_rag.py`
 - `tests/test_fertilizer.py`
 - `tests/test_frontend_assets.py`
 - `tests/test_ingestion.py`
@@ -379,23 +400,27 @@ Tests:
 
 Latest local full test run:
 
-- `73 passed`
-- 2 warnings:
-  - PyPDF2 deprecation warning
-  - LangChain/Groq Pydantic `dict` deprecation warning
+- `80 passed`
+- 1 PyPDF2 deprecation warning
 
 Latest HF worktree test run:
 
-- `71 passed`
-- `2 skipped`
+- `79 passed`
+- `1 skipped`
+- 1 PyPDF2 deprecation warning
+
+Latest focused evaluator tests:
+
+- `tests/test_evaluate_rag.py tests/test_app_routes.py`
+- `52 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest live HF checks:
 
 - `/healthz`: ready
-- `/version`: available locally after 2026-06-30 changes; deploy to HF before
-  expecting it on the public Space.
-- `/ask` compost question: returned ProSol source
+- `/version`: commit `aa7b4b35aa7cdffb55e0940679781dbebd2c04c2`
+- `/ask` niébé storage question: returned one IITA source and confidence `Fort`
+- `/ask` mil semis question: returned cited answer and confidence `Fort`
 - `/speech` fake audio: returned expected French transcription failure, proving
   route is deployed and active
 
