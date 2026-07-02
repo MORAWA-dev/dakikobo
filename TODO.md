@@ -271,7 +271,7 @@ to prove what works, what fails, and why.
 - [ ] Add simple request size limits.
 - [ ] Add SQLite for local/dev case logs.
 - [ ] Add Docker build test in CI if the repo moves to GitHub Actions.
-- [ ] Add a nightly smoke test against the Hugging Face Space.
+- [x] Add a nightly/manual smoke test against the Hugging Face Space.
 
 ## Priority order
 

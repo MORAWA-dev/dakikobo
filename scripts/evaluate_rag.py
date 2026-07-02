@@ -498,6 +498,8 @@ def main(argv: list[str] | None = None) -> int:
     passed = sum(1 for result in results if result.passed)
     print(f"Wrote {args.output}")
     print(f"Summary: {passed}/{len(results)} passed")
+    if args.strict and run_error:
+        return 1
     if args.strict and passed != len(results):
         return 1
     return 0

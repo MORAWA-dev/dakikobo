@@ -1,0 +1,56 @@
+name: Hugging Face Space smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "DakiKobo app URL"
+        required: false
+        default: "https://kimcomehome-dakikobo.hf.space"
+      strict:
+        description: "Fail the workflow when any evaluation check fails"
+        required: false
+        type: choice
+        options:
+          - "true"
+          - "false"
+        default: "true"
+  schedule:
+    - cron: "30 5 * * *"
+
+jobs:
+  evaluate-space:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install evaluator dependency
+        run: python -m pip install requests==2.31.0
+
+      - name: Run public Space evaluation
+        run: |
+          BASE_URL="${{ inputs.base_url || 'https://kimcomehome-dakikobo.hf.space' }}"
+          STRICT="${{ inputs.strict || 'true' }}"
+          ARGS=(--base-url "$BASE_URL" --output reports/rag_eval_results.md --timeout 180 --wait-timeout 420)
+          if [ "$STRICT" = "true" ]; then
+            ARGS+=(--strict)
+          fi
+          python scripts/evaluate_rag.py "${ARGS[@]}"
+
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-evaluation-report
+          path: reports/rag_eval_results.md
+          if-no-files-found: warn

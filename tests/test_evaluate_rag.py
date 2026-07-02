@@ -9,6 +9,7 @@ from scripts.evaluate_rag import (
     _as_sources,
     checks_for,
     format_report,
+    main,
     wait_for_ready,
 )
 
@@ -141,3 +142,27 @@ def test_wait_for_ready_reports_unreachable(monkeypatch):
 
     assert payload["rag_status"] == "unreachable"
     assert "dns failed" in payload["error"]
+
+
+def test_main_strict_fails_when_health_is_not_ready(monkeypatch, tmp_path):
+    output = tmp_path / "report.md"
+
+    monkeypatch.setattr(
+        "scripts.evaluate_rag.wait_for_ready",
+        lambda base_url, timeout: {"rag_status": "unreachable", "error": "dns failed"},
+    )
+    monkeypatch.setattr(
+        "scripts.evaluate_rag.run_evaluation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("should skip cases")),
+    )
+
+    code = main([
+        "--base-url",
+        "https://example.test",
+        "--output",
+        str(output),
+        "--strict",
+    ])
+
+    assert code == 1
+    assert "RAG health check did not become ready" in output.read_text(encoding="utf-8")

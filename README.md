@@ -185,6 +185,10 @@ python scripts/evaluate_rag.py
 The script waits for `/healthz`, exercises RAG, fertilizer, weather, soil, and
 off-topic safety cases, then writes `reports/rag_eval_results.md`.
 
+The same evaluator is wired into GitHub Actions as
+`.github/workflows/hf-smoke.yml`. It can run manually from the Actions tab and
+also runs daily on schedule, uploading the Markdown report as an artifact.
+
 Useful options:
 
 ```bash

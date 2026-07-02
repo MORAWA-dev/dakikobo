@@ -318,6 +318,7 @@ The project includes a repeatable public demo evaluator.
 Implementation:
 
 - `scripts/evaluate_rag.py`
+- `.github/workflows/hf-smoke.yml`
 - Default target: `https://kimcomehome-dakikobo.hf.space`
 - Default output: `reports/rag_eval_results.md`
 
@@ -331,6 +332,13 @@ Coverage:
 
 The evaluator records HTTP status, latency, confidence, source count, source
 cards, answer/context snippets, and pass/fail checks.
+
+GitHub Actions:
+
+- Manual workflow: "Hugging Face Space smoke test"
+- Scheduled workflow: daily at `05:30 UTC`
+- Installs only `requests`, runs `scripts/evaluate_rag.py`, and uploads
+  `reports/rag_eval_results.md` as an artifact.
 
 ## Main Routes
 
@@ -356,6 +364,7 @@ Application:
 - `app.py`
 - `config.py`
 - `requirements.txt`
+- `.github/workflows/hf-smoke.yml`
 
 Core modules:
 
@@ -496,7 +505,9 @@ Operations:
 
 - `/version` exists locally and should be verified after the next HF deploy.
 - Structured JSON logs exist; no dashboard or log aggregation exists yet.
-- No nightly HF smoke test yet.
+- Nightly/manual HF smoke workflow exists, but the first successful remote
+  artifact should be reviewed after GitHub Actions runs it from GitHub-hosted
+  networking.
 - No persistent database yet.
 
 ## Recommended Evaluation Tasks For Another Model
