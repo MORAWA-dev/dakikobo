@@ -12,7 +12,7 @@ import re
 
 import requests
 
-from config import GEMINI_API_KEY, GEMINI_MODEL
+from config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_TIMEOUT_SECONDS
 from core.case import build_disease_case
 
 _API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
@@ -160,7 +160,7 @@ def screen_leaf_image(
                 f"{_API_ROOT}/models/{model}:generateContent",
                 params={"key": GEMINI_API_KEY},
                 json=payload,
-                timeout=45,
+                timeout=GEMINI_TIMEOUT_SECONDS,
             )
         except requests.RequestException:
             return _with_case(

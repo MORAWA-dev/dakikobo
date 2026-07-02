@@ -7,6 +7,7 @@ import pytest
 from langchain_core.documents import Document
 
 import config
+import core.rag_pipeline as rag_pipeline
 from core.rag_pipeline import load_markdown_from_folder, load_pdfs_from_folder
 
 # A few documents we expect to ship in the knowledge base. If these are renamed
@@ -85,3 +86,29 @@ def test_load_pdfs_returns_documents():
         assert d.metadata.get("source"), "Document missing source metadata"
     sources = {d.metadata["source"] for d in docs}
     assert "farmer_training_manual.pdf" in sources
+
+
+def test_fetch_website_content_uses_configured_timeout(monkeypatch):
+    calls = {}
+
+    class FakeResponse:
+        text = "page agricole"
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, headers, timeout):
+        calls["url"] = url
+        calls["headers"] = headers
+        calls["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(rag_pipeline, "WEB_FETCH_TIMEOUT_SECONDS", 2.5)
+    monkeypatch.setattr(rag_pipeline.requests, "get", fake_get)
+
+    docs = rag_pipeline.fetch_website_content("https://example.test")
+
+    assert len(docs) == 1
+    assert docs[0].page_content == "page agricole"
+    assert docs[0].metadata["source"] == "https://example.test"
+    assert calls["timeout"] == 2.5

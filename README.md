@@ -132,10 +132,18 @@ Optional overrides (defaults in `config.py` are fine for development):
 # LOG_LEVEL=INFO
 # LLM_MAX_TOKENS=512
 # LLM_TEMPERATURE=0.1
+# LLM_TIMEOUT_SECONDS=30.0
+# LLM_MAX_RETRIES=1
 # STT_MODEL=whisper-large-v3-turbo
 # STT_LANGUAGE=fr
+# STT_TIMEOUT_SECONDS=30.0
+# STT_MAX_RETRIES=1
 # MAX_AUDIO_UPLOAD_MB=5.0
 # GEMINI_MODEL=gemini-2.5-flash
+# GEMINI_TIMEOUT_SECONDS=45.0
+# WEATHER_TIMEOUT_SECONDS=10.0
+# SOIL_TIMEOUT_SECONDS=12.0
+# WEB_FETCH_TIMEOUT_SECONDS=15.0
 # FLASK_DEBUG=true
 # PREFER_MARKDOWN_KB=true # use Data/markdown before PDF fallback
 # REBUILD_VECTORSTORE=true   # force a fresh index rebuild
@@ -209,6 +217,8 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `APP_VERSION`          | `0.1.0`                                  | Version string returned by `/version`    |
 | `LOG_LEVEL`            | `INFO`                                   | Structured JSON application log level    |
 | `LLM_MODEL`            | `llama-3.3-70b-versatile`                | Groq chat model                          |
+| `LLM_TIMEOUT_SECONDS`  | `30.0`                                   | Max wait for Groq chat responses         |
+| `LLM_MAX_RETRIES`      | `1`                                      | Groq chat retry count                    |
 | `EMBEDDING_MODEL`      | `paraphrase-multilingual-MiniLM-L12-v2`  | Sentence-transformer for retrieval       |
 | `SIMILARITY_THRESHOLD` | `0.2`                                    | Min relevance to use a chunk (else fallback) |
 | `CITATION_SCORE_MARGIN` | `0.12`                                  | Drop secondary source cards far below the best match |
@@ -223,6 +233,13 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
 | `STT_MODEL`            | `whisper-large-v3-turbo`                 | Groq model for voice input transcription |
 | `STT_LANGUAGE`         | `fr`                                     | Voice input language hint                |
+| `STT_TIMEOUT_SECONDS`  | `30.0`                                   | Max wait for Groq voice transcription    |
+| `STT_MAX_RETRIES`      | `1`                                      | Groq voice transcription retry count     |
+| `GEMINI_MODEL`         | `gemini-2.5-flash`                       | Gemini Vision model for leaf screening   |
+| `GEMINI_TIMEOUT_SECONDS` | `45.0`                                 | Max wait for Gemini image screening      |
+| `WEATHER_TIMEOUT_SECONDS` | `10.0`                                | Max wait for Open-Meteo requests         |
+| `SOIL_TIMEOUT_SECONDS` | `12.0`                                   | Max wait for SoilGrids requests          |
+| `WEB_FETCH_TIMEOUT_SECONDS` | `15.0`                              | Max wait for web knowledge fetches       |
 | `MAX_AUDIO_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded voice recording size    |
 | `REQUEST_COOLDOWN_SECONDS` | `2.0`                                | Per-session cooldown for `/ask` requests |
 | `VOICE_COOLDOWN_SECONDS` | `2.0`                                  | Per-session cooldown for voice transcription |

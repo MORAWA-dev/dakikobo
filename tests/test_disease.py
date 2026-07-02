@@ -130,3 +130,19 @@ def test_context_is_added_to_gemini_prompt(monkeypatch):
     assert "culture: niébé" in seen["prompt"]
     assert "stade: floraison" in seen["prompt"]
     assert "localisation: Koudougou" in seen["prompt"]
+
+
+def test_gemini_timeout_is_configurable(monkeypatch):
+    seen = {}
+
+    def fake_post(*args, **kwargs):
+        seen["timeout"] = kwargs["timeout"]
+        return _FakeResp(200, _candidate("UNCLEAR"))
+
+    monkeypatch.setattr(disease, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(disease, "GEMINI_TIMEOUT_SECONDS", 6.5)
+    monkeypatch.setattr(disease.requests, "post", fake_post)
+
+    screen_leaf_image(b"x", "image/jpeg")
+
+    assert seen["timeout"] == 6.5

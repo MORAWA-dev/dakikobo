@@ -14,10 +14,13 @@ GROQ_USER_AGENT = os.getenv("GROQ_USER_AGENT", "Mozilla/5.0 DakiKobo/1.0")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 512))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1))
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
 
 # --- Gemini Vision (leaf disease screening) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "45.0"))
 
 # --- Embeddings & Vector Store ---
 # Multilingual model — much better for French queries/corpus than all-MiniLM
@@ -61,6 +64,7 @@ KNOWLEDGE_URLS = [
     # "https://www.fao.org/in-action/agrisurvey/access-to-data/burkina-faso/en",
     # "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
 ]
+WEB_FETCH_TIMEOUT_SECONDS = float(os.getenv("WEB_FETCH_TIMEOUT_SECONDS", "15.0"))
 
 # --- TTS ---
 TTS_LANGUAGE = "fr"           # French — official language of Burkina Faso
@@ -72,9 +76,14 @@ AUDIO_OUTPUT_DIR = os.path.join("static", "audio")
 STT_MODEL = os.getenv("STT_MODEL", "whisper-large-v3-turbo")
 STT_LANGUAGE = os.getenv("STT_LANGUAGE", "fr")
 STT_TIMEOUT_SECONDS = float(os.getenv("STT_TIMEOUT_SECONDS", "30.0"))
+STT_MAX_RETRIES = int(os.getenv("STT_MAX_RETRIES", "1"))
 VOICE_COOLDOWN_SECONDS = float(os.getenv("VOICE_COOLDOWN_SECONDS", "2.0"))
 MAX_AUDIO_UPLOAD_MB = float(os.getenv("MAX_AUDIO_UPLOAD_MB", "5.0"))
 MAX_AUDIO_UPLOAD_BYTES = int(MAX_AUDIO_UPLOAD_MB * 1024 * 1024)
+
+# --- External context APIs ---
+WEATHER_TIMEOUT_SECONDS = float(os.getenv("WEATHER_TIMEOUT_SECONDS", "10.0"))
+SOIL_TIMEOUT_SECONDS = float(os.getenv("SOIL_TIMEOUT_SECONDS", "12.0"))
 
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"

@@ -27,6 +27,7 @@ from config import (
     TTS_TIMEOUT_SECONDS,
     AUDIO_OUTPUT_DIR,
     VECTORSTORE_DIR,
+    WEB_FETCH_TIMEOUT_SECONDS,
 )
 
 
@@ -41,7 +42,7 @@ def fetch_website_content(url: str) -> list[Document]:
     """
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=WEB_FETCH_TIMEOUT_SECONDS)
         response.raise_for_status()
         return [Document(page_content=response.text, metadata={"source": url})]
     except requests.exceptions.RequestException as e:

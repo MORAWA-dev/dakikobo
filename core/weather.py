@@ -8,9 +8,10 @@ from datetime import date, datetime, timedelta
 
 import requests
 
+from config import WEATHER_TIMEOUT_SECONDS
 
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-REQUEST_TIMEOUT_SECONDS = 10
+REQUEST_TIMEOUT_SECONDS = WEATHER_TIMEOUT_SECONDS
 
 
 class WeatherError(RuntimeError):

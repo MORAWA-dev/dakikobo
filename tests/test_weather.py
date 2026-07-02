@@ -48,6 +48,7 @@ def test_build_weather_context_fetches_and_caches(monkeypatch):
         calls.append((url, params, timeout))
         return _FakeResponse(_sample_payload())
 
+    monkeypatch.setattr(weather, "REQUEST_TIMEOUT_SECONDS", 3.25)
     monkeypatch.setattr(weather.requests, "get", fake_get)
 
     first = weather.build_weather_context("ouagadougou")
@@ -56,6 +57,7 @@ def test_build_weather_context_fetches_and_caches(monkeypatch):
     assert len(calls) == 1
     assert calls[0][0] == weather.OPEN_METEO_FORECAST_URL
     assert calls[0][1]["past_days"] == 7
+    assert calls[0][2] == 3.25
     assert first["location"]["name"] == "Ouagadougou"
     assert first["metrics"]["rain_7d_mm"] == 21.0
     assert first["metrics"]["rain_next_3d_mm"] == 19.0

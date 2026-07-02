@@ -8,9 +8,10 @@ from datetime import date
 
 import requests
 
+from config import SOIL_TIMEOUT_SECONDS
 
 SOILGRIDS_QUERY_URL = "https://rest.isric.org/soilgrids/v2.0/properties/query"
-REQUEST_TIMEOUT_SECONDS = 12
+REQUEST_TIMEOUT_SECONDS = SOIL_TIMEOUT_SECONDS
 
 
 class SoilError(RuntimeError):

@@ -267,7 +267,8 @@ to prove what works, what fails, and why.
 - [x] Add privacy-safe structured JSON logging for route, status, latency, model/feature, confidence, source count, upload size, and failure type.
 - [x] Add `scripts/evaluate_rag.py` for public Space RAG/tool/safety smoke reports.
 - [x] Harden TTS fallback/timeouts so slow gTTS cannot block an answer.
-- [ ] Add timeout handling around Groq, Gemini, TTS, weather, Firecrawl.
+- [x] Add timeout/retry handling around Groq chat, Groq STT, Gemini, TTS, weather, soil, and web fetches.
+- [ ] Add Firecrawl ingestion script with timeout/retry handling and review workflow.
 - [ ] Add simple request size limits.
 - [ ] Add SQLite for local/dev case logs.
 - [x] Add Docker build test in CI.

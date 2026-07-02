@@ -6,6 +6,7 @@ from config import (
     GROQ_API_KEY,
     GROQ_USER_AGENT,
     STT_LANGUAGE,
+    STT_MAX_RETRIES,
     STT_MODEL,
     STT_TIMEOUT_SECONDS,
 )
@@ -30,12 +31,13 @@ def transcribe_audio(
     if not audio_bytes:
         raise SpeechTranscriptionError("Audio payload is empty.")
 
-    client = Groq(
-        api_key=GROQ_API_KEY,
-        timeout=STT_TIMEOUT_SECONDS,
-        default_headers={"User-Agent": GROQ_USER_AGENT},
-    )
     try:
+        client = Groq(
+            api_key=GROQ_API_KEY,
+            timeout=STT_TIMEOUT_SECONDS,
+            max_retries=STT_MAX_RETRIES,
+            default_headers={"User-Agent": GROQ_USER_AGENT},
+        )
         transcript = client.audio.transcriptions.create(
             model=STT_MODEL,
             file=(filename or "question.webm", audio_bytes, mime_type or "audio/webm"),

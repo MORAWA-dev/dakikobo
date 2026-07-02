@@ -9,7 +9,9 @@ from config import (
     GROQ_USER_AGENT,
     LLM_MODEL,
     LLM_MAX_TOKENS,
+    LLM_MAX_RETRIES,
     LLM_TEMPERATURE,
+    LLM_TIMEOUT_SECONDS,
     SIMILARITY_THRESHOLD,
     BOT_NAME,
 )
@@ -31,6 +33,8 @@ def get_llm():
             model=LLM_MODEL,
             max_tokens=LLM_MAX_TOKENS,
             temperature=LLM_TEMPERATURE,
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=LLM_MAX_RETRIES,
             groq_api_key=GROQ_API_KEY,
             default_headers={"User-Agent": GROQ_USER_AGENT},
         )

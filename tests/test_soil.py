@@ -52,6 +52,7 @@ def test_build_soil_context_fetches_and_caches(monkeypatch):
         calls.append((url, params, timeout))
         return _FakeResponse(_sample_payload())
 
+    monkeypatch.setattr(soil, "REQUEST_TIMEOUT_SECONDS", 4.25)
     monkeypatch.setattr(soil.requests, "get", fake_get)
 
     first = soil.build_soil_context("ouagadougou", "sorgho")
@@ -61,6 +62,7 @@ def test_build_soil_context_fetches_and_caches(monkeypatch):
     assert calls[0][0] == soil.SOILGRIDS_QUERY_URL
     assert ("property", "clay") in calls[0][1]
     assert ("property", "soc") in calls[0][1]
+    assert calls[0][2] == 4.25
     assert first["location"]["name"] == "Ouagadougou"
     assert first["crop"] == "sorgho"
     assert first["metrics"]["sand_percent"] == 72.0
