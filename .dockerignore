@@ -6,4 +6,5 @@ __pycache__
 .env
 chroma_db
 data/feedback.csv
+reports/rag_eval_results.md
 static/audio/*.mp3

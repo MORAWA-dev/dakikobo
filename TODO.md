@@ -270,7 +270,7 @@ to prove what works, what fails, and why.
 - [ ] Add timeout handling around Groq, Gemini, TTS, weather, Firecrawl.
 - [ ] Add simple request size limits.
 - [ ] Add SQLite for local/dev case logs.
-- [ ] Add Docker build test in CI if the repo moves to GitHub Actions.
+- [x] Add Docker build test in CI.
 - [x] Add a nightly/manual smoke test against the Hugging Face Space.
 
 ## Priority order

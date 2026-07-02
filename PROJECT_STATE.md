@@ -318,6 +318,7 @@ The project includes a repeatable public demo evaluator.
 Implementation:
 
 - `scripts/evaluate_rag.py`
+- `.github/workflows/docker-build.yml`
 - `.github/workflows/hf-smoke.yml`
 - Default target: `https://kimcomehome-dakikobo.hf.space`
 - Default output: `reports/rag_eval_results.md`
@@ -335,6 +336,8 @@ cards, answer/context snippets, and pass/fail checks.
 
 GitHub Actions:
 
+- Docker build workflow: builds the Space image on push, pull request, and manual
+  dispatch; runs the container with `RAG_WARMUP_ON_START=false`; polls `/healthz`.
 - Manual workflow: "Hugging Face Space smoke test"
 - Scheduled workflow: daily at `05:30 UTC`
 - Installs only `requests`, runs `scripts/evaluate_rag.py`, and uploads
@@ -364,6 +367,7 @@ Application:
 - `app.py`
 - `config.py`
 - `requirements.txt`
+- `.github/workflows/docker-build.yml`
 - `.github/workflows/hf-smoke.yml`
 
 Core modules:
@@ -505,6 +509,8 @@ Operations:
 
 - `/version` exists locally and should be verified after the next HF deploy.
 - Structured JSON logs exist; no dashboard or log aggregation exists yet.
+- Docker build workflow exists; review first GitHub-hosted run for dependency
+  install duration and container startup time.
 - Nightly/manual HF smoke workflow exists, but the first successful remote
   artifact should be reviewed after GitHub Actions runs it from GitHub-hosted
   networking.

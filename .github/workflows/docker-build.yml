@@ -1,0 +1,52 @@
+name: Docker build
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build --pull -t dakikobo:ci .
+
+      - name: Run container
+        run: |
+          docker run -d \
+            --name dakikobo-ci \
+            -p 7860:7860 \
+            -e RAG_WARMUP_ON_START=false \
+            -e FLASK_SECRET_KEY=ci-only \
+            -e GROQ_API_KEY=ci-placeholder \
+            dakikobo:ci
+
+      - name: Wait for health check
+        run: |
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:7860/healthz; then
+              exit 0
+            fi
+            echo "Waiting for container health check ($attempt/30)..."
+            sleep 2
+          done
+          docker logs dakikobo-ci
+          exit 1
+
+      - name: Show container logs
+        if: always()
+        run: docker logs dakikobo-ci || true
+
+      - name: Stop container
+        if: always()
+        run: docker stop dakikobo-ci || true

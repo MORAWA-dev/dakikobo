@@ -37,5 +37,8 @@ Data/_archive/
 # Logs
 *.log
 
+# Generated evaluation reports
+reports/rag_eval_results.md
+
 # Local planning docs with prompts (optional — remove line to track)
 # suggestions/

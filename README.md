@@ -188,6 +188,8 @@ off-topic safety cases, then writes `reports/rag_eval_results.md`.
 The same evaluator is wired into GitHub Actions as
 `.github/workflows/hf-smoke.yml`. It can run manually from the Actions tab and
 also runs daily on schedule, uploading the Markdown report as an artifact.
+The Docker image is checked by `.github/workflows/docker-build.yml`, which builds
+the Space container and smoke-tests `/healthz` without pushing an image.
 
 Useful options:
 
