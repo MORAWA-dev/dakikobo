@@ -51,6 +51,14 @@ path until reviewed.
 4. Firecrawl output is raw material, not truth. Scraped Markdown must keep URL, crawl date, publisher, and review status.
 5. Accepted documents move into `Data/markdown/` only after review.
 6. Firecrawl candidates belong in `Data/scraped/pending/`; reviewed promoted copies belong in `Data/markdown/scraped_reviewed/`.
+7. Firecrawl scraping uses `Data/scraped/source_allowlist.csv` by default; unlisted URLs require an explicit `--allow-unlisted` experiment and must not be promoted without review.
+
+## Firecrawl Allowlist And Seed Batch
+
+- Allowlist: `Data/scraped/source_allowlist.csv`
+- First seed batch: `Data/scraped/seed_urls_fao_burkina.txt`
+- Current seed scope: FAO Burkina Faso MAFAP, FAO AGRISurvey Burkina Faso, and FAO Country Profiles Burkina Faso.
+- Local pending outputs generated on 2026-07-02 UTC are ignored by git under `Data/scraped/pending/*.md`.
 
 ## Next Source Work
 

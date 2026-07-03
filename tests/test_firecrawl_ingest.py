@@ -6,7 +6,10 @@ from scripts.firecrawl_ingest import (
     FirecrawlClient,
     FirecrawlIngestError,
     ScrapedPage,
+    load_allowlist,
+    match_allowlist_entry,
     promote_reviewed_markdown,
+    require_url_allowed,
     write_pending_markdown,
 )
 
@@ -42,7 +45,7 @@ def test_firecrawl_client_posts_markdown_scrape_request():
                 "data": {
                     "markdown": "# Semis du mil\nContenu agricole.",
                     "metadata": {
-                        "title": "Guide semis mil",
+                        "title": " \tGuide   semis\u00a0mil  ",
                         "sourceURL": "https://example.test/mil",
                         "statusCode": 200,
                     },
@@ -128,6 +131,8 @@ def test_write_pending_markdown_adds_review_gate(tmp_path):
         output_dir=tmp_path,
         topics="semis, pluie",
         crops="mil, sorgho",
+        license_note="unknown",
+        source_id="test_source",
     )
 
     text = path.read_text(encoding="utf-8")
@@ -137,6 +142,8 @@ def test_write_pending_markdown_adds_review_gate(tmp_path):
     assert "Conseil source." in text
     assert 'topics: "semis, pluie"' in text
     assert 'crops: "mil, sorgho"' in text
+    assert 'source_id: "test_source"' in text
+    assert 'license: "unknown"' in text
 
 
 def test_promote_reviewed_markdown_removes_pending_checklist(tmp_path):
@@ -164,3 +171,52 @@ def test_promote_reviewed_markdown_removes_pending_checklist(tmp_path):
     assert "## Review checklist" not in text
     assert "<!-- DAKIKOBO_SCRAPED_CONTENT_START -->" not in text
     assert "Conseil source." in text
+
+
+def test_load_allowlist_matches_seed_url(tmp_path):
+    allowlist = tmp_path / "allowlist.csv"
+    allowlist.write_text(
+        "\n".join(
+            [
+                "source_id,enabled,url_pattern,publisher,scope,topics,crops,license_note,notes",
+                (
+                    "fao_country,true,https://www.fao.org/countryprofiles/*iso3=bfa*,"
+                    "FAO Country Profiles,Burkina Faso,country profile,,unknown,seed"
+                ),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    entries = load_allowlist(allowlist)
+    entry = match_allowlist_entry(
+        "https://www.fao.org/countryprofiles/index/en/?iso3=BFA",
+        entries,
+    )
+
+    assert entry is not None
+    assert entry.source_id == "fao_country"
+    assert entry.publisher == "FAO Country Profiles"
+    assert entry.topics == "country profile"
+
+
+def test_require_url_allowed_rejects_unlisted_url(tmp_path):
+    allowlist = tmp_path / "allowlist.csv"
+    allowlist.write_text(
+        "\n".join(
+            [
+                "source_id,enabled,url_pattern,publisher,scope,topics,crops,license_note,notes",
+                "fao,true,https://www.fao.org/*,FAO,Global,agriculture,,unknown,seed",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    entries = load_allowlist(allowlist)
+
+    try:
+        require_url_allowed("https://example.test/random", entries)
+    except FirecrawlIngestError as exc:
+        assert "not in the Firecrawl allowlist" in str(exc)
+    else:
+        raise AssertionError("unlisted URLs should be rejected")

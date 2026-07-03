@@ -13,6 +13,8 @@ Data/markdown/scraped_reviewed/.
 from __future__ import annotations
 
 import argparse
+import csv
+import fnmatch
 import hashlib
 import os
 import re
@@ -44,6 +46,8 @@ from config import (
 
 RETRYABLE_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 CONTENT_MARKER = "<!-- DAKIKOBO_SCRAPED_CONTENT_START -->"
+DEFAULT_ALLOWLIST_PATH = PROJECT_ROOT / "Data" / "scraped" / "source_allowlist.csv"
+DEFAULT_SEED_URLS_PATH = PROJECT_ROOT / "Data" / "scraped" / "seed_urls_fao_burkina.txt"
 
 
 class FirecrawlIngestError(RuntimeError):
@@ -59,6 +63,19 @@ class ScrapedPage:
     scraped_at: str
 
 
+@dataclass(frozen=True)
+class AllowlistEntry:
+    source_id: str
+    enabled: bool
+    url_pattern: str
+    publisher: str
+    scope: str
+    topics: str
+    crops: str
+    license_note: str
+    notes: str
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -71,6 +88,10 @@ def _slugify(value: str, fallback: str = "source") -> str:
     value = re.sub(r"[^a-z0-9]+", "-", value)
     value = value.strip("-")
     return (value or fallback)[:80]
+
+
+def _clean_text(value: Any) -> str:
+    return " ".join(str(value or "").replace("\xa0", " ").split())
 
 
 def _url_fingerprint(url: str) -> str:
@@ -130,6 +151,78 @@ def _title_from_url(url: str) -> str:
     parsed = urlparse(url)
     path = parsed.path.rstrip("/").split("/")[-1]
     return path.replace("-", " ").replace("_", " ").strip().title() or parsed.netloc
+
+
+def _normalize_url_for_match(url: str) -> str:
+    parsed = urlparse((url or "").strip())
+    if not parsed.scheme or not parsed.netloc:
+        raise FirecrawlIngestError(f"Invalid URL: {url}")
+    normalized = parsed._replace(
+        scheme=parsed.scheme.lower(),
+        netloc=parsed.netloc.lower(),
+        fragment="",
+    )
+    return normalized.geturl().rstrip("/").lower()
+
+
+def _is_enabled(value: str) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "y", "enabled"}
+
+
+def load_allowlist(path: str | Path = DEFAULT_ALLOWLIST_PATH) -> list[AllowlistEntry]:
+    allowlist_path = Path(path)
+    if not allowlist_path.exists():
+        raise FirecrawlIngestError(f"Allowlist file not found: {allowlist_path}")
+
+    entries = []
+    with allowlist_path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(
+            line for line in f if line.strip() and not line.lstrip().startswith("#")
+        )
+        for row in reader:
+            pattern = (row.get("url_pattern") or "").strip()
+            source_id = (row.get("source_id") or "").strip()
+            if not pattern or not source_id:
+                continue
+            entries.append(
+                AllowlistEntry(
+                    source_id=source_id,
+                    enabled=_is_enabled(row.get("enabled", "")),
+                    url_pattern=pattern,
+                    publisher=(row.get("publisher") or "unknown").strip(),
+                    scope=(row.get("scope") or "").strip(),
+                    topics=(row.get("topics") or "").strip(),
+                    crops=(row.get("crops") or "").strip(),
+                    license_note=(row.get("license_note") or "unknown").strip(),
+                    notes=(row.get("notes") or "").strip(),
+                )
+            )
+    return entries
+
+
+def match_allowlist_entry(
+    url: str,
+    entries: list[AllowlistEntry],
+) -> AllowlistEntry | None:
+    normalized_url = _normalize_url_for_match(url)
+    for entry in entries:
+        if not entry.enabled:
+            continue
+        pattern = _normalize_url_for_match(entry.url_pattern.replace("*", "wildcard"))
+        pattern = pattern.replace("wildcard", "*")
+        if fnmatch.fnmatch(normalized_url, pattern):
+            return entry
+    return None
+
+
+def require_url_allowed(url: str, entries: list[AllowlistEntry]) -> AllowlistEntry:
+    entry = match_allowlist_entry(url, entries)
+    if entry is None:
+        raise FirecrawlIngestError(
+            f"URL is not in the Firecrawl allowlist: {url}. "
+            "Add it to Data/scraped/source_allowlist.csv or pass --allow-unlisted."
+        )
+    return entry
 
 
 class FirecrawlClient:
@@ -211,7 +304,7 @@ class FirecrawlClient:
 
             metadata = data.get("metadata") or {}
             source_url = metadata.get("sourceURL") or metadata.get("url") or url
-            title = metadata.get("title") or _title_from_url(source_url)
+            title = _clean_text(metadata.get("title") or _title_from_url(source_url))
             return ScrapedPage(
                 url=source_url,
                 title=title,
@@ -231,17 +324,20 @@ def pending_markdown(
     publisher: str,
     topics: str,
     crops: str,
+    license_note: str = "unknown",
+    source_id: str = "",
 ) -> str:
     metadata = {
         "title": page.title,
         "source_file": page.url,
         "source_url": page.url,
+        "source_id": source_id,
         "doc_type": "scraped_web",
         "language": language,
         "country": country,
         "publisher": publisher,
         "year": page.metadata.get("publishedTime") or page.metadata.get("year") or "unknown",
-        "license": "unknown",
+        "license": license_note,
         "review_status": "pending_human_review",
         "scraped_at": page.scraped_at,
         "topics": topics,
@@ -284,6 +380,8 @@ def write_pending_markdown(
     publisher: str = "unknown",
     topics: str = "",
     crops: str = "",
+    license_note: str = "unknown",
+    source_id: str = "",
     overwrite: bool = False,
 ) -> Path:
     output_path = Path(output_dir)
@@ -302,6 +400,8 @@ def write_pending_markdown(
             publisher=publisher,
             topics=topics,
             crops=crops,
+            license_note=license_note,
+            source_id=source_id,
         ),
         encoding="utf-8",
     )
@@ -374,6 +474,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Scrape candidate sources with Firecrawl.")
     parser.add_argument("--url", action="append", default=[], help="URL to scrape; can be repeated.")
     parser.add_argument("--urls-file", help="Text file with one URL per line.")
+    parser.add_argument("--seed-batch", action="store_true", help="Use the curated FAO Burkina Faso seed URL batch.")
+    parser.add_argument("--list-seeds", action="store_true", help="Print the curated seed URLs and exit.")
+    parser.add_argument("--allowlist", default=str(DEFAULT_ALLOWLIST_PATH), help="CSV allowlist of trusted URL patterns.")
+    parser.add_argument("--allow-unlisted", action="store_true", help="Scrape URLs outside the allowlist; use only for manual experiments.")
     parser.add_argument("--output-dir", default=FIRECRAWL_PENDING_DIR, help="Pending output directory.")
     parser.add_argument("--reviewed-dir", default=FIRECRAWL_REVIEWED_DIR, help="Reviewed output directory.")
     parser.add_argument("--promote", action="append", default=[], help="Pending Markdown file to promote.")
@@ -392,6 +496,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+
+    if args.list_seeds:
+        for url in _read_urls_file(DEFAULT_SEED_URLS_PATH):
+            print(url)
+        return 0
 
     if args.promote:
         failures = 0
@@ -412,9 +521,22 @@ def main(argv: list[str] | None = None) -> int:
     urls = list(args.url)
     if args.urls_file:
         urls.extend(_read_urls_file(args.urls_file))
+    if args.seed_batch:
+        urls.extend(_read_urls_file(DEFAULT_SEED_URLS_PATH))
     if not urls:
-        print("ERROR: provide --url, --urls-file, or --promote.", file=sys.stderr)
+        print("ERROR: provide --url, --urls-file, --seed-batch, or --promote.", file=sys.stderr)
         return 2
+
+    allowlist_entries: list[AllowlistEntry] = []
+    allowlist_matches: dict[str, AllowlistEntry | None] = {}
+    if not args.allow_unlisted:
+        try:
+            allowlist_entries = load_allowlist(args.allowlist)
+            for url in urls:
+                allowlist_matches[url] = require_url_allowed(url, allowlist_entries)
+        except FirecrawlIngestError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
 
     try:
         client = FirecrawlClient(
@@ -430,15 +552,20 @@ def main(argv: list[str] | None = None) -> int:
     failures = 0
     for url in urls:
         try:
+            entry = allowlist_matches.get(url)
             page = client.scrape(url)
             path = write_pending_markdown(
                 page,
                 output_dir=args.output_dir,
                 country=args.country,
                 language=args.language,
-                publisher=args.publisher,
-                topics=args.topics,
-                crops=args.crops,
+                publisher=args.publisher if args.publisher != "unknown" else (
+                    entry.publisher if entry else args.publisher
+                ),
+                topics=args.topics or (entry.topics if entry else ""),
+                crops=args.crops or (entry.crops if entry else ""),
+                license_note=entry.license_note if entry else "unknown",
+                source_id=entry.source_id if entry else "",
                 overwrite=args.overwrite,
             )
             print(f"Pending review: {path}")

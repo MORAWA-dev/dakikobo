@@ -214,15 +214,28 @@ python scripts/evaluate_rag.py --strict
 
 Firecrawl is available for collecting candidate web pages, but scraped output is
 not ingested directly. It is written to `Data/scraped/pending/` with source
-metadata and a review checklist.
+metadata and a review checklist. URLs are checked against
+`Data/scraped/source_allowlist.csv` by default.
+
+Use the first curated FAO Burkina Faso seed batch:
+
+```bash
+python scripts/firecrawl_ingest.py --list-seeds
+python scripts/firecrawl_ingest.py --seed-batch
+```
+
+Scrape a single allowlisted URL:
 
 ```bash
 python scripts/firecrawl_ingest.py \
-  --url https://example.org/agriculture-page \
+  --url https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en \
   --publisher "Publisher name" \
   --topics "semis, fertilite" \
   --crops "mil, sorgho"
 ```
+
+For manual experiments outside the allowlist, pass `--allow-unlisted`. Do not
+promote those files without adding a reviewed allowlist row first.
 
 After human review and cleanup, promote the pending file into the active Markdown
 corpus:

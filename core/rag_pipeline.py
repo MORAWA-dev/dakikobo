@@ -158,6 +158,7 @@ def load_markdown_from_folder(folder_path: str) -> list[Document]:
                 "page_count",
                 "year",
                 "publisher",
+                "source_id",
                 "source_url",
                 "review_status",
                 "license",

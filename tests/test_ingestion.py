@@ -69,6 +69,7 @@ def test_load_markdown_preserves_review_metadata(tmp_path):
         """---
 title: "Guide web revu"
 source_file: "https://example.test/guide"
+source_id: "example_source"
 source_url: "https://example.test/guide"
 doc_type: "scraped_web"
 language: "fr"
@@ -93,6 +94,7 @@ Contenu agricole vérifié.
     assert len(docs) == 1
     metadata = docs[0].metadata
     assert metadata["source"] == "Guide web revu"
+    assert metadata["source_id"] == "example_source"
     assert metadata["source_url"] == "https://example.test/guide"
     assert metadata["doc_type"] == "scraped_web"
     assert metadata["review_status"] == "reviewed_by_codex"

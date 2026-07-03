@@ -151,11 +151,12 @@ Candidate source:
 - [x] Archive rejected deep-research outputs and keep a verification audit.
 - [x] Add `scripts/firecrawl_ingest.py` that uses `FIRECRAWL_API_KEY`.
 - [x] Do not scrape at user request time. Scrape offline, review, then ingest.
-- [ ] Maintain an allowlist of trusted sources:
-  - Burkina Faso agriculture ministry pages
-  - FAO Burkina Faso pages
-  - WASCAL / AGRHYMET / CILSS climate-agriculture resources
-  - INERA / extension manuals where accessible
+- [x] Maintain an allowlist of trusted sources:
+  - [ ] Burkina Faso agriculture ministry pages
+  - [x] FAO Burkina Faso pages
+  - [ ] WASCAL / AGRHYMET / CILSS climate-agriculture resources
+  - [ ] INERA / extension manuals where accessible
+- [x] Scrape the first FAO Burkina Faso seed batch into local pending review files.
 - [x] Store crawled output as pending Markdown under `Data/scraped/pending/`.
 - [x] Add metadata: URL, title, publisher, date crawled, language, license/usage note.
 - [x] Add a review flag before documents enter RAG.

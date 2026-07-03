@@ -26,6 +26,10 @@ data/feedback.csv
 # Model-gathered data that returned fabricated results; kept locally only.
 Data/_archive/
 
+# Firecrawl raw candidates stay local until reviewed/promoted.
+Data/scraped/pending/*.md
+!Data/scraped/pending/.gitkeep
+
 # macOS junk
 .DS_Store
 

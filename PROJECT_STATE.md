@@ -350,6 +350,8 @@ Firecrawl is wired for offline candidate collection, not runtime answering.
 Implementation:
 
 - Script: `scripts/firecrawl_ingest.py`
+- Allowlist: `Data/scraped/source_allowlist.csv`
+- Seed batch: `Data/scraped/seed_urls_fao_burkina.txt`
 - Pending output: `Data/scraped/pending/`
 - Reviewed active output: `Data/markdown/scraped_reviewed/`
 - Config: `FIRECRAWL_API_KEY`, timeout, scrape-timeout, and retry env vars
@@ -364,8 +366,18 @@ Workflow:
 Safety:
 
 - Scraped files carry `review_status: pending_human_review`.
+- URLs are rejected unless they match the allowlist, unless `--allow-unlisted`
+  is passed for a manual experiment.
 - Pending files live outside `Data/markdown/`, so they do not enter active RAG.
 - Promoted files remove the review checklist before ingestion.
+
+First generated pending batch:
+
+- FAO MAFAP Burkina Faso
+- FAO AGRISurvey Burkina Faso
+- FAO Country Profiles Burkina Faso
+- These files are local pending review artifacts and are git-ignored until a
+  reviewer cleans and promotes them.
 
 ## Main Routes
 
@@ -536,8 +548,8 @@ RAG and data:
   expose more of it in the UI.
 - Retrieval source filtering exists, but needs more live evaluation and tuning.
 - Generated/scraped data should remain outside RAG until human review.
-- Firecrawl ingestion exists; trusted-source allowlists and first curated source
-  batches are still needed.
+- Firecrawl ingestion and the first FAO allowlist/seed batch exist; additional
+  trusted sources still need allowlist rows and review.
 
 Vision:
 
@@ -588,7 +600,7 @@ Highest-impact next tasks:
 2. Add a privacy note for uploaded photos/audio.
 3. Convert `data/feedback.csv` into a small SQLite case log.
 4. Add a text-question context flow for crop, location, and growth stage.
-5. Add a Firecrawl trusted-source allowlist and scrape the first curated batch.
+5. Review and promote the first Firecrawl FAO seed batch if license/content checks pass.
 6. Add log aggregation or a simple observability dashboard.
 7. Continue live retrieval evaluation and tune citation thresholds if needed.
 

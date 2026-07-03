@@ -1,0 +1,4 @@
+# First Firecrawl candidate batch. These stay pending until reviewed.
+https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en
+https://www.fao.org/in-action/agrisurvey/access-to-data/burkina-faso/en
+https://www.fao.org/countryprofiles/index/en/?iso3=BFA
