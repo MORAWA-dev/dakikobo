@@ -1,6 +1,6 @@
 # DakiKobo Project State
 
-Last updated: 2026-06-30
+Last updated: 2026-07-03
 
 This file is a compact state report for another model, reviewer, or engineer to
 evaluate what already exists before proposing new work.
@@ -19,12 +19,12 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `aa7b4b35`
-- Live health verified on 2026-06-30:
+- Latest HF runtime commit verified: `b45c40da`
+- Live health verified on 2026-07-03:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-06-30T11:11:33+00:00`
+  - warm-up finished at `2026-07-03T08:05:26+00:00`
 
 Local git note:
 
@@ -458,7 +458,7 @@ Tests:
 
 Latest local full test run:
 
-- `80 passed`
+- `103 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest HF worktree test run:
@@ -469,14 +469,16 @@ Latest HF worktree test run:
 
 Latest focused evaluator tests:
 
-- `tests/test_evaluate_rag.py tests/test_app_routes.py`
-- `52 passed`
+- `tests/test_ingestion.py tests/test_app_routes.py::test_existing_valid_vector_store_is_reused tests/test_app_routes.py::test_invalid_existing_vector_store_is_rebuilt tests/test_app_routes.py::test_rebuild_clears_existing_vector_store tests/test_firecrawl_ingest.py`
+- `18 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest live HF checks:
 
 - `/healthz`: ready
-- `/version`: commit `aa7b4b35aa7cdffb55e0940679781dbebd2c04c2`
+- `/version`: commit `b45c40dadc05c76ba7d29611075ed481ef03c9c1`
+- `/ask` FAO data question: returned the new FAO Burkina policy/data synthesis
+  source and confidence `Fort`
 - `/ask` niébé storage question: returned one IITA source and confidence `Fort`
 - `/ask` mil semis question: returned cited answer and confidence `Fort`
 - `/speech` fake audio: returned expected French transcription failure, proving
