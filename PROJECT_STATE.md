@@ -322,7 +322,30 @@ Privacy rule:
 - Logs do not include raw questions, answers, image bytes, audio bytes, API keys,
   user photos, or user recordings.
 
-### 11. Evaluation Tooling
+### 11. SQLite Case Log
+
+Feedback buttons write answer ratings to a local SQLite database for later
+evaluation.
+
+Implementation:
+
+- Module: `core/case_log.py`
+- Route: `/feedback`
+- Config: `CASE_LOG_DB_PATH`
+- Default path: `data/case_log.sqlite3`
+- Table: `feedback_events`
+
+Stored fields:
+
+- `id`
+- `created_at`
+- `rating`
+- `question`
+- `answer`
+
+The database is runtime-generated and git-ignored.
+
+### 12. Evaluation Tooling
 
 The project includes a repeatable public demo evaluator.
 
@@ -354,7 +377,7 @@ GitHub Actions:
 - Installs only `requests`, runs `scripts/evaluate_rag.py`, and uploads
   `reports/rag_eval_results.md` as an artifact.
 
-### 12. Firecrawl Candidate Source Ingestion
+### 13. Firecrawl Candidate Source Ingestion
 
 Firecrawl is wired for offline candidate collection, not runtime answering.
 
@@ -410,7 +433,7 @@ First generated pending batch:
 | `/soil` | GET | Soil + fertilizer context |
 | `/soil/locations` | GET | Available soil locations and crops |
 | `/examples/<example_id>` | GET | Quota-safe demo examples |
-| `/feedback` | POST | Answer rating capture |
+| `/feedback` | POST | Answer rating capture into SQLite case log |
 
 ## Key Files For Review
 
@@ -450,6 +473,7 @@ Data and governance:
 Tests:
 
 - `tests/test_app_routes.py`
+- `tests/test_case_log.py`
 - `tests/test_disease.py`
 - `tests/test_evaluate_rag.py`
 - `tests/test_fertilizer.py`
@@ -465,7 +489,7 @@ Tests:
 
 Latest local full test run:
 
-- `106 passed`
+- `109 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest HF worktree test run:
@@ -543,6 +567,7 @@ Optional but used by features:
 - `IMAGE_COOLDOWN_SECONDS`
 - `MAX_IMAGE_UPLOAD_MB`
 - `LOG_LEVEL`
+- `CASE_LOG_DB_PATH`
 
 Do not commit:
 
@@ -550,6 +575,7 @@ Do not commit:
 - `chroma_db/`
 - `static/audio/*.mp3`
 - `data/feedback.csv`
+- `data/case_log.sqlite3*`
 - user photos or recordings
 - API keys
 
@@ -559,7 +585,7 @@ Product:
 
 - The app still feels partly like a chat widget instead of a full field workflow.
 - Text questions do not yet always collect crop, commune, growth stage, or date.
-- Feedback is stored as CSV, not a reusable case/evaluation database.
+- Feedback is stored in SQLite, but there is no follow-up outcome workflow yet.
 - A short privacy note exists, but there is no full privacy policy page yet.
 
 RAG and data:
@@ -591,7 +617,7 @@ Operations:
 - Nightly/manual HF smoke workflow exists, but the first successful remote
   artifact should be reviewed after GitHub Actions runs it from GitHub-hosted
   networking.
-- No persistent database yet.
+- SQLite case-log persistence exists for feedback; no full user/case database yet.
 
 ## Recommended Evaluation Tasks For Another Model
 
@@ -621,8 +647,8 @@ Evaluate in this order:
 
 Highest-impact next tasks:
 
-1. Convert `data/feedback.csv` into a small SQLite case log.
-2. Add a text-question context flow for crop, location, and growth stage.
+1. Add a text-question context flow for crop, location, and growth stage.
+2. Add follow-up outcome feedback for advice.
 3. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
    policy/data retrieval smoke questions.
 4. Add log aggregation or a simple observability dashboard.

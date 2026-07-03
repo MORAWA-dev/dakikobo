@@ -66,6 +66,10 @@ KNOWLEDGE_URLS = [
 ]
 WEB_FETCH_TIMEOUT_SECONDS = float(os.getenv("WEB_FETCH_TIMEOUT_SECONDS", "15.0"))
 
+# --- Local case / feedback log ---
+# Runtime-generated SQLite database. Do not commit it.
+CASE_LOG_DB_PATH = os.getenv("CASE_LOG_DB_PATH", os.path.join("data", "case_log.sqlite3"))
+
 # --- Firecrawl candidate source ingestion ---
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
 FIRECRAWL_API_URL = os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v2/scrape")

@@ -1,7 +1,6 @@
 # app.py — DakiKobo Flask entry point
 
 import os
-import csv
 import json
 import logging
 import re
@@ -36,6 +35,7 @@ from core.speech import (
     transcribe_audio,
 )
 from core.examples import get_demo_example
+from core.case_log import record_feedback
 from core.weather import (
     WeatherError,
     build_weather_context,
@@ -76,6 +76,7 @@ from config import (
     VOICE_COOLDOWN_SECONDS,
     MAX_AUDIO_UPLOAD_BYTES,
     MAX_AUDIO_UPLOAD_MB,
+    CASE_LOG_DB_PATH,
 )
 
 logging.basicConfig(
@@ -92,8 +93,8 @@ app.config["MAX_IMAGE_UPLOAD_MB"] = MAX_IMAGE_UPLOAD_MB
 app.config["MAX_AUDIO_UPLOAD_BYTES"] = MAX_AUDIO_UPLOAD_BYTES
 app.config["MAX_AUDIO_UPLOAD_MB"] = MAX_AUDIO_UPLOAD_MB
 
-# Lightweight feedback log (no database) — one CSV row per thumbs up/down.
-FEEDBACK_FILE = os.path.join("data", "feedback.csv")
+# Runtime feedback/case log. SQLite file is generated and git-ignored.
+CASE_LOG_DB = CASE_LOG_DB_PATH
 
 
 def _set_log_fields(**fields) -> None:
@@ -1058,17 +1059,14 @@ def feedback():
         return jsonify({"ok": False, "error": "invalid rating"}), 400
 
     try:
-        os.makedirs(os.path.dirname(FEEDBACK_FILE), exist_ok=True)
-        file_exists = os.path.isfile(FEEDBACK_FILE)
-        with open(FEEDBACK_FILE, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(["timestamp", "rating", "question", "answer"])
-            writer.writerow(
-                [datetime.now(timezone.utc).isoformat(), rating, question, answer]
-            )
-        _set_log_fields(outcome="ok", rating=rating)
-        return jsonify({"ok": True})
+        feedback_id = record_feedback(
+            CASE_LOG_DB,
+            rating=rating,
+            question=question,
+            answer=answer,
+        )
+        _set_log_fields(outcome="ok", rating=rating, feedback_id=feedback_id)
+        return jsonify({"ok": True, "feedback_id": feedback_id})
     except Exception as e:
         print(f"ERROR — feedback write failed: {e}")
         _set_log_fields(outcome="write_error", failure_type=type(e).__name__)

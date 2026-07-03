@@ -5,6 +5,7 @@ import logging
 from types import SimpleNamespace
 
 import app as app_module
+from core.case_log import list_feedback_events
 
 
 class _FakeRagChain:
@@ -1081,9 +1082,9 @@ def test_screen_rejects_large_upload(monkeypatch):
     assert payload["confidence"] == "Faible"
 
 
-def test_feedback_writes_csv(tmp_path, monkeypatch):
-    feedback_file = tmp_path / "feedback" / "feedback.csv"
-    monkeypatch.setattr(app_module, "FEEDBACK_FILE", str(feedback_file))
+def test_feedback_writes_sqlite_case_log(tmp_path, monkeypatch):
+    case_log = tmp_path / "feedback" / "case_log.sqlite3"
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(case_log))
     client = app_module.app.test_client()
 
     response = client.post(
@@ -1092,7 +1093,9 @@ def test_feedback_writes_csv(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.get_json() == {"ok": True}
-    content = feedback_file.read_text(encoding="utf-8")
-    assert "timestamp,rating,question,answer" in content
-    assert ",up,Q,A" in content
+    assert response.get_json() == {"ok": True, "feedback_id": 1}
+    rows = list_feedback_events(str(case_log))
+    assert len(rows) == 1
+    assert rows[0]["rating"] == "up"
+    assert rows[0]["question"] == "Q"
+    assert rows[0]["answer"] == "A"

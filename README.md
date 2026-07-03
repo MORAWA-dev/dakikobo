@@ -49,7 +49,7 @@ and the interface is mobile-first for use on phones.
   forecast cards for selected Burkina Faso locations.
 - **Soil-aware fertilizer context** — SoilGrids texture, organic carbon, pH and retention-risk
   classes combined with deterministic fertilizer guidance.
-- **Feedback capture** — 👍 / 👎 under each answer, logged to `data/feedback.csv` (no database).
+- **Feedback capture** — 👍 / 👎 under each answer, stored in a local SQLite case log.
 - **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
 
 ---
@@ -182,7 +182,7 @@ Open <http://127.0.0.1:5000> in your browser.
 - **Quick chips** above the input send common questions in one tap.
 - **Voice output:** tick *"Activer la lecture vocale"* to hear answers read aloud.
 - **Voice input:** tap the microphone, speak, then tap again to stop or wait for auto-stop.
-- **Feedback:** use 👍 / 👎 under an answer — entries are appended to `data/feedback.csv`.
+- **Feedback:** use 👍 / 👎 under an answer — entries are stored in `data/case_log.sqlite3`.
 
 ---
 
@@ -271,6 +271,7 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `DATA_FOLDER`          | `Data`                                   | Root folder for source documents         |
 | `MARKDOWN_FOLDER`      | `Data/markdown`                          | Reviewed Markdown corpus for RAG         |
 | `PREFER_MARKDOWN_KB`   | `true`                                   | Use Markdown first; fallback to PDFs if needed |
+| `CASE_LOG_DB_PATH`     | `data/case_log.sqlite3`                  | Runtime SQLite feedback/case log         |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
 | `STT_MODEL`            | `whisper-large-v3-turbo`                 | Groq model for voice input transcription |
@@ -315,7 +316,8 @@ dakikobo/
 
 ## Notes
 
-- `.env`, `chroma_db/`, generated audio and `data/feedback.csv` are git-ignored.
+- `.env`, `chroma_db/`, generated audio, `data/feedback.csv` and
+  `data/case_log.sqlite3*` are git-ignored.
 - `/healthz` reports readiness; `/version` reports app version, commit if exposed
   by the host, and key runtime config flags.
 - Runtime logs are JSON lines with route, status, latency, model/feature, failure

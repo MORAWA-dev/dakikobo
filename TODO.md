@@ -41,7 +41,7 @@ traceable sources.
 - [ ] Image diagnosis answers are useful but not structured enough for inspection.
 - [ ] The app does not yet ask for crop, growth stage, location, or recent weather.
 - [ ] RAG citations now show source cards and relevance filtering, but still need live tuning against noisy edge cases.
-- [ ] Feedback is stored as CSV, not a reusable case/evaluation dataset.
+- [x] Feedback is stored in a SQLite case log instead of a CSV-only file.
 - [ ] Structured JSON logs exist, but there is no observability dashboard for failures, quotas, slow responses, or bad answers.
 - [ ] No scheduled knowledge refresh from trusted web sources.
 - [ ] No benchmark suite for vision/photo diagnosis quality.
@@ -193,7 +193,7 @@ Candidate resources:
 
 ### 5. Field journal and follow-up
 
-- [ ] Convert `data/feedback.csv` into a case log.
+- [x] Convert `data/feedback.csv` into a SQLite case log.
 - [ ] Add "Avez-vous applique ce conseil ?" follow-up question.
 - [ ] Add "Result after 3-7 days" feedback:
   - improved
@@ -278,7 +278,7 @@ to prove what works, what fails, and why.
 - [x] Add timeout/retry handling around Groq chat, Groq STT, Gemini, TTS, weather, soil, and web fetches.
 - [x] Add Firecrawl ingestion script with timeout/retry handling and review workflow.
 - [ ] Add simple request size limits.
-- [ ] Add SQLite for local/dev case logs.
+- [x] Add SQLite for local/dev case logs.
 - [x] Add Docker build test in CI.
 - [x] Add a nightly/manual smoke test against the Hugging Face Space.
 
@@ -286,7 +286,7 @@ to prove what works, what fails, and why.
 
 1. Structured case cards for image and text answers.
 2. Weather context card.
-3. Case log and follow-up feedback.
+3. Follow-up feedback after advice.
 4. Colab evaluation notebooks for vision.
 5. Soil context.
 6. Public demo story and example gallery.

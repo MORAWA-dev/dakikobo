@@ -19,8 +19,10 @@ static/audio/*.mp3
 # ChromaDB persisted data (if you switch to persistent storage later)
 chroma_db/
 
-# User feedback log (runtime-generated)
+# User feedback/case logs (runtime-generated)
 data/feedback.csv
+data/case_log.sqlite3
+data/case_log.sqlite3-*
 
 # Rejected / unverified generated research — never commit, never ingest.
 # Model-gathered data that returned fabricated results; kept locally only.
