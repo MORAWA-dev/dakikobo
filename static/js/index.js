@@ -133,8 +133,12 @@ $(function() {
             var rating = $(this).data('rating');
             $fb.find('.fb-btn').prop('disabled', true);
             $.post('/feedback', { rating: rating, question: question, answer: answer })
-                .done(function() {
+                .done(function(response) {
                     $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
+                    var feedbackId = response && response.feedback_id;
+                    if (feedbackId) {
+                        renderFollowupPrompt(bubble, feedbackId);
+                    }
                 })
                 .fail(function() {
                     $fb.find('.fb-btn').prop('disabled', false);
@@ -142,6 +146,41 @@ $(function() {
         });
 
         bubble.append($fb);
+        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
+    }
+
+    function renderFollowupPrompt(bubble, feedbackId) {
+        var $prompt = $('<div class="followup-prompt"></div>');
+        $prompt.append($('<div class="followup-label"></div>').text('Avez-vous appliqué ce conseil ?'));
+        var $options = $('<div class="followup-options"></div>');
+        var outcomes = [
+            { value: 'applied_improved', label: '✅ Oui, amélioré' },
+            { value: 'applied_unchanged', label: '➡️ Pas de changement' },
+            { value: 'applied_worse', label: '⚠️ Résultat pire' },
+            { value: 'not_applied', label: '❌ Non appliqué' },
+            { value: 'not_sure', label: '🤷 Pas sûr' }
+        ];
+        outcomes.forEach(function(item) {
+            var $btn = $('<button type="button" class="followup-btn"></button>')
+                .attr('data-outcome', item.value)
+                .text(item.label);
+            $options.append($btn);
+        });
+        $prompt.append($options);
+
+        $options.on('click', '.followup-btn', function() {
+            var outcome = $(this).data('outcome');
+            $options.find('.followup-btn').prop('disabled', true);
+            $.post('/feedback/outcome', { feedback_id: feedbackId, outcome: outcome })
+                .done(function() {
+                    $options.after($('<span class="followup-thanks"></span>').text('Merci pour le suivi !'));
+                })
+                .fail(function() {
+                    $options.find('.followup-btn').prop('disabled', false);
+                });
+        });
+
+        bubble.append($prompt);
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
     }
 

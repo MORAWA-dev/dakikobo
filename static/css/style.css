@@ -819,6 +819,7 @@ body {
     transform: scale(1.15);
 }
 
+
 .fb-btn:disabled {
     opacity: 0.5;
     cursor: default;
@@ -827,6 +828,66 @@ body {
 .fb-thanks {
     font-size: 11px;
     color: #5a6b5a;
+}
+
+/* Follow-up outcome prompt (after initial thumbs feedback) */
+.followup-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.followup-label {
+    color: #243b2a;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.followup-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.followup-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    border: 1px solid #bfe3dd;
+    border-radius: 13px;
+    background-color: #f4fbfa;
+    color: #04370e;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 4px 9px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.followup-btn:hover:not(:disabled) {
+    background-color: #e6f6f4;
+    border-color: #4fd1c5;
+}
+
+.followup-btn:active:not(:disabled) {
+    background-color: #cfeee9;
+}
+
+.followup-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.followup-thanks {
+    font-size: 11px;
+    color: #46a65c;
+    font-weight: 600;
 }
 
 /* Public demo examples */

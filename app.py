@@ -35,7 +35,7 @@ from core.speech import (
     transcribe_audio,
 )
 from core.examples import get_demo_example
-from core.case_log import record_feedback
+from core.case_log import record_feedback, record_outcome
 from core.weather import (
     WeatherError,
     build_weather_context,
@@ -1071,6 +1071,42 @@ def feedback():
         print(f"ERROR — feedback write failed: {e}")
         _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
         return jsonify({"ok": False, "error": "write failed"}), 500
+
+
+@app.route("/feedback/outcome", methods=["POST"])
+def feedback_outcome():
+    """Record follow-up outcome after a farmer applies (or not) advice."""
+    _set_log_fields(feature="feedback_outcome")
+    try:
+        feedback_id = int(request.form.get("feedback_id", 0))
+    except (ValueError, TypeError):
+        feedback_id = 0
+    outcome_value = request.form.get("outcome", "").strip()
+
+    if not feedback_id:
+        _set_log_fields(outcome="validation_error", failure_type="missing_feedback_id")
+        return jsonify({"ok": False, "error": "missing feedback_id"}), 400
+
+    try:
+        updated = record_outcome(
+            CASE_LOG_DB,
+            feedback_id=feedback_id,
+            outcome=outcome_value,
+        )
+    except ValueError:
+        _set_log_fields(outcome="validation_error", failure_type="invalid_outcome")
+        return jsonify({"ok": False, "error": "invalid outcome"}), 400
+    except Exception as e:
+        print(f"ERROR — outcome write failed: {e}")
+        _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
+        return jsonify({"ok": False, "error": "write failed"}), 500
+
+    if not updated:
+        _set_log_fields(outcome="not_found", failure_type="feedback_id_not_found")
+        return jsonify({"ok": False, "error": "feedback_id not found"}), 404
+
+    _set_log_fields(outcome="ok", rating_outcome=outcome_value, feedback_id=feedback_id)
+    return jsonify({"ok": True})
 
 
 if RAG_WARMUP_ON_START:

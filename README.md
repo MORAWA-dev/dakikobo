@@ -49,7 +49,7 @@ and the interface is mobile-first for use on phones.
   forecast cards for selected Burkina Faso locations.
 - **Soil-aware fertilizer context** — SoilGrids texture, organic carbon, pH and retention-risk
   classes combined with deterministic fertilizer guidance.
-- **Feedback capture** — 👍 / 👎 under each answer, stored in a local SQLite case log.
+- **Feedback capture** — 👍 / 👎 under each answer, with follow-up outcome tracking (was the advice applied? did it help?), stored in a local SQLite case log.
 - **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
 
 ---

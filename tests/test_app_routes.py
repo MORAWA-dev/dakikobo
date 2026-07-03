@@ -1099,3 +1099,61 @@ def test_feedback_writes_sqlite_case_log(tmp_path, monkeypatch):
     assert rows[0]["rating"] == "up"
     assert rows[0]["question"] == "Q"
     assert rows[0]["answer"] == "A"
+
+
+def test_feedback_outcome_route_updates_row(tmp_path, monkeypatch):
+    case_log = tmp_path / "outcome" / "case_log.sqlite3"
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(case_log))
+    client = app_module.app.test_client()
+
+    fb = client.post(
+        "/feedback",
+        data={"rating": "down", "question": "Q", "answer": "A"},
+    )
+    feedback_id = fb.get_json()["feedback_id"]
+
+    response = client.post(
+        "/feedback/outcome",
+        data={"feedback_id": feedback_id, "outcome": "applied_improved"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True}
+    rows = list_feedback_events(str(case_log))
+    assert rows[0]["outcome"] == "applied_improved"
+    assert rows[0]["outcome_at"] is not None
+
+
+def test_feedback_outcome_rejects_invalid_outcome(tmp_path, monkeypatch):
+    case_log = tmp_path / "outcome" / "case_log.sqlite3"
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(case_log))
+    client = app_module.app.test_client()
+
+    fb = client.post(
+        "/feedback",
+        data={"rating": "up", "question": "Q", "answer": "A"},
+    )
+    feedback_id = fb.get_json()["feedback_id"]
+
+    response = client.post(
+        "/feedback/outcome",
+        data={"feedback_id": feedback_id, "outcome": "maybe_later"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "invalid outcome"
+
+
+def test_feedback_outcome_returns_404_for_missing_id(tmp_path, monkeypatch):
+    case_log = tmp_path / "outcome" / "case_log.sqlite3"
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(case_log))
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/feedback/outcome",
+        data={"feedback_id": 9999, "outcome": "not_applied"},
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "feedback_id not found"
+

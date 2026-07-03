@@ -19,12 +19,12 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `d8cd0c1`
+- Latest HF runtime commit verified: `4e1c34c`
 - Live health verified on 2026-07-03:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-07-03T09:46:26+00:00`
+  - warm-up finished at `2026-07-03T10:16:55+00:00`
 
 Local git note:
 
@@ -342,8 +342,14 @@ Stored fields:
 - `rating`
 - `question`
 - `answer`
+- `outcome` (nullable)
+- `outcome_at` (nullable)
 
 The database is runtime-generated and git-ignored.
+
+The `/feedback/outcome` route accepts a follow-up outcome for a previously rated
+answer. Valid outcomes are `applied`, `improved`, `unchanged`, and `worse`. The
+outcome and its timestamp are stored alongside the original feedback event.
 
 ### 12. Evaluation Tooling
 
@@ -434,6 +440,7 @@ First generated pending batch:
 | `/soil/locations` | GET | Available soil locations and crops |
 | `/examples/<example_id>` | GET | Quota-safe demo examples |
 | `/feedback` | POST | Answer rating capture into SQLite case log |
+| `/feedback/outcome` | POST | Follow-up outcome after advice (applied/improved/unchanged/worse) |
 
 ## Key Files For Review
 
@@ -507,7 +514,7 @@ Latest focused evaluator tests:
 Latest live HF checks:
 
 - `/healthz`: ready
-- `/version`: commit `d8cd0c1deabfbb9ee39544d959018b7a5005d5d5`
+- `/version`: commit `4e1c34cf6eaf624c28ac41a5717ba6342e18dd11`
 - `/`: rendered `mediaPrivacyNote` and the visible media privacy text
 - `/ask` FAO data question: returned the new FAO Burkina policy/data synthesis
   source with publisher/year/country/review-status URL metadata and confidence
@@ -585,7 +592,7 @@ Product:
 
 - The app still feels partly like a chat widget instead of a full field workflow.
 - Text questions do not yet always collect crop, commune, growth stage, or date.
-- Feedback is stored in SQLite, but there is no follow-up outcome workflow yet.
+- Feedback is stored in SQLite with follow-up outcome tracking. Deferred follow-up reminders are not yet implemented.
 - A short privacy note exists, but there is no full privacy policy page yet.
 
 RAG and data:

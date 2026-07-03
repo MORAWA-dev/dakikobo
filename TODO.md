@@ -194,8 +194,8 @@ Candidate resources:
 ### 5. Field journal and follow-up
 
 - [x] Convert `data/feedback.csv` into a SQLite case log.
-- [ ] Add "Avez-vous applique ce conseil ?" follow-up question.
-- [ ] Add "Result after 3-7 days" feedback:
+- [x] Add "Avez-vous appliqué ce conseil ?" follow-up question.
+- [x] Add "Result after 3-7 days" feedback:
   - improved
   - unchanged
   - worse

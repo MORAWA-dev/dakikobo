@@ -7,7 +7,15 @@ import sqlite3
 from datetime import datetime, timezone
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+VALID_OUTCOMES = frozenset({
+    "applied_improved",
+    "applied_unchanged",
+    "applied_worse",
+    "not_applied",
+    "not_sure",
+})
 
 
 def _now_iso() -> str:
@@ -27,8 +35,26 @@ def _connect(db_path: str) -> sqlite3.Connection:
     return conn
 
 
+def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    """Check whether *column* already exists on *table*."""
+    info = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(row["name"] == column for row in info)
+
+
+def _migrate_to_v2(conn: sqlite3.Connection) -> None:
+    """Add outcome tracking columns (idempotent)."""
+    if not _column_exists(conn, "feedback_events", "outcome"):
+        conn.execute(
+            "ALTER TABLE feedback_events ADD COLUMN outcome TEXT"
+        )
+    if not _column_exists(conn, "feedback_events", "outcome_at"):
+        conn.execute(
+            "ALTER TABLE feedback_events ADD COLUMN outcome_at TEXT"
+        )
+
+
 def init_case_log(db_path: str) -> None:
-    """Create the case-log database schema if needed."""
+    """Create the case-log database schema if needed and apply migrations."""
     with _connect(db_path) as conn:
         conn.execute(
             """
@@ -37,10 +63,13 @@ def init_case_log(db_path: str) -> None:
                 created_at TEXT NOT NULL,
                 rating TEXT NOT NULL CHECK (rating IN ('up', 'down')),
                 question TEXT NOT NULL,
-                answer TEXT NOT NULL
+                answer TEXT NOT NULL,
+                outcome TEXT,
+                outcome_at TEXT
             )
             """
         )
+        _migrate_to_v2(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
@@ -68,14 +97,44 @@ def record_feedback(
         return int(cursor.lastrowid)
 
 
+def record_outcome(
+    db_path: str,
+    *,
+    feedback_id: int,
+    outcome: str,
+) -> bool:
+    """Update a feedback row with a follow-up outcome.
+
+    Returns True when the row was found and updated, False otherwise.
+    """
+    if outcome not in VALID_OUTCOMES:
+        raise ValueError(
+            f"outcome must be one of {sorted(VALID_OUTCOMES)}"
+        )
+
+    init_case_log(db_path)
+    with _connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            UPDATE feedback_events
+            SET outcome = ?, outcome_at = ?
+            WHERE id = ?
+            """,
+            (outcome, _now_iso(), feedback_id),
+        )
+        return cursor.rowcount > 0
+
+
 def list_feedback_events(db_path: str) -> list[dict]:
     """Return feedback rows for tests, exports, and future evaluation tooling."""
     if not os.path.isfile(db_path):
         return []
+    init_case_log(db_path)
     with _connect(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT id, created_at, rating, question, answer
+            SELECT id, created_at, rating, question, answer,
+                   outcome, outcome_at
             FROM feedback_events
             ORDER BY id
             """
