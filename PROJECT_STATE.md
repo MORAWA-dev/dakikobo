@@ -79,6 +79,7 @@ Behavior:
 - Shows confidence labels: `Fort`, `Moyen`, `Faible`.
 - Uses off-topic fallback rather than inventing unsupported advice.
 - Generates French TTS audio when possible.
+- Shows a visible privacy note for photos and voice recordings.
 
 ### 2. RAG Knowledge Base
 
@@ -228,6 +229,8 @@ Behavior:
 - Includes observations, possible causes, immediate actions, confidence, risk,
   and disclaimer.
 - Does not present output as a final diagnosis.
+- Uploaded photos are read in memory for analysis and are not saved by the app.
+- The UI tells users to avoid faces or personal identifiers in uploaded photos.
 - Requires `GEMINI_API_KEY`.
 
 ### 7. Voice Input
@@ -251,6 +254,8 @@ Behavior:
 - Native browser speech recognition remains as fallback.
 - French errors are returned for blocked microphone, empty audio, oversized
   upload, unclear speech, or transcription failure.
+- Voice recordings are read for transcription and are not written to app logs.
+- The UI tells users to avoid personal identifiers in voice recordings.
 
 Limit:
 
@@ -554,7 +559,7 @@ Product:
 - The app still feels partly like a chat widget instead of a full field workflow.
 - Text questions do not yet always collect crop, commune, growth stage, or date.
 - Feedback is stored as CSV, not a reusable case/evaluation database.
-- There is no user-facing privacy note for uploaded photos/audio yet.
+- A short privacy note exists, but there is no full privacy policy page yet.
 
 RAG and data:
 
@@ -615,9 +620,10 @@ Evaluate in this order:
 
 Highest-impact next tasks:
 
-1. Add a privacy note for uploaded photos/audio.
-2. Convert `data/feedback.csv` into a small SQLite case log.
-3. Add a text-question context flow for crop, location, and growth stage.
+1. Convert `data/feedback.csv` into a small SQLite case log.
+2. Add a text-question context flow for crop, location, and growth stage.
+3. Verify hosted RAG warm-up after the privacy-note deployment and run a UI
+   smoke check.
 4. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
    policy/data retrieval smoke questions.
 5. Add log aggregation or a simple observability dashboard.

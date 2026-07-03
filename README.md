@@ -321,5 +321,8 @@ dakikobo/
 - Runtime logs are JSON lines with route, status, latency, model/feature, failure
   type and confidence where available. Raw questions, answers, images and audio
   are not logged.
+- Leaf photos and voice recordings are used only for the requested analysis or
+  transcription. The app warns users not to send faces, names, numbers or
+  personal documents.
 - This tool gives general guidance; users should confirm specifics (e.g. fertilizer
   doses) with a local agricultural extension agent.

@@ -42,6 +42,17 @@ def test_source_cards_render_review_metadata():
     assert ".source-title-link" in css
 
 
+def test_media_privacy_note_is_visible():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+
+    assert "Confidentialité" in html
+    assert 'id="mediaPrivacyNote"' in html
+    assert "Photo et dictée servent seulement à l'analyse" in html
+    assert "Évitez les visages, noms, numéros" in html
+    assert ".media-privacy-note" in css
+
+
 def test_voice_input_uses_server_side_stt():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
 

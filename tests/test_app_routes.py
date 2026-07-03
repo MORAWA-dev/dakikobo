@@ -117,6 +117,7 @@ def test_index_route_renders():
     assert b'id="toolsToggle"' in response.data
     assert b'id="weatherLocation"' in response.data
     assert b'id="soilCrop"' in response.data
+    assert b'id="mediaPrivacyNote"' in response.data
 
 
 def test_health_route_is_lightweight():

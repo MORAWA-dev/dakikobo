@@ -28,6 +28,7 @@ traceable sources.
 - [x] TTS has one global auto-play toggle plus per-answer `Réécouter` buttons when audio is available.
 - [x] A `Sources & limites` panel explains evidence, deterministic tools, and required field confirmation.
 - [x] Source cards now expose publisher, year, country, review status, and clickable URL when reviewed metadata exists.
+- [x] A visible privacy note explains that photos/audio are used for analysis and should not include personal identifiers.
 - [x] Hugging Face starts a background RAG warm-up so the first real question is not the warm-up trigger.
 - [x] Markdown corpus audit completed: 16/16 converted documents now match PDF text volume closely enough for RAG review.
 - [x] Docker/Hugging Face deployment files exist.
@@ -265,7 +266,7 @@ to prove what works, what fails, and why.
 - [ ] Keep scraped documents separate from manually reviewed PDFs.
 - [x] Keep Firecrawl scraped candidates outside active RAG until promotion.
 - [ ] Remove or quarantine any source with unclear rights.
-- [ ] Add a privacy note for uploaded images.
+- [x] Add a privacy note for uploaded images and voice recordings.
 - [ ] Never commit API keys, `.env`, generated audio, feedback logs, or user photos.
 
 ## Engineering hardening
@@ -285,12 +286,11 @@ to prove what works, what fails, and why.
 
 1. Structured case cards for image and text answers.
 2. Weather context card.
-3. Privacy note for photos/audio.
-4. Verify hosted RAG warm-up and FAO retrieval after the source-card metadata change.
-5. Case log and follow-up feedback.
-6. Colab evaluation notebooks for vision.
-7. Soil context.
-8. Public demo story and example gallery.
+3. Verify hosted RAG warm-up and UI privacy note after deployment.
+4. Case log and follow-up feedback.
+5. Colab evaluation notebooks for vision.
+6. Soil context.
+7. Public demo story and example gallery.
 
 ## Definition of "incredible"
 
