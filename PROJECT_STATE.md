@@ -19,12 +19,12 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `1ed4d78d`
+- Latest HF runtime commit verified: `6f82fa3`
 - Live health verified on 2026-07-03:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-07-03T09:06:12+00:00`
+  - warm-up finished at `2026-07-03T09:14:20+00:00`
 
 Local git note:
 
@@ -478,7 +478,7 @@ Latest focused evaluator tests:
 Latest live HF checks:
 
 - `/healthz`: ready
-- `/version`: commit `1ed4d78da3a8f28c84c46bc6631de7119da418a0`
+- `/version`: commit `6f82fa313a0408d7764e33c6c2a7f2d03c1197eb`
 - `/ask` FAO data question: returned the new FAO Burkina policy/data synthesis
   source with publisher/year/country/review-status URL metadata and confidence
   `Fort`
