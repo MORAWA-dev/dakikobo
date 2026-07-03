@@ -88,12 +88,13 @@ Active source path:
 
 Current active Markdown file count:
 
-- 18 Markdown files
+- 19 Markdown files
 
 Important curated additions:
 
 - `Data/markdown/prosol_fertilite_sols_burkina_2020.md`
 - `Data/markdown/iita_niebe_afrique_ouest_2018.md`
+- `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`
 
 Source governance:
 
@@ -107,6 +108,9 @@ Source governance:
 - Persisted Chroma stores are validated at startup. If the collection is missing
   or contains zero chunks, the app clears `chroma_db/` and rebuilds from the
   active Markdown/PDF corpus.
+- Persisted Chroma stores now include `source_manifest.json`. If active
+  Markdown/PDF files, embedding model, chunk settings, or configured external
+  knowledge URLs change, the app treats the store as stale and rebuilds it.
 
 Retrieval status:
 
@@ -378,6 +382,11 @@ First generated pending batch:
 - FAO Country Profiles Burkina Faso
 - These files are local pending review artifacts and are git-ignored until a
   reviewer cleans and promotes them.
+- A short reviewed synthesis from this batch was promoted to active Markdown:
+  `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`.
+  It is limited to policy, public expenditure, price incentives, statistics,
+  EPA data availability, and FAO country-profile context. It must not be used
+  for exact fertilizer, pesticide, disease, or crop-calendar recommendations.
 
 ## Main Routes
 
@@ -548,8 +557,9 @@ RAG and data:
   expose more of it in the UI.
 - Retrieval source filtering exists, but needs more live evaluation and tuning.
 - Generated/scraped data should remain outside RAG until human review.
-- Firecrawl ingestion and the first FAO allowlist/seed batch exist; additional
-  trusted sources still need allowlist rows and review.
+- Firecrawl ingestion and the first FAO allowlist/seed batch exist. One curated
+  FAO synthesis is active; the raw scraped files remain ignored pending
+  artifacts. Additional trusted sources still need allowlist rows and review.
 
 Vision:
 
@@ -560,6 +570,10 @@ Vision:
 Operations:
 
 - `/version` exists locally and should be verified after the next HF deploy.
+- Full local Chroma rebuild over the 19-file Markdown corpus was attempted on
+  2026-07-03. Loading and hashing succeeded, but CPU embedding did not complete
+  in the local time window. The hosted Space should rebuild through the manifest
+  guard during warm-up and must be checked with `/healthz`.
 - Structured JSON logs exist; no dashboard or log aggregation exists yet.
 - Docker build workflow exists; review first GitHub-hosted run for dependency
   install duration and container startup time.
@@ -600,7 +614,8 @@ Highest-impact next tasks:
 2. Add a privacy note for uploaded photos/audio.
 3. Convert `data/feedback.csv` into a small SQLite case log.
 4. Add a text-question context flow for crop, location, and growth stage.
-5. Review and promote the first Firecrawl FAO seed batch if license/content checks pass.
+5. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
+   policy/data retrieval smoke questions.
 6. Add log aggregation or a simple observability dashboard.
 7. Continue live retrieval evaluation and tune citation thresholds if needed.
 

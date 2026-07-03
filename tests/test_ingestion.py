@@ -2,13 +2,19 @@
 
 import os
 import glob
+import json
 
 import pytest
 from langchain_core.documents import Document
 
 import config
 import core.rag_pipeline as rag_pipeline
-from core.rag_pipeline import load_markdown_from_folder, load_pdfs_from_folder
+from core.rag_pipeline import (
+    build_source_manifest,
+    list_markdown_files,
+    load_markdown_from_folder,
+    load_pdfs_from_folder,
+)
 
 # A few documents we expect to ship in the knowledge base. If these are renamed
 # or removed, the ingestion contract changed and the test should flag it.
@@ -101,6 +107,53 @@ Contenu agricole vérifié.
     assert metadata["license"] == "unknown"
     assert metadata["topics"] == "semis, pluie"
     assert metadata["crops"] == "mil, sorgho"
+
+
+def test_source_manifest_tracks_markdown_content(tmp_path):
+    active = tmp_path / "active.md"
+    skipped = tmp_path / "_index.md"
+    active.write_text("contenu A", encoding="utf-8")
+    skipped.write_text("ignore", encoding="utf-8")
+
+    files = list_markdown_files(str(tmp_path))
+    manifest = build_source_manifest(
+        files,
+        source_type="Markdown",
+        external_sources=["https://example.test/source"],
+    )
+
+    assert files == [str(active)]
+    assert manifest["source_type"] == "Markdown"
+    assert manifest["embedding_model"] == config.EMBEDDING_MODEL
+    assert manifest["external_sources"] == ["https://example.test/source"]
+    assert manifest["files"][0]["path"].endswith("active.md")
+    assert manifest["files"][0]["bytes"] == len("contenu A".encode("utf-8"))
+
+    first_hash = manifest["files"][0]["sha256"]
+    active.write_text("contenu B", encoding="utf-8")
+    changed = build_source_manifest(files, source_type="Markdown")
+
+    assert changed["files"][0]["sha256"] != first_hash
+
+
+def test_stale_vector_store_manifest_is_rejected(tmp_path, monkeypatch):
+    vector_dir = tmp_path / "chroma"
+    vector_dir.mkdir()
+    (vector_dir / "source_manifest.json").write_text(
+        json.dumps({"files": [{"path": "old.md"}]}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(rag_pipeline, "VECTORSTORE_DIR", str(vector_dir))
+    monkeypatch.setattr(
+        rag_pipeline,
+        "load_vector_store",
+        lambda: (_ for _ in ()).throw(AssertionError("stale store should not load")),
+    )
+
+    db = rag_pipeline.load_vector_store_if_usable({"files": [{"path": "new.md"}]})
+
+    assert db is None
 
 
 def test_load_pdfs_returns_documents():

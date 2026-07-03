@@ -22,6 +22,7 @@ path until reviewed.
 |---|---|---|---|---|---|---|---|---|
 | `active_rag` | 2026-06-27 | [Catalogue de fiches techniques des mesures d'amélioration de la fertilité des sols](https://www.inter-reseaux.org/wp-content/uploads/Catalogue-AFS-ProSol-04-12-2020.pdf) | ProSol, 2020 | Burkina Faso | fumure organique, compost, parcs améliorés, légumineuses, CES | unknown | reviewed_by_codex_pending_human_review | Extracted to `Data/markdown/prosol_fertilite_sols_burkina_2020.md`; pesticide section excluded and exact microdose table kept out of general RAG advice. |
 | `active_rag` | 2026-06-27 | [Guide sur la production du niébé en Afrique de l'Ouest](https://www.iita.org/wp-content/uploads/2020/05/Cowpea-manual-FRENCH_VERSION.pdf) | IITA, copyright 2017, citation 2018 | West Africa | niébé production, varieties, pests, storage | copyright IITA 2017; reuse terms not fully verified | reviewed_by_codex_pending_human_review | Extracted to `Data/markdown/iita_niebe_afrique_ouest_2018.md`; chemical product tables excluded and source kept labeled as regional. |
+| `active_rag` | 2026-07-03 | [FAO Burkina Faso MAFAP / AGRISurvey / Country Profiles seed batch](https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en) | FAO, accessed 2026 | Burkina Faso | policy, public expenditure, price incentives, EPA/statistics, country profile | FAO web reuse terms not fully verified | reviewed_by_codex_pending_human_review | Curated synthesis extracted to `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`; excludes raw news/project tables and does not support technical field recommendations. |
 | `candidate` | 2026-06-27 | [ProPulse Légumineuses](https://agritrop.cirad.fr/612314/1/V2COR200225%20PROPULSE%20L%C3%89GUMINEUSES%20.pdf) | CIRAD / partners, PDF created 2025 | Burkina Faso and West Africa | cereal-legume associations, rotations, legumes | unknown | pending_human_review | Useful where the document explicitly supports Burkina sections. Extract cautiously by section. |
 
 ## Pending Sources
@@ -59,9 +60,11 @@ path until reviewed.
 - First seed batch: `Data/scraped/seed_urls_fao_burkina.txt`
 - Current seed scope: FAO Burkina Faso MAFAP, FAO AGRISurvey Burkina Faso, and FAO Country Profiles Burkina Faso.
 - Local pending outputs generated on 2026-07-02 UTC are ignored by git under `Data/scraped/pending/*.md`.
+- Reviewed output promoted on 2026-07-03: `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`.
 
 ## Next Source Work
 
 1. Extract verified Burkina sections from CIRAD ProPulse 2025.
 2. Search for original official arachide and climate sources to replace weak citations.
-3. Use `scripts/firecrawl_ingest.py` only for offline candidate collection, never during user requests.
+3. Run a human content/license review on the promoted FAO synthesis before quoting it outside the app demo.
+4. Use `scripts/firecrawl_ingest.py` only for offline candidate collection, never during user requests.

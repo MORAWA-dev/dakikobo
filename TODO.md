@@ -158,8 +158,11 @@ Candidate source:
   - [ ] INERA / extension manuals where accessible
 - [x] Scrape the first FAO Burkina Faso seed batch into local pending review files.
 - [x] Store crawled output as pending Markdown under `Data/scraped/pending/`.
+- [x] Promote a curated FAO Burkina policy/data synthesis from the first seed batch into active Markdown.
 - [x] Add metadata: URL, title, publisher, date crawled, language, license/usage note.
 - [x] Add a review flag before documents enter RAG.
+- [x] Add source-manifest validation so Chroma rebuilds when the active corpus changes.
+- [ ] Verify hosted RAG warm-up and FAO retrieval after the promoted FAO synthesis is deployed.
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:
@@ -281,7 +284,7 @@ to prove what works, what fails, and why.
 1. Structured case cards for image and text answers.
 2. Weather context card.
 3. Better source/citation cards.
-4. Firecrawl allowlist and first curated source batch.
+4. Verify hosted RAG warm-up and FAO retrieval after the first promoted source.
 5. Case log and follow-up feedback.
 6. Colab evaluation notebooks for vision.
 7. Soil context.

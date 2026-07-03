@@ -231,11 +231,14 @@ def test_existing_valid_vector_store_is_reused(monkeypatch):
 
     monkeypatch.setattr(app_module, "REBUILD_VECTORSTORE", False)
     monkeypatch.setattr(app_module, "vector_store_exists", lambda: True)
-    monkeypatch.setattr(app_module, "load_vector_store_if_usable", lambda: db)
+    monkeypatch.setattr(app_module, "_expected_vector_store_manifest", lambda: {"files": []})
+    monkeypatch.setattr(app_module, "load_vector_store_if_usable", lambda manifest: db)
     monkeypatch.setattr(
         app_module,
         "initialize_vector_store",
-        lambda docs: (_ for _ in ()).throw(AssertionError("valid store should load")),
+        lambda docs, manifest=None: (_ for _ in ()).throw(
+            AssertionError("valid store should load")
+        ),
     )
 
     assert app_module._load_or_build_vector_store() is db
@@ -248,7 +251,8 @@ def test_invalid_existing_vector_store_is_rebuilt(monkeypatch):
     monkeypatch.setattr(app_module, "REBUILD_VECTORSTORE", False)
     monkeypatch.setattr(app_module, "KNOWLEDGE_URLS", [])
     monkeypatch.setattr(app_module, "vector_store_exists", lambda: True)
-    monkeypatch.setattr(app_module, "load_vector_store_if_usable", lambda: None)
+    monkeypatch.setattr(app_module, "_expected_vector_store_manifest", lambda: {"files": []})
+    monkeypatch.setattr(app_module, "load_vector_store_if_usable", lambda manifest: None)
     monkeypatch.setattr(app_module, "clear_vector_store", lambda: calls.append("clear"))
     monkeypatch.setattr(
         app_module,
@@ -258,13 +262,13 @@ def test_invalid_existing_vector_store_is_rebuilt(monkeypatch):
     monkeypatch.setattr(
         app_module,
         "initialize_vector_store",
-        lambda docs: {"doc_count": len(docs)},
+        lambda docs, manifest=None: {"doc_count": len(docs), "manifest": manifest},
     )
 
     db = app_module._load_or_build_vector_store()
 
     assert calls == ["clear"]
-    assert db == {"doc_count": 1}
+    assert db == {"doc_count": 1, "manifest": {"files": []}}
 
 
 def test_rebuild_clears_existing_vector_store(monkeypatch):
@@ -274,6 +278,7 @@ def test_rebuild_clears_existing_vector_store(monkeypatch):
     monkeypatch.setattr(app_module, "REBUILD_VECTORSTORE", True)
     monkeypatch.setattr(app_module, "KNOWLEDGE_URLS", [])
     monkeypatch.setattr(app_module, "vector_store_exists", lambda: True)
+    monkeypatch.setattr(app_module, "_expected_vector_store_manifest", lambda: {"files": []})
     monkeypatch.setattr(app_module, "clear_vector_store", lambda: calls.append("clear"))
     monkeypatch.setattr(
         app_module,
@@ -283,13 +288,13 @@ def test_rebuild_clears_existing_vector_store(monkeypatch):
     monkeypatch.setattr(
         app_module,
         "initialize_vector_store",
-        lambda docs: {"doc_count": len(docs)},
+        lambda docs, manifest=None: {"doc_count": len(docs), "manifest": manifest},
     )
 
     db = app_module._load_or_build_vector_store()
 
     assert calls == ["clear"]
-    assert db == {"doc_count": 1}
+    assert db == {"doc_count": 1, "manifest": {"files": []}}
 
 
 def test_demo_example_route_returns_text_without_live_services(monkeypatch):

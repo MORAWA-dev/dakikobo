@@ -2,6 +2,8 @@
 
 import os
 import glob
+import hashlib
+import json
 import random
 import shutil
 import string
@@ -29,6 +31,9 @@ from config import (
     VECTORSTORE_DIR,
     WEB_FETCH_TIMEOUT_SECONDS,
 )
+
+
+VECTORSTORE_MANIFEST = "source_manifest.json"
 
 
 # =================================================================
@@ -119,18 +124,89 @@ def _source_label_for_markdown(md_file: str, metadata: dict[str, str]) -> str:
     return os.path.basename(md_file)
 
 
+def list_markdown_files(folder_path: str) -> list[str]:
+    """Return ingestible Markdown files under folder_path."""
+    return [
+        f for f in sorted(
+            glob.glob(os.path.join(folder_path, "**", "*.md"), recursive=True)
+        )
+        if not os.path.basename(f).startswith("_")
+    ]
+
+
+def list_pdf_files(folder_path: str) -> list[str]:
+    """Return PDF files under folder_path."""
+    return sorted(glob.glob(os.path.join(folder_path, "**", "*.pdf"), recursive=True))
+
+
+def _file_sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_source_manifest(
+    file_paths: list[str],
+    *,
+    source_type: str,
+    external_sources: list[str] | None = None,
+) -> dict:
+    """Build a stable manifest for the corpus used to create Chroma."""
+    files = []
+    for path in sorted(set(file_paths)):
+        if not os.path.isfile(path):
+            continue
+        files.append(
+            {
+                "path": os.path.relpath(path).replace(os.sep, "/"),
+                "bytes": os.path.getsize(path),
+                "sha256": _file_sha256(path),
+            }
+        )
+
+    return {
+        "version": 1,
+        "source_type": source_type,
+        "embedding_model": EMBEDDING_MODEL,
+        "chunk_size": CHUNK_SIZE,
+        "chunk_overlap": CHUNK_OVERLAP,
+        "external_sources": sorted(external_sources or []),
+        "files": files,
+    }
+
+
+def _manifest_path() -> str:
+    return os.path.join(VECTORSTORE_DIR, VECTORSTORE_MANIFEST)
+
+
+def _read_vector_store_manifest() -> dict | None:
+    try:
+        with open(_manifest_path(), encoding="utf-8") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"Warning: Could not read vector store manifest: {e}")
+        return None
+
+
+def _write_vector_store_manifest(manifest: dict | None) -> None:
+    if manifest is None:
+        return
+    os.makedirs(VECTORSTORE_DIR, exist_ok=True)
+    with open(_manifest_path(), "w", encoding="utf-8") as file:
+        json.dump(manifest, file, ensure_ascii=False, indent=2, sort_keys=True)
+
+
 def load_markdown_from_folder(folder_path: str) -> list[Document]:
     """Return a Document per readable Markdown file under folder_path.
 
     Files whose names begin with `_` are treated as manifests/indexes and skipped.
     Each Document keeps traceability back to the converted file and original PDF.
     """
-    md_files = [
-        f for f in sorted(
-            glob.glob(os.path.join(folder_path, "**", "*.md"), recursive=True)
-        )
-        if not os.path.basename(f).startswith("_")
-    ]
+    md_files = list_markdown_files(folder_path)
     print(f"Found {len(md_files)} Markdown file(s) in and under {folder_path}")
 
     docs = []
@@ -199,9 +275,7 @@ def load_pdfs_from_folder(folder_path: str) -> list[Document]:
     chunks can be cited. Subfolders are included. An unreadable or empty PDF is
     logged and skipped (never crashes startup).
     """
-    pdf_files = sorted(
-        glob.glob(os.path.join(folder_path, "**", "*.pdf"), recursive=True)
-    )
+    pdf_files = list_pdf_files(folder_path)
     print(f"Found {len(pdf_files)} PDF(s) in and under {folder_path}")
     docs = []
     for f in pdf_files:
@@ -249,10 +323,15 @@ def load_vector_store():
     return Chroma(persist_directory=VECTORSTORE_DIR, embedding_function=_embeddings())
 
 
-def load_vector_store_if_usable():
+def load_vector_store_if_usable(expected_manifest: dict | None = None):
     """Load a persisted Chroma store only when its collection has documents."""
     if not vector_store_exists():
         return None
+    if expected_manifest is not None:
+        current_manifest = _read_vector_store_manifest()
+        if current_manifest != expected_manifest:
+            print("Warning: Existing vector store manifest is stale; rebuilding.")
+            return None
     try:
         db = load_vector_store()
         count = db._collection.count()
@@ -268,7 +347,7 @@ def load_vector_store_if_usable():
     return db
 
 
-def initialize_vector_store(documents: list[Document]):
+def initialize_vector_store(documents: list[Document], source_manifest: dict | None = None):
     """
     Build a persistent ChromaDB vector store from a list of Documents and save it
     to VECTORSTORE_DIR. Each chunk keeps its source metadata.
@@ -288,6 +367,7 @@ def initialize_vector_store(documents: list[Document]):
         # SIMILARITY_THRESHOLD works regardless of the embedding model.
         collection_metadata={"hnsw:space": "cosine"},
     )
+    _write_vector_store_manifest(source_manifest)
     return db
 
 

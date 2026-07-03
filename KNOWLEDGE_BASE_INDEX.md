@@ -2,6 +2,22 @@
 
 Lightweight index for AI assistants (ChatGPT Project, Cursor). Full PDFs stay in `Data/` locally — not uploaded to cloud assistants.
 
+## Current Active RAG Path
+
+The app now prefers reviewed Markdown under `Data/markdown/`, with PDF fallback
+when Markdown is missing or disabled. See `DATA_SOURCES.md` for source
+governance and `PROJECT_STATE.md` for the latest verification status.
+
+Key curated Markdown additions:
+
+| File | Topic | Crops | Zone |
+|---|---|---|---|
+| `Data/markdown/prosol_fertilite_sols_burkina_2020.md` | Soil fertility, compost, organic manure, CES | Mixed | Burkina Faso |
+| `Data/markdown/iita_niebe_afrique_ouest_2018.md` | Niébé production, symptoms, storage | Niébé | West Africa |
+| `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md` | Policy, public expenditure, price incentives, EPA/statistics, FAO country profile | Mixed | Burkina Faso |
+
+Firecrawl raw outputs under `Data/scraped/pending/` are not active RAG sources.
+
 ## Ingested (`Data/knowledge_base/`)
 
 | File | Topic | Crops | Zone |
@@ -35,10 +51,10 @@ Lightweight index for AI assistants (ChatGPT Project, Cursor). Full PDFs stay in
 
 ## Ingestion notes
 
-- `app.py` loads only `*.pdf` directly in `knowledge_base/` (no subfolders)
-- `config.py` → `DATA_FOLDER = data/knowledge_base` (macOS case-insensitive → `Data/knowledge_base`)
-- ChromaDB is in-memory — re-indexes on every server restart
-- Planned: metadata tags (`crop`, `zone`, `doc_type`), persistent Chroma, PyMuPDF extraction
+- Current app config uses the full `Data/` tree and recursive ingestion.
+- Markdown is preferred for hosted startup and cleaner chunking.
+- ChromaDB is persisted in `chroma_db/` and is generated, not committed.
+- Planned: richer source-card display using document metadata.
 
 ## Priority ingestion order
 

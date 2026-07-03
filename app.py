@@ -17,6 +17,9 @@ from core.rag_pipeline import (
     fetch_website_content,
     load_markdown_from_folder,
     load_pdfs_from_folder,
+    list_markdown_files,
+    list_pdf_files,
+    build_source_manifest,
     initialize_vector_store,
     clear_vector_store,
     vector_store_exists,
@@ -483,11 +486,31 @@ def _load_local_knowledge_documents() -> tuple[list, str]:
     return local_docs, local_source
 
 
+def _expected_vector_store_manifest() -> dict:
+    """Describe the source files that should be represented in Chroma."""
+    source_type = "PDF"
+    source_files = []
+    if PREFER_MARKDOWN_KB:
+        source_files = list_markdown_files(MARKDOWN_FOLDER)
+        source_type = "Markdown"
+
+    if not source_files:
+        source_files = list_pdf_files(DATA_FOLDER)
+        source_type = "PDF"
+
+    return build_source_manifest(
+        source_files,
+        source_type=source_type,
+        external_sources=KNOWLEDGE_URLS,
+    )
+
+
 def _load_or_build_vector_store():
     store_exists = vector_store_exists()
+    expected_manifest = _expected_vector_store_manifest()
     if store_exists and not REBUILD_VECTORSTORE:
         print("1. Loading existing vector store (set REBUILD_VECTORSTORE=true to rebuild)...")
-        db = load_vector_store_if_usable()
+        db = load_vector_store_if_usable(expected_manifest)
         if db is not None:
             return db
         print("1. Clearing unusable vector store for a clean rebuild...")
@@ -512,7 +535,7 @@ def _load_or_build_vector_store():
         f"({len(local_docs)} {local_source} docs + {len(website_docs)} web sources)..."
     )
     all_docs = website_docs + local_docs
-    return initialize_vector_store(all_docs)
+    return initialize_vector_store(all_docs, expected_manifest)
 
 
 def get_rag_chain():
