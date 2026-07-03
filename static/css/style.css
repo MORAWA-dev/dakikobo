@@ -526,6 +526,33 @@ body {
     line-height: 1.25;
 }
 
+.source-title-link {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.source-title-link:hover {
+    color: #0b5f4d;
+}
+
+.source-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 5px;
+}
+
+.source-meta-item {
+    color: #425542;
+    font-size: 10px;
+    line-height: 1.25;
+}
+
+.source-meta-item strong {
+    color: #2f4f2f;
+    font-weight: 700;
+}
+
 .source-snippet {
     color: #5a6b5a;
     font-size: 11px;

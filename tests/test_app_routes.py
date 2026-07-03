@@ -31,6 +31,28 @@ class _SingleSourceRagChain:
         }
 
 
+class _MetadataSourceRagChain:
+    def invoke(self, query):
+        assert query == "Quelles données FAO existent ?"
+        return {
+            "result": "La FAO signale AGRISurvey, FAOSTAT et CountrySTAT.",
+            "source_documents": [
+                SimpleNamespace(
+                    metadata={
+                        "source": "FAO Burkina Faso - politiques agricoles",
+                        "doc_type": "scraped_web",
+                        "publisher": "FAO",
+                        "year": "2026",
+                        "country": "Burkina Faso",
+                        "review_status": "reviewed_by_codex_pending_human_review",
+                        "source_url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
+                    },
+                    page_content="La FAO signale AGRISurvey, FAOSTAT et CountrySTAT pour le Burkina Faso.",
+                )
+            ],
+        }
+
+
 class _NoisySourceRagChain:
     def invoke(self, query):
         assert query == "Comment stocker le niébé contre les bruches ?"
@@ -643,6 +665,39 @@ def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):
 
     assert response.status_code == 200
     assert payload["confidence"] == "Moyen"
+
+
+def test_rag_route_exposes_source_metadata(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _MetadataSourceRagChain())
+    monkeypatch.setattr(
+        app_module,
+        "text_to_speech_to_static",
+        lambda text: "/static/audio/rag.mp3",
+    )
+
+    response = client.post(
+        "/ask",
+        data={"messageText": "Quelles données FAO existent ?"},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["sources"] == [
+        {
+            "title": "FAO Burkina Faso - politiques agricoles",
+            "type": "Source web revue",
+            "snippet": (
+                "La FAO signale AGRISurvey, FAOSTAT et CountrySTAT "
+                "pour le Burkina Faso."
+            ),
+            "publisher": "FAO",
+            "year": "2026",
+            "country": "Burkina Faso",
+            "review_status": "Revu, validation humaine à finaliser",
+            "url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
+        }
+    ]
 
 
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):

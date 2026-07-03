@@ -27,6 +27,7 @@ traceable sources.
 - [x] The demo UI uses the neutral DakiKobo logo avatar, compact wrapped examples, and clearer action controls.
 - [x] TTS has one global auto-play toggle plus per-answer `Réécouter` buttons when audio is available.
 - [x] A `Sources & limites` panel explains evidence, deterministic tools, and required field confirmation.
+- [x] Source cards now expose publisher, year, country, review status, and clickable URL when reviewed metadata exists.
 - [x] Hugging Face starts a background RAG warm-up so the first real question is not the warm-up trigger.
 - [x] Markdown corpus audit completed: 16/16 converted documents now match PDF text volume closely enough for RAG review.
 - [x] Docker/Hugging Face deployment files exist.
@@ -86,6 +87,7 @@ triage assistant that explains its evidence".
   - show document title, short snippet, and source type
   - show "Base locale", "Outil engrais", "Vision", "Météo", "Sol"
   - keep filenames available but not as the only citation
+  - show publisher, year, country, review status, and safe clickable URLs when metadata exists
 
 - [x] Add confidence labels in French:
   - `Fort` when deterministic/tool or multiple good RAG sources agree
@@ -283,8 +285,8 @@ to prove what works, what fails, and why.
 
 1. Structured case cards for image and text answers.
 2. Weather context card.
-3. Better source/citation cards.
-4. Verify hosted RAG warm-up and FAO retrieval after the first promoted source.
+3. Privacy note for photos/audio.
+4. Verify hosted RAG warm-up and FAO retrieval after the source-card metadata change.
 5. Case log and follow-up feedback.
 6. Colab evaluation notebooks for vision.
 7. Soil context.

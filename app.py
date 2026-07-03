@@ -157,6 +157,13 @@ _DOC_TYPE_LABELS = {
     "scraped_web": "Source web revue",
 }
 
+_REVIEW_STATUS_LABELS = {
+    "reviewed_by_codex_pending_human_review": "Revu, validation humaine à finaliser",
+    "reviewed_by_codex": "Revu par Codex",
+    "pending_human_review": "À vérifier humainement",
+    "pending_verification": "Vérification requise",
+}
+
 _CITATION_STOPWORDS = {
     "avec", "dans", "pour", "contre", "comment", "quelle", "quand", "quoi",
     "vous", "votre", "cette", "cela", "faire", "avoir", "etre", "sont",
@@ -226,23 +233,57 @@ def _source_overlap(source: dict, query_tokens: set[str], match_text: str = "") 
     return len(query_tokens.intersection(_source_tokens(source, match_text)))
 
 
+def _safe_source_url(metadata: dict) -> str:
+    url = (metadata.get("source_url") or "").strip()
+    if not url:
+        source_file = (metadata.get("source_file") or "").strip()
+        if source_file.startswith(("http://", "https://")):
+            url = source_file
+    if url.startswith(("http://", "https://")):
+        return url
+    return ""
+
+
+def _source_card_from_doc(doc) -> dict:
+    metadata = getattr(doc, "metadata", {}) or {}
+    title = metadata.get("source", "Inconnu")
+    doc_type = metadata.get("doc_type", "")
+    card = {
+        "title": title,
+        "type": _DOC_TYPE_LABELS.get(doc_type, "Base locale"),
+        "snippet": _short_snippet(getattr(doc, "page_content", "")),
+    }
+    for key in ("publisher", "year", "country"):
+        value = (metadata.get(key) or "").strip()
+        if value:
+            card[key] = value
+
+    review_status = (metadata.get("review_status") or "").strip()
+    review_label = _REVIEW_STATUS_LABELS.get(review_status)
+    if review_label:
+        card["review_status"] = review_label
+
+    url = _safe_source_url(metadata)
+    if url:
+        card["url"] = url
+
+    return card
+
+
 def _format_rag_sources(source_docs) -> list[dict]:
     """Return unique, UI-friendly source cards from retrieved documents.
 
     The card type reflects the document's `doc_type` metadata when available
-    (e.g. "Rapport FAO"), and falls back to the generic "Base locale" label.
+    (e.g. "Rapport FAO"), and cards expose reviewed document metadata when
+    available: publisher, year, country, review status, and source URL.
     """
     by_title = {}
     for doc in source_docs:
-        title = doc.metadata.get("source", "Inconnu")
+        metadata = getattr(doc, "metadata", {}) or {}
+        title = metadata.get("source", "Inconnu")
         if title in by_title:
             continue
-        doc_type = doc.metadata.get("doc_type", "")
-        by_title[title] = {
-            "title": title,
-            "type": _DOC_TYPE_LABELS.get(doc_type, "Base locale"),
-            "snippet": _short_snippet(getattr(doc, "page_content", "")),
-        }
+        by_title[title] = _source_card_from_doc(doc)
     return sorted(by_title.values(), key=lambda item: item["title"])
 
 

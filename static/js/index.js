@@ -183,11 +183,31 @@ $(function() {
             var title = src.title || 'Source';
             var type = src.type || 'Source';
             var snippet = src.snippet || '';
+            var url = safeSourceUrl(src.url);
             var $card = $('<div class="source-card"></div>');
             var $top = $('<div class="source-card-top"></div>');
             $top.append($('<span class="source-type"></span>').text(type));
-            $top.append($('<span class="source-title"></span>').text(title));
+            if (url) {
+                $top.append(
+                    $('<a class="source-title source-title-link" target="_blank" rel="noopener noreferrer"></a>')
+                        .attr('href', url)
+                        .text(title)
+                );
+            } else {
+                $top.append($('<span class="source-title"></span>').text(title));
+            }
             $card.append($top);
+            var metaItems = sourceMetaItems(src);
+            if (metaItems.length) {
+                var $meta = $('<div class="source-meta"></div>');
+                metaItems.forEach(function(item) {
+                    var $item = $('<span class="source-meta-item"></span>');
+                    $item.append($('<strong></strong>').text(item.label + ' : '));
+                    $item.append($('<span></span>').text(item.value));
+                    $meta.append($item);
+                });
+                $card.append($meta);
+            }
             if (snippet) {
                 $card.append($('<p class="source-snippet"></p>').text(snippet));
             }
@@ -195,6 +215,28 @@ $(function() {
         });
         bubble.append($box);
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
+    }
+
+    function safeSourceUrl(url) {
+        if (!url || typeof url !== 'string') {
+            return '';
+        }
+        return /^https?:\/\//i.test(url) ? url : '';
+    }
+
+    function sourceMetaItems(src) {
+        var items = [];
+        [
+            ['Éditeur', src.publisher],
+            ['Année', src.year],
+            ['Pays', src.country],
+            ['Revue', src.review_status]
+        ].forEach(function(item) {
+            if (item[1]) {
+                items.push({ label: item[0], value: item[1] });
+            }
+        });
+        return items;
     }
 
     function asList(value) {

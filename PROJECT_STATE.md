@@ -19,12 +19,12 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `b45c40da`
+- Latest HF runtime commit verified: `1ed4d78d`
 - Live health verified on 2026-07-03:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-07-03T08:05:26+00:00`
+  - warm-up finished at `2026-07-03T09:06:12+00:00`
 
 Local git note:
 
@@ -118,6 +118,8 @@ Retrieval status:
   the Chroma store is available.
 - Source cards also use a crop/topic lexical guard against the full retrieved
   chunks, so mixed generic citations are suppressed for focused questions.
+- Source cards expose reviewed metadata when available: publisher, year,
+  country, review status, and a safe clickable source URL.
 - Weak secondary citations are dropped when they score far below the best match.
 - RAG answers show at most two source cards by default (`MAX_RAG_SOURCES=2`).
 - If retrieval returns zero documents, the app forces the grounded fallback
@@ -458,7 +460,7 @@ Tests:
 
 Latest local full test run:
 
-- `103 passed`
+- `105 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest HF worktree test run:
@@ -469,16 +471,17 @@ Latest HF worktree test run:
 
 Latest focused evaluator tests:
 
-- `tests/test_ingestion.py tests/test_app_routes.py::test_existing_valid_vector_store_is_reused tests/test_app_routes.py::test_invalid_existing_vector_store_is_rebuilt tests/test_app_routes.py::test_rebuild_clears_existing_vector_store tests/test_firecrawl_ingest.py`
-- `18 passed`
+- `tests/test_app_routes.py::test_rag_route_returns_unique_sources tests/test_app_routes.py::test_rag_route_exposes_source_metadata tests/test_frontend_assets.py`
+- `6 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest live HF checks:
 
 - `/healthz`: ready
-- `/version`: commit `b45c40dadc05c76ba7d29611075ed481ef03c9c1`
+- `/version`: commit `1ed4d78da3a8f28c84c46bc6631de7119da418a0`
 - `/ask` FAO data question: returned the new FAO Burkina policy/data synthesis
-  source and confidence `Fort`
+  source with publisher/year/country/review-status URL metadata and confidence
+  `Fort`
 - `/ask` niébé storage question: returned one IITA source and confidence `Fort`
 - `/ask` mil semis question: returned cited answer and confidence `Fort`
 - `/speech` fake audio: returned expected French transcription failure, proving
@@ -555,8 +558,8 @@ Product:
 
 RAG and data:
 
-- Document-level metadata exists for reviewed Markdown but source cards could
-  expose more of it in the UI.
+- Document-level metadata exists for reviewed Markdown and is now exposed in RAG
+  source cards when available.
 - Retrieval source filtering exists, but needs more live evaluation and tuning.
 - Generated/scraped data should remain outside RAG until human review.
 - Firecrawl ingestion and the first FAO allowlist/seed batch exist. One curated
@@ -612,14 +615,13 @@ Evaluate in this order:
 
 Highest-impact next tasks:
 
-1. Add document-level metadata to ingestion and source cards.
-2. Add a privacy note for uploaded photos/audio.
-3. Convert `data/feedback.csv` into a small SQLite case log.
-4. Add a text-question context flow for crop, location, and growth stage.
-5. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
+1. Add a privacy note for uploaded photos/audio.
+2. Convert `data/feedback.csv` into a small SQLite case log.
+3. Add a text-question context flow for crop, location, and growth stage.
+4. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
    policy/data retrieval smoke questions.
-6. Add log aggregation or a simple observability dashboard.
-7. Continue live retrieval evaluation and tune citation thresholds if needed.
+5. Add log aggregation or a simple observability dashboard.
+6. Continue live retrieval evaluation and tune citation thresholds if needed.
 
 ## Evaluation Principle
 

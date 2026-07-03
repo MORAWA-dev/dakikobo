@@ -28,6 +28,20 @@ def test_credibility_modal_is_wired_in_frontend_assets():
     assert ".credibility-modal" in css
 
 
+def test_source_cards_render_review_metadata():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+
+    assert "éditeur, année et statut de revue" in html
+    assert "function sourceMetaItems" in js
+    assert "src.publisher" in js
+    assert "src.review_status" in js
+    assert "function safeSourceUrl" in js
+    assert ".source-meta" in css
+    assert ".source-title-link" in css
+
+
 def test_voice_input_uses_server_side_stt():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
 
