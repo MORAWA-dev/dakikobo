@@ -286,11 +286,10 @@ to prove what works, what fails, and why.
 
 1. Structured case cards for image and text answers.
 2. Weather context card.
-3. Verify hosted RAG warm-up and UI privacy note after deployment.
-4. Case log and follow-up feedback.
-5. Colab evaluation notebooks for vision.
-6. Soil context.
-7. Public demo story and example gallery.
+3. Case log and follow-up feedback.
+4. Colab evaluation notebooks for vision.
+5. Soil context.
+6. Public demo story and example gallery.
 
 ## Definition of "incredible"
 

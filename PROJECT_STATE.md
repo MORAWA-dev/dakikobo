@@ -19,12 +19,12 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `6f82fa3`
+- Latest HF runtime commit verified: `d8cd0c1`
 - Live health verified on 2026-07-03:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-07-03T09:14:20+00:00`
+  - warm-up finished at `2026-07-03T09:46:26+00:00`
 
 Local git note:
 
@@ -465,7 +465,7 @@ Tests:
 
 Latest local full test run:
 
-- `105 passed`
+- `106 passed`
 - 1 PyPDF2 deprecation warning
 
 Latest HF worktree test run:
@@ -483,7 +483,8 @@ Latest focused evaluator tests:
 Latest live HF checks:
 
 - `/healthz`: ready
-- `/version`: commit `6f82fa313a0408d7764e33c6c2a7f2d03c1197eb`
+- `/version`: commit `d8cd0c1deabfbb9ee39544d959018b7a5005d5d5`
+- `/`: rendered `mediaPrivacyNote` and the visible media privacy text
 - `/ask` FAO data question: returned the new FAO Burkina policy/data synthesis
   source with publisher/year/country/review-status URL metadata and confidence
   `Fort`
@@ -622,12 +623,10 @@ Highest-impact next tasks:
 
 1. Convert `data/feedback.csv` into a small SQLite case log.
 2. Add a text-question context flow for crop, location, and growth stage.
-3. Verify hosted RAG warm-up after the privacy-note deployment and run a UI
-   smoke check.
-4. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
+3. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
    policy/data retrieval smoke questions.
-5. Add log aggregation or a simple observability dashboard.
-6. Continue live retrieval evaluation and tune citation thresholds if needed.
+4. Add log aggregation or a simple observability dashboard.
+5. Continue live retrieval evaluation and tune citation thresholds if needed.
 
 ## Evaluation Principle
 
