@@ -939,6 +939,17 @@ body {
 .field-context-panel {
     flex-shrink: 0;
     padding: 8px 20px 0;
+    order: 0;
+}
+
+.field-context-toggle[aria-expanded="true"] {
+    border-color: #4fd1c5;
+    background: #e8faf6;
+}
+
+.workflow-step-hint {
+    color: #5a6b5a;
+    font-size: 11px;
 }
 
 .field-context-toggle {

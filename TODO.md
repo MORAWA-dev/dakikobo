@@ -37,7 +37,7 @@ traceable sources.
 
 ## Current gaps
 
-- [ ] The UI is still mostly a chat widget; it should feel like a real field workflow.
+- [x] Field workflow UX: context first (open by default), numbered steps, tools sync from location.
 - [x] Image diagnosis answers use structured case cards (inspection sections).
 - [x] Optional field context (crop, growth stage, location) for text questions and photos.
 - [x] RAG citations: relevance filtering + weak-source demotion; live suite mostly green (soil external flaky).

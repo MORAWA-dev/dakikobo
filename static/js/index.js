@@ -994,6 +994,40 @@ $(function() {
         };
     }
 
+
+    var FIELD_LOCATION_TO_WEATHER = {
+        'Ouagadougou': 'ouagadougou',
+        'Bobo-Dioulasso': 'bobo',
+        'Kaya': 'kaya',
+        'Ouahigouya': 'ouahigouya',
+        "Fada N'Gourma": 'fada',
+        'Dori': 'dori'
+    };
+
+    var FIELD_LOCATION_TO_SOIL = FIELD_LOCATION_TO_WEATHER;
+
+    function syncToolsFromFieldLocation() {
+        var selected = ($('#fieldLocationSelect').val() || '').trim();
+        if (!selected || selected === '__custom__') {
+            return;
+        }
+        var weatherId = FIELD_LOCATION_TO_WEATHER[selected];
+        if (weatherId && $('#weatherLocation').length) {
+            $('#weatherLocation').val(weatherId);
+        }
+        var soilId = FIELD_LOCATION_TO_SOIL[selected];
+        if (soilId && $('#soilLocation').length) {
+            $('#soilLocation').val(soilId);
+        }
+        var crop = ($('#fieldCrop').val() || '').trim();
+        if (crop && crop !== 'autre' && $('#soilCrop').length) {
+            // soil crop options use maïs etc.
+            if ($('#soilCrop option[value="' + crop + '"]').length) {
+                $('#soilCrop').val(crop);
+            }
+        }
+    }
+
     $('#fieldLocationSelect').on('change', function() {
         var isCustom = $(this).val() === '__custom__';
         $('#fieldLocationCustom').prop('hidden', !isCustom);
@@ -1001,7 +1035,12 @@ $(function() {
             $('#fieldLocationCustom').trigger('focus');
         } else {
             $('#fieldLocationCustom').val('');
+            syncToolsFromFieldLocation();
         }
+    });
+
+    $('#fieldCrop').on('change', function() {
+        syncToolsFromFieldLocation();
     });
 
     function fieldContextLabel(ctx) {
@@ -1124,6 +1163,7 @@ $(function() {
         $form.append($('<div class="context-title"></div>').text("Avant l'analyse"));
 
         var $grid = $('<div class="context-grid"></div>');
+        var fieldCtx = getFieldContext();
         var $crop = $('<select name="crop" aria-label="Culture"></select>');
         [
             ['', 'Culture : je ne sais pas'],
@@ -1136,6 +1176,9 @@ $(function() {
         ].forEach(function(opt) {
             $crop.append($('<option></option>').val(opt[0]).text(opt[1]));
         });
+        if (fieldCtx.crop) {
+            $crop.val(fieldCtx.crop);
+        }
 
         var $stage = $('<select name="growth_stage" aria-label="Stade de croissance"></select>');
         [
@@ -1148,8 +1191,14 @@ $(function() {
         ].forEach(function(opt) {
             $stage.append($('<option></option>').val(opt[0]).text(opt[1]));
         });
+        if (fieldCtx.growth_stage) {
+            $stage.val(fieldCtx.growth_stage);
+        }
 
         var $location = $('<input type="text" name="location" maxlength="120" autocomplete="off" placeholder="Commune ou village (optionnel)">');
+        if (fieldCtx.location) {
+            $location.val(fieldCtx.location);
+        }
         $grid.append($crop).append($stage).append($location);
 
         var $actions = $('<div class="context-actions"></div>');
@@ -1268,7 +1317,11 @@ $(function() {
     });
 
     // Welcome message (French — primary language for Burkina Faso farmers)
-    var welcomeMessage = "🌾 Bienvenue à DakiKobo ! 💡 Je suis DakiKobo, votre conseiller agricole pour le Burkina Faso. Posez-moi vos questions sur le mil, le sorgho, le maïs, le niébé, l'arachide, les sols et le climat.";
+    // Field workflow: keep parcelle context visible by default.
+    setFieldContextOpen(true);
+    syncToolsFromFieldLocation();
+
+    var welcomeMessage = "🌾 Bienvenue à DakiKobo. Parcours terrain : (1) renseignez le contexte parcelle si vous le pouvez, (2) posez votre question ou envoyez une photo de feuille, (3) utilisez Outils pour météo et sol. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
 
     $('#chatbot-form-btn-clear').click(function(e) {
         e.preventDefault();
