@@ -10,7 +10,7 @@ publisher: "AGRHYMET / CILSS"
 year: "unknown"
 license: "unknown"
 review_status: "pending_human_review"
-scraped_at: "2026-07-10T12:06:07+00:00"
+scraped_at: "2026-07-10T12:34:06+00:00"
 topics: "climate, agro-meteorology, early warning, rainfall"
 ---
 
@@ -28,7 +28,7 @@ topics: "climate, agro-meteorology, early warning, rainfall"
 
 - URL: https://www.agrhymet.ne/
 - Firecrawl status code: 502
-- Scraped at: 2026-07-10T12:06:07+00:00
+- Scraped at: 2026-07-10T12:34:06+00:00
 
 <!-- DAKIKOBO_SCRAPED_CONTENT_START -->
 

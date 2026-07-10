@@ -5,11 +5,15 @@ from pathlib import Path
 from scripts.vision_eval_helpers import (
     PhotoCase,
     classify_from_text,
+    cosine_similarity,
     has_hedging_language,
     load_manifest_csv,
+    rank_by_embedding,
+    retrieval_accuracy,
     run_text_classifier_baseline,
     score_prompt_variant,
     summarize_predictions,
+    top1_label_from_neighbors,
     write_manifest_csv,
     write_markdown_report,
 )
@@ -72,3 +76,30 @@ def test_score_prompt_variant_and_hedging():
     assert rows[0]["pred_label"] == "disease_suspected"
     assert rows[0]["hedged"] is True
     assert has_hedging_language(rows[0]["raw_text"])
+
+
+def test_embedding_retrieval_helpers():
+    assert cosine_similarity([1.0, 0.0], [1.0, 0.0]) == 1.0
+    assert cosine_similarity([1.0, 0.0], [0.0, 1.0]) == 0.0
+    assert cosine_similarity([], [1.0]) == 0.0
+
+    gallery = [
+        ("a", [1.0, 0.0, 0.0]),
+        ("b", [0.9, 0.1, 0.0]),
+        ("c", [0.0, 1.0, 0.0]),
+    ]
+    ranked = rank_by_embedding([1.0, 0.0, 0.0], gallery, top_k=2)
+    assert [item_id for item_id, _ in ranked] == ["a", "b"]
+
+    labels = {"a": "healthy", "b": "healthy", "c": "disease_suspected"}
+    assert top1_label_from_neighbors(ranked, labels) == "healthy"
+
+    metrics = retrieval_accuracy(
+        queries=[("q1", [1.0, 0.0, 0.0], "healthy")],
+        gallery=gallery,
+        label_by_id=labels,
+        top_k=2,
+    )
+    assert metrics["n"] == 1
+    assert metrics["accuracy"] == 1.0
+    assert metrics["rows"][0]["pred_label"] == "healthy"

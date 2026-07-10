@@ -208,6 +208,97 @@ def run_text_classifier_baseline(
     return preds
 
 
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Cosine similarity for two equal-length vectors (pure Python, no numpy)."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
+
+
+def rank_by_embedding(
+    query_vec: list[float],
+    gallery: list[tuple[str, list[float]]],
+    *,
+    top_k: int = 5,
+) -> list[tuple[str, float]]:
+    """Rank gallery (id, vector) pairs by cosine similarity to the query.
+
+    Used by the SCOLD / foundation-embedding retrieval lab. Pure Python so
+    unit tests do not need torch/transformers.
+    """
+    scored = [(item_id, cosine_similarity(query_vec, vec)) for item_id, vec in gallery]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    k = max(0, int(top_k))
+    return scored[:k]
+
+
+def top1_label_from_neighbors(
+    neighbors: list[tuple[str, float]],
+    label_by_id: dict[str, str],
+    *,
+    min_score: float = 0.0,
+) -> str:
+    """Majority label among neighbors above min_score; tie → first neighbor."""
+    votes: dict[str, int] = {}
+    order: list[str] = []
+    for item_id, score in neighbors:
+        if score < min_score:
+            continue
+        label = (label_by_id.get(item_id) or "unknown").strip() or "unknown"
+        if label not in votes:
+            order.append(label)
+        votes[label] = votes.get(label, 0) + 1
+    if not votes:
+        return "unknown"
+    best = max(votes.values())
+    for label in order:
+        if votes[label] == best:
+            return label
+    return "unknown"
+
+
+def retrieval_accuracy(
+    queries: list[tuple[str, list[float], str]],
+    gallery: list[tuple[str, list[float]]],
+    label_by_id: dict[str, str],
+    *,
+    top_k: int = 3,
+    min_score: float = 0.0,
+) -> dict:
+    """Leave-query-out style accuracy for embedding retrieval.
+
+    Each query is (query_id, vector, gold_label). Gallery should not include
+    the query itself if ids collide — callers filter.
+    """
+    rows = []
+    for qid, qvec, gold in queries:
+        gallery_wo = [(i, v) for i, v in gallery if i != qid]
+        neighbors = rank_by_embedding(qvec, gallery_wo, top_k=top_k)
+        pred = top1_label_from_neighbors(neighbors, label_by_id, min_score=min_score)
+        rows.append(
+            {
+                "query_id": qid,
+                "gold_label": gold,
+                "pred_label": pred,
+                "top1_id": neighbors[0][0] if neighbors else "",
+                "top1_score": neighbors[0][1] if neighbors else 0.0,
+            }
+        )
+    return {
+        "n": len(rows),
+        "accuracy": accuracy(
+            [r["gold_label"] for r in rows],
+            [r["pred_label"] for r in rows],
+        ),
+        "rows": rows,
+    }
+
+
 def has_hedging_language(text: str) -> bool:
     """True if the French text keeps a cautious hypothesis style."""
     t = (text or "").lower()

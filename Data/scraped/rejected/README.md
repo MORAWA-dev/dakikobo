@@ -15,6 +15,8 @@ Common reasons:
 | `20260710_502-bad-gateway_c1fb33ad.md` | https://www.agrhymet.ne/ | HTTP 502 Bad Gateway |
 | `20260710_bienvenue-sur-le-portail-web-du-cilss-page-not-found_26253fab.md` | https://www.cilss.int/a-propos/ | HTTP 404 page not found |
 | `_wascal_scrape_failures_20260710.md` | wascal.org / www.wascal.org | Firecrawl `ERR_TUNNEL_CONNECTION_FAILED` |
+| `_wascal_inera_scrape_failures_20260710_refresh.md` | INERA + WASCAL (refresh batch) | Tunnel errors again on full trusted refresh |
+| `20260710_502-bad-gateway_c1fb33ad.md` | agrhymet.ne | HTTP 502 (re-scraped during refresh) |
 
 **Active curated alternatives already in RAG:**
 

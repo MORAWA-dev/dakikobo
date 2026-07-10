@@ -259,7 +259,7 @@ Use the Colab Pro credits for experiments that produce reusable artifacts:
 
 - [x] Notebook 1: build a disease-photo evaluation set and metrics (`notebooks/01_disease_photo_eval.ipynb`).
 - [x] Notebook 2 scaffold: Gemini prompt variants + optional live REST call for phone photos (helpers in `scripts/vision_eval_helpers.py`).
-- [ ] Notebook 3: test SCOLD/foundation image embeddings for retrieval and few-shot classification.
+- [x] Notebook 3 scaffold: SCOLD/foundation embedding retrieval helpers + `03_scold_retrieval_eval.ipynb` (wire real encoder in Colab).
 - [ ] Notebook 4: train a small baseline classifier only as a research comparison.
 - [ ] Notebook 5: export a lightweight model only if it is clearly useful.
 
