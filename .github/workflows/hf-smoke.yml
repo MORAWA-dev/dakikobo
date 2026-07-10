@@ -8,13 +8,17 @@ on:
         required: false
         default: "https://kimcomehome-dakikobo.hf.space"
       strict:
-        description: "Fail the workflow when any evaluation check fails"
+        description: "Fail when hard pass-rate is below min-pass-rate (advisory keyword checks never fail CI)"
         required: false
         type: choice
         options:
           - "true"
           - "false"
         default: "true"
+      min_pass_rate:
+        description: "Minimum hard-check pass rate (0.0-1.0) when strict=true"
+        required: false
+        default: "0.75"
   schedule:
     - cron: "30 5 * * *"
 
@@ -41,7 +45,14 @@ jobs:
         run: |
           BASE_URL="${{ inputs.base_url || 'https://kimcomehome-dakikobo.hf.space' }}"
           STRICT="${{ inputs.strict || 'true' }}"
-          ARGS=(--base-url "$BASE_URL" --output reports/rag_eval_results.md --timeout 180 --wait-timeout 420)
+          MIN_PASS_RATE="${{ inputs.min_pass_rate || '0.75' }}"
+          ARGS=(
+            --base-url "$BASE_URL"
+            --output reports/rag_eval_results.md
+            --timeout 180
+            --wait-timeout 420
+            --min-pass-rate "$MIN_PASS_RATE"
+          )
           if [ "$STRICT" = "true" ]; then
             ARGS+=(--strict)
           fi

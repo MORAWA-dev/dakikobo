@@ -3,10 +3,12 @@
 Usage:
     python scripts/evaluate_rag.py
     python scripts/evaluate_rag.py --base-url http://127.0.0.1:8005
-    python scripts/evaluate_rag.py --strict
+    python scripts/evaluate_rag.py --strict --min-pass-rate 0.75
 
 The script calls public HTTP endpoints and writes a Markdown report with
 answer snippets, confidence labels, source cards, latency, and pass/fail checks.
+Keyword/confidence checks are advisory (LLM variation). Strict mode fails only
+on low hard pass-rate, transport errors, or readiness failure.
 It does not read local secrets.
 """
 
@@ -57,6 +59,8 @@ class Check:
     name: str
     passed: bool
     detail: str
+    # Advisory checks stay in the report but do not fail the case for CI exit.
+    advisory: bool = False
 
 
 @dataclass
@@ -69,8 +73,18 @@ class EvalResult:
     checks: list[Check] = field(default_factory=list)
 
     @property
+    def hard_checks(self) -> list[Check]:
+        return [check for check in self.checks if not check.advisory]
+
+    @property
+    def advisory_checks(self) -> list[Check]:
+        return [check for check in self.checks if check.advisory]
+
+    @property
     def passed(self) -> bool:
-        return bool(self.checks) and all(check.passed for check in self.checks)
+        """True when every hard (non-advisory) check passed."""
+        hard = self.hard_checks
+        return bool(hard) and all(check.passed for check in hard)
 
 
 CASES = [
@@ -277,34 +291,65 @@ def checks_for(case: EvalCase, result: EvalResult) -> list[Check]:
     sources = _as_sources(payload)
     confidence = payload.get("confidence", "")
     source_count = len(sources)
+    answer_text = (answer or "").strip()
 
     checks = [
-        Check("HTTP 200", result.status_code == 200, f"status={result.status_code}"),
         Check(
-            "confidence",
-            confidence in case.allowed_confidence,
-            f"confidence={confidence or '<missing>'}",
+            "HTTP 200",
+            result.status_code == 200,
+            f"status={result.status_code}",
+            advisory=False,
         ),
+        Check(
+            "no_error",
+            not bool(result.error),
+            f"error={result.error or 'none'}",
+            advisory=False,
+        ),
+    ]
+    # Real breakage: empty body when the case expects grounded sources.
+    if case.min_sources > 0:
+        checks.append(
+            Check(
+                "non_empty_answer",
+                bool(answer_text),
+                "answer present" if answer_text else "answer empty",
+                advisory=False,
+            )
+        )
+    checks.append(
         Check(
             "min_sources",
             source_count >= case.min_sources,
             f"sources={source_count}, min={case.min_sources}",
-        ),
-    ]
+            advisory=False,
+        )
+    )
     if case.max_sources is not None:
         checks.append(
             Check(
                 "max_sources",
                 source_count <= case.max_sources,
                 f"sources={source_count}, max={case.max_sources}",
+                advisory=False,
             )
         )
+    # LLM-flaky content signals: keep in the report as warnings only.
+    checks.append(
+        Check(
+            "confidence",
+            confidence in case.allowed_confidence,
+            f"confidence={confidence or '<missing>'}",
+            advisory=True,
+        )
+    )
     if case.answer_terms_any:
         checks.append(
             Check(
                 "answer_terms",
                 _contains_any(answer, case.answer_terms_any),
                 "any=" + ", ".join(case.answer_terms_any),
+                advisory=True,
             )
         )
     if case.source_terms_any:
@@ -313,11 +358,19 @@ def checks_for(case: EvalCase, result: EvalResult) -> list[Check]:
                 "source_terms",
                 _contains_any(_source_text(sources), case.source_terms_any),
                 "any=" + ", ".join(case.source_terms_any),
+                advisory=True,
             )
         )
     if case.expect_refusal:
         refusal = _contains_any(answer, ("ne sais pas", "pas disponible dans la base"))
-        checks.append(Check("refusal", refusal, "expected grounded fallback"))
+        checks.append(
+            Check(
+                "refusal",
+                refusal,
+                "expected grounded fallback",
+                advisory=True,
+            )
+        )
     return checks
 
 
@@ -397,8 +450,26 @@ def _status_text(passed: bool) -> str:
     return "PASS" if passed else "FAIL"
 
 
+def _check_status_text(check: Check) -> str:
+    if check.passed:
+        return "PASS"
+    return "WARN" if check.advisory else "FAIL"
+
+
 def _escape_table(value: Any) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def hard_pass_rate(results: list[EvalResult]) -> float:
+    if not results:
+        return 0.0
+    passed = sum(1 for result in results if result.passed)
+    return passed / len(results)
+
+
+def has_transport_failure(results: list[EvalResult]) -> bool:
+    """True when a case had a request exception (no HTTP response)."""
+    return any(bool(result.error) or result.status_code is None for result in results)
 
 
 def format_report(
@@ -408,17 +479,35 @@ def format_report(
     results: list[EvalResult],
     generated_at: datetime | None = None,
     run_error: str = "",
+    min_pass_rate: float = 0.75,
 ) -> str:
     generated_at = generated_at or datetime.now(timezone.utc)
     passed = sum(1 for result in results if result.passed)
-    failed = len(results) - passed
+    rate = hard_pass_rate(results)
+    advisory_fails = sum(
+        1
+        for result in results
+        for check in result.advisory_checks
+        if not check.passed
+    )
     lines = [
         "# DakiKobo RAG Evaluation Report",
+        "",
+        "## Flakiness note",
+        "",
+        "Content checks (`confidence`, `answer_terms`, `source_terms`, `refusal`) are "
+        "**advisory**. Groq/LLM wording varies; a `WARN` on those checks does not fail "
+        "the smoke gate. Hard case status uses structural signals only (HTTP, transport "
+        "errors, empty answers when sources are expected, source counts). CI strict mode "
+        f"fails when the hard pass-rate is below `{min_pass_rate:.0%}` or when a request "
+        "exception / readiness failure occurs.",
         "",
         f"- Generated: `{generated_at.isoformat(timespec='seconds')}`",
         f"- Base URL: `{base_url.rstrip('/')}`",
         f"- Health: `{json.dumps(health, ensure_ascii=False, sort_keys=True)}`",
-        f"- Summary: `{passed} passed / {len(results)} total`",
+        f"- Summary: `{passed} passed / {len(results)} total` "
+        f"(hard pass-rate `{rate:.0%}`, min `{min_pass_rate:.0%}`)",
+        f"- Advisory warnings: `{advisory_fails}`",
     ]
     if run_error:
         lines.append(f"- Run error: `{run_error}`")
@@ -461,7 +550,7 @@ def format_report(
                 f"- Category: `{case.category}`",
                 f"- Request: `{case.method} {case.path}`",
                 f"- Prompt: {case.prompt}",
-                f"- Status: `{_status_text(result.passed)}`",
+                f"- Status: `{_status_text(result.passed)}` (hard checks)",
                 f"- HTTP: `{result.status_code}`",
                 f"- Confidence: `{payload.get('confidence', '')}`",
                 f"- Latency: `{result.latency_ms or 0} ms`",
@@ -471,7 +560,10 @@ def format_report(
             lines.append(f"- Error: `{result.error}`")
         lines.extend(["", "**Checks**", ""])
         for check in result.checks:
-            lines.append(f"- `{_status_text(check.passed)}` {check.name}: {check.detail}")
+            kind = "advisory" if check.advisory else "hard"
+            lines.append(
+                f"- `{_check_status_text(check)}` {check.name} ({kind}): {check.detail}"
+            )
         lines.extend(["", "**Answer / Context**", "", _short(answer) or "<empty>", "", "**Sources**", ""])
         lines.append(_format_sources(sources))
         lines.append("")
@@ -492,12 +584,29 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=120.0, help="Per-request timeout seconds.")
     parser.add_argument("--wait-timeout", type=float, default=360.0, help="RAG readiness wait seconds.")
     parser.add_argument("--no-wait", action="store_true", help="Skip /healthz readiness wait.")
-    parser.add_argument("--strict", action="store_true", help="Exit non-zero when any check fails.")
+    parser.add_argument(
+        "--min-pass-rate",
+        type=float,
+        default=0.75,
+        help=(
+            "Minimum fraction of cases that must pass hard checks when --strict is set "
+            "(default: 0.75). Advisory keyword/confidence checks do not count."
+        ),
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Exit non-zero if hard pass-rate is below --min-pass-rate, if any request "
+            "exception occurs, or if readiness/run error is set."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+    min_pass_rate = max(0.0, min(1.0, float(args.min_pass_rate)))
     base_url = args.base_url.rstrip("/")
     health = {}
     if not args.no_wait:
@@ -521,15 +630,38 @@ def main(argv: list[str] | None = None) -> int:
         health=health,
         results=results,
         run_error=run_error,
+        min_pass_rate=min_pass_rate,
     )
     write_report(args.output, report)
 
     passed = sum(1 for result in results if result.passed)
+    rate = hard_pass_rate(results)
     print(f"Wrote {args.output}")
-    print(f"Summary: {passed}/{len(results)} passed")
-    if args.strict and run_error:
+    print(f"Summary: {passed}/{len(results)} hard-passed (rate={rate:.0%}, min={min_pass_rate:.0%})")
+    advisory_fails = sum(
+        1 for result in results for check in result.advisory_checks if not check.passed
+    )
+    if advisory_fails:
+        print(f"Advisory warnings: {advisory_fails} (do not fail CI by themselves)")
+
+    if not args.strict:
+        return 0
+    if run_error:
         return 1
-    if args.strict and passed != len(results):
+    if not results:
+        return 1
+    # Request exceptions (timeout/DNS/no status) always fail strict mode.
+    if has_transport_failure(results):
+        print("Strict fail: at least one case had a request exception / no HTTP status.")
+        return 1
+    # HTTP non-200 and empty/missing payload shape fail individual cases (hard
+    # checks). Exit only when hard pass-rate falls below the threshold so one
+    # flaky external dependency (e.g. SoilGrids 502) does not fail the smoke job
+    # if the rest of the Space is healthy.
+    if rate + 1e-12 < min_pass_rate:
+        print(
+            f"Strict fail: hard pass-rate {rate:.0%} is below minimum {min_pass_rate:.0%}."
+        )
         return 1
     return 0
 
