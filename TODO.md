@@ -167,8 +167,11 @@ Candidate source:
 - [x] Add source-manifest validation so Chroma rebuilds when the active corpus changes.
 - [x] Verify hosted RAG warm-up after recent deploys (status ready/warming checked live).
 - [x] Curated MAERAH/OAPH orientation promoted to `Data/markdown/scraped_reviewed/` (not raw homepage).
+- [x] CILSS curated orientation added to active Markdown (regional, not field doses).
 - [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later.
-- [ ] Final human validation of MAERAH synthesis license/details.
+- [ ] AGRHYMET site returned 502 — retry when online; do not promote bad-gateway pages.
+- [ ] Final human validation of MAERAH/CILSS synthesis license/details.
+- [x] Feedback evaluation CSV export script (`scripts/export_feedback_eval.py`).
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:

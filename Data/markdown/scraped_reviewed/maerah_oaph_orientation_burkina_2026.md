@@ -18,6 +18,9 @@ crops: "mil, sorgho, mais, niebe, arachide, riz, coton, elevage, peche"
 
 # MAERAH Burkina Faso - orientation institutionnelle et OAPH 2023-2025
 
+**OAPH = Offensive Agropastorale et Halieutique 2023-2025** (programme national).
+Ne jamais inventer une autre signification pour OAPH.
+
 Source web revue: pages publiques du ministère en charge de l'agriculture
 (MAERAH) — site https://www.agriculture.bf/ et pages OAPH / projets.
 
@@ -54,7 +57,13 @@ politiques et programmes agricoles, hydriques, d'elevage et de peche au
 Burkina Faso. Le site officiel regroupe actualites, ressources documentaires,
 communiques et entrees vers les projets.
 
-## Offensive agropastorale et h alieutique (OAPH) 2023-2025
+## Offensive agropastorale et halieutique (OAPH) 2023-2025
+
+**Definition exacte de l'acronyme OAPH (ne pas inventer d'autre expansion) :**
+**OAPH = Offensive Agropastorale et Halieutique 2023-2025.**
+
+Ce n'est **pas** un "Office des Amenagements Hydro-Agricoles". Toute reponse
+qui invente un autre sens de OAPH est incorrecte par rapport a cette source.
 
 Le site ministeriel publie une page dediee a l'**Offensive agropastorale et
 halieutique 2023-2025 (OAPH)**. Il s'agit d'un cadre national d'orientation

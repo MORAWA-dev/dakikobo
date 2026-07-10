@@ -15,6 +15,8 @@ Key curated Markdown additions:
 | `Data/markdown/prosol_fertilite_sols_burkina_2020.md` | Soil fertility, compost, organic manure, CES | Mixed | Burkina Faso |
 | `Data/markdown/iita_niebe_afrique_ouest_2018.md` | Niébé production, symptoms, storage | Niébé | West Africa |
 | `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md` | Policy, public expenditure, price incentives, EPA/statistics, FAO country profile | Mixed | Burkina Faso |
+| `Data/markdown/scraped_reviewed/maerah_oaph_orientation_burkina_2026.md` | MAERAH / OAPH 2023-2025 orientation, public projects list | Mixed | Burkina Faso |
+| `Data/markdown/scraped_reviewed/cilss_orientation_sahel_2026.md` | CILSS regional role, Sahel resilience (not field doses) | Mixed | Sahel / West Africa |
 
 Firecrawl raw outputs under `Data/scraped/pending/` are not active RAG sources.
 

@@ -46,6 +46,7 @@ Data/scraped/pending/*.md
 
 # Generated evaluation reports
 reports/rag_eval_results.md
+reports/feedback_eval.csv
 
 # Local planning docs with prompts (optional — remove line to track)
 # suggestions/
