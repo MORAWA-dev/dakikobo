@@ -130,6 +130,8 @@ def test_index_route_renders():
     assert response.content_type.startswith("text/html")
     assert b'data-example-id="semis_mil"' in response.data
     assert b'data-example-id="oaph_burkina"' in response.data
+    assert b'data-example-id="cilss_sahel"' in response.data
+    assert b'data-example-id="hors_sujet"' in response.data
     assert b'data-example-id="photo_mais"' in response.data
     assert b'id="credibilityToggle"' in response.data
     assert b'id="credibilityModal"' in response.data
@@ -414,6 +416,21 @@ def test_demo_example_oaph_uses_correct_expansion():
     assert payload["confidence"] == "Fort"
     assert "MAERAH" in payload["sources"][0]["title"]
     assert payload["case"]["input_type"] == "text"
+
+
+def test_demo_example_cilss_and_off_topic_refusal():
+    client = app_module.app.test_client()
+
+    cilss = client.get("/examples/cilss_sahel").get_json()
+    assert "CILSS" in cilss["answer"] or "secheresse" in cilss["answer"].lower() or "sécheresse" in cilss["answer"].lower()
+    assert cilss["sources"]
+    assert cilss["case"]["input_type"] == "text"
+
+    off = client.get("/examples/hors_sujet").get_json()
+    assert off["answer_kind"] == "refusal"
+    assert "ne sais pas encore" in off["answer"].lower()
+    assert off.get("sources") == []
+    assert "case" not in off or not off.get("case")
 
 
 def test_demo_example_route_returns_image_case():

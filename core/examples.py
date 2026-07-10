@@ -40,6 +40,17 @@ _IITA_SOURCE = {
     "snippet": "Le niebe fixe une partie de l'azote et s'inscrit dans les rotations avec les cereales.",
 }
 
+_CILSS_SOURCE = {
+    "title": "CILSS - orientation regionale Sahel et Afrique de l'Ouest",
+    "type": "Source web revue",
+    "snippet": "Organisation regionale pour la secheresse, la resilience et la securite alimentaire.",
+    "publisher": "CILSS",
+    "year": "2026",
+    "country": "Sahel / Afrique de l'Ouest",
+    "review_status": "Validé par le propriétaire",
+    "url": "https://www.cilss.int/",
+}
+
 
 DEMO_EXAMPLES = {
     "semis_mil": {
@@ -99,6 +110,36 @@ DEMO_EXAMPLES = {
         "sources": [_MAERAH_SOURCE],
         "confidence": "Fort",
         "audio_url": "",
+    },
+    "cilss_sahel": {
+        "kind": "message",
+        "question": "C'est quoi le CILSS ?",
+        "answer": (
+            "Le CILSS est le Comite permanent Inter-Etats de Lutte contre la "
+            "Secheresse dans le Sahel. C'est une organisation regionale qui "
+            "travaille sur la secheresse, la resilience et la securite alimentaire "
+            "en Afrique de l'Ouest et au Sahel. Cela n'indique pas la pluie exacte "
+            "sur votre parcelle : pour le court terme, utilisez l'outil meteo, "
+            "puis confirmez avec les services nationaux. Les bulletins AGRHYMET "
+            "ne sont pas encore indexes ici."
+        ),
+        "sources": [_CILSS_SOURCE],
+        "confidence": "Moyen",
+        "audio_url": "",
+    },
+    "hors_sujet": {
+        "kind": "message",
+        "question": "Comment réparer un moteur de voiture ?",
+        "answer": (
+            "Je ne sais pas encore. Cette information n'est pas disponible dans la "
+            "base de donnees de DakiKobo pour le Burkina Faso. Posez une question "
+            "agricole (cultures, engrais, humidite, photo de feuille) pour un "
+            "conseil prudent et source."
+        ),
+        "sources": [],
+        "confidence": "Faible",
+        "audio_url": "",
+        "answer_kind": "refusal",
     },
     "fumure_sorgho": {
         "kind": "message",
@@ -174,6 +215,11 @@ def get_demo_example(example_id: str) -> dict | None:
         return None
     result = deepcopy(example)
     # Text/fertilizer demos get the same evidence-first card shape as live /ask.
+    # Refusals stay plain (no fake evidence card).
+    if example_id == "hors_sujet" or result.get("answer_kind") == "refusal":
+        result["answer_kind"] = "refusal"
+        result.pop("case", None)
+        return result
     if result.get("kind") == "message" and not result.get("case"):
         crop = "sorgho" if example_id == "fumure_sorgho" else ""
         input_type = "fertilizer" if example_id == "fumure_sorgho" else "text"

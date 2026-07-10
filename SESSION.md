@@ -65,6 +65,48 @@ cd - && git worktree remove "$WT" --force
 
 ## Session entries
 
+### 2026-07-10 — Code-only demo polish (CILSS + honest refusal)
+
+**Decided**
+
+- User gathers A/B/C data later via DATA_COLLECTION_TASKS; agent continues **code-only**.
+- Add quota-safe demos: **CILSS** (regional, no field rain) and **Hors sujet** (honest refusal, no fake case card).
+- README points to collection tasks + SESSION.
+
+**Files changed**
+
+- `core/examples.py`, `templates/index.html`, `DEMO_SCRIPT.md`, `README.md`
+- tests, `SESSION.md`
+
+**Git / deploy**
+
+- (filled at commit)
+
+**Next action**
+
+- More code polish, or wait for owner data / climate UP.
+
+---
+
+### 2026-07-10 — Data collection task list for owner
+
+**Decided**
+
+- User will gather climate docs, leaf photos, and local crop names later (online + people).
+- All “inputs needed” are organized in `Data/reviews/DATA_COLLECTION_TASKS.md` (tracks A/B/C, inbox paths, done criteria).
+- Agent waits for “ingest what I collected” before processing; no invented local names or climate content.
+
+**Files changed**
+
+- `Data/reviews/DATA_COLLECTION_TASKS.md`
+- `SESSION.md`
+
+**Next action**
+
+- Owner works through DATA_COLLECTION_TASKS at own pace; agent continues code-only if asked.
+
+---
+
 ### 2026-07-10 — UP-only refresh + crop-labels API + vision eval kit
 
 **Decided**

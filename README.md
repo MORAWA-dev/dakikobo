@@ -31,6 +31,9 @@ Live Space: **https://kimcomehome-dakikobo.hf.space/**
 
 Script détaillé : [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md).
 
+Collecte de données (plus tard, hors code) : [`Data/reviews/DATA_COLLECTION_TASKS.md`](Data/reviews/DATA_COLLECTION_TASKS.md).  
+Continuité agent : [`SESSION.md`](SESSION.md).
+
 **Ce que DakiKobo n'est pas :** un oracle de rendement, un diagnostic officiel, ou un
 remplacement de l'agent agricole.
 

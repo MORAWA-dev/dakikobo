@@ -38,14 +38,14 @@ Use this sequence for reviewers or a short video.
 
 ## 6. Honest limits (45–60s)
 
-- Ask something off-topic or underspecified.
-- Show either:
-  - « Je ne sais pas encore… » (no invented answer), or
-  - « Je ne peux pas confirmer… » (partial evidence, needs human check).
+- Tap **Hors sujet** (or ask: « Comment réparer un moteur de voiture ? »).
+- Show « Je ne sais pas encore… » (no invented answer).
+- Optional: underspecified field question → « Je ne peux pas confirmer… ».
 - Close on: cautious field triage assistant, not a magic chatbot.
 
 ## Optional extras (if time)
 
+- **CILSS**: regional role, not field rainfall for one plot.
 - **Rotation** example: niébé–céréales and azote (IITA-style message).
 - **Humidité du sol** with location context (Kaya) for weather signals.
 - **Outils** drawer: météo / sol (SoilGrids may be flaky externally).
