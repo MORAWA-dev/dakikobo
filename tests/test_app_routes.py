@@ -9,9 +9,14 @@ import app as app_module
 from core.case_log import list_feedback_events
 
 
+def _query_starts_with(query: str, expected: str) -> None:
+    """Resolved queries may append culture/lieu hints after the user text."""
+    assert (query or "").startswith(expected), query
+
+
 class _FakeRagChain:
     def invoke(self, query):
-        assert query == "Quand semer le mil ?"
+        _query_starts_with(query, "Quand semer le mil ?")
         return {
             "result": "Semez le mil au début de la saison des pluies.",
             "source_documents": [
@@ -24,7 +29,7 @@ class _FakeRagChain:
 
 class _SingleSourceRagChain:
     def invoke(self, query):
-        assert query == "Quand semer le mil ?"
+        _query_starts_with(query, "Quand semer le mil ?")
         return {
             "result": "Semez le mil au début de la saison des pluies.",
             "source_documents": [
@@ -35,7 +40,7 @@ class _SingleSourceRagChain:
 
 class _MetadataSourceRagChain:
     def invoke(self, query):
-        assert query == "Quelles données FAO existent ?"
+        _query_starts_with(query, "Quelles données FAO existent ?")
         return {
             "result": "La FAO signale AGRISurvey, FAOSTAT et CountrySTAT.",
             "source_documents": [
@@ -57,7 +62,7 @@ class _MetadataSourceRagChain:
 
 class _NoisySourceRagChain:
     def invoke(self, query):
-        assert query == "Comment stocker le niébé contre les bruches ?"
+        _query_starts_with(query, "Comment stocker le niébé contre les bruches ?")
         return {
             "result": "Utilisez des sacs PICS avec des grains bien secs.",
             "source_documents": [
@@ -838,7 +843,7 @@ def test_rag_route_attaches_field_context_to_case(monkeypatch):
     payload = response.get_json()
 
     assert response.status_code == 200
-    assert "Contexte parcelle" in seen["query"]
+    assert "Contexte utile" in seen["query"] or "culture: mil" in seen["query"]
     assert "culture: mil" in seen["query"]
     assert payload["case"]["crop"] == "mil"
     assert payload["case"]["growth_stage"] == "levée / jeune plant"
@@ -923,7 +928,7 @@ def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
 
     class FakeDb:
         def similarity_search_with_relevance_scores(self, query, k):
-            assert query == "Comment stocker le niébé contre les bruches ?"
+            _query_starts_with(query, "Comment stocker le niébé contre les bruches ?")
             assert k == 10
             return [
                 (
@@ -982,6 +987,99 @@ def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):
     assert payload["confidence"] == "Faible"
     assert "case" not in payload
     assert payload.get("answer_kind") == "refusal"
+
+
+def test_rag_route_question_crop_overrides_form_crop(monkeypatch):
+    """Stale form crop=sorgho must not hijack a soja question."""
+    client = app_module.app.test_client()
+    seen = {}
+
+    class _SojaChain:
+        def invoke(self, query):
+            seen["query"] = query
+            return {
+                "result": (
+                    "Pour le soja à Mogtédo, préférez un sol bien drainé. "
+                    "Semez après une pluie utile et confirmez avec un agent."
+                ),
+                "source_documents": [
+                    SimpleNamespace(
+                        metadata={"source": "guide_legumineuses.pdf"},
+                        page_content="Le soja préfère des sols drainés au Burkina.",
+                    ),
+                ],
+            }
+
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _SojaChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module,
+        "_source_scores",
+        lambda query: {"guide_legumineuses.pdf": 0.42},
+    )
+
+    response = client.post(
+        "/ask",
+        data={
+            "messageText": "comment bien semer le soja dans la ville de Mogtedo",
+            "crop": "sorgho",
+            "growth_stage": "levée / jeune plant",
+            "location": "Ouagadougou",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "soja" in seen["query"].lower()
+    assert "culture: soja" in seen["query"]
+    assert "culture: sorgho" not in seen["query"]
+    assert payload["case"]["crop"] == "soja"
+    assert payload["case"]["location"] == "Mogtédo"
+    assert payload["case"]["growth_stage"] == ""
+    assert "sorgho" not in payload["answer"].lower()
+
+
+def test_rag_route_short_followup_keeps_prior_crop(monkeypatch):
+    client = app_module.app.test_client()
+    seen = {}
+
+    class _FollowChain:
+        def invoke(self, query):
+            seen["query"] = query
+            return {
+                "result": "Pour le soja à Ouagadougou, préparez le sol et attendez une pluie utile.",
+                "source_documents": [
+                    SimpleNamespace(
+                        metadata={"source": "guide_soja.pdf"},
+                        page_content="Semis du soja en zone urbaine periurbaine.",
+                    ),
+                ],
+            }
+
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _FollowChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module, "_source_scores", lambda query: {"guide_soja.pdf": 0.4}
+    )
+
+    response = client.post(
+        "/ask",
+        data={
+            "messageText": "ok a ouagadougou",
+            "crop": "sorgho",
+            "growth_stage": "levée / jeune plant",
+            "location": "Ouagadougou",
+            "prior_question": "comment bien semer le soja dans la ville de Mogtedo",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "soja" in seen["query"].lower()
+    assert "Précision" in seen["query"]
+    assert payload["case"]["crop"] == "soja"
+    assert payload["case"]["location"] == "Ouagadougou"
+    assert "plants de sorgho" not in payload["answer"].lower()
 
 
 def test_rag_route_uncertain_is_first_class_not_failure(monkeypatch):

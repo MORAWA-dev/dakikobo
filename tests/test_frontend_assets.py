@@ -127,6 +127,11 @@ def test_field_context_local_storage_is_wired():
     assert ".case-lead" in css
     assert ".sources-details" in css
     assert ".case-meta-line" in css
+    # Multi-turn: short follow-ups send prior_question so topic is kept.
+    assert "prior_question" in js
+    assert "lastUserQuestion" in js
+    assert "looksLikeShortFollowup" in js
+    assert "Sujet :" in js
 
 
 def test_text_field_context_panel_is_wired():

@@ -37,6 +37,7 @@ from core.speech import (
 from core.examples import get_demo_example
 from core.case import build_advice_case
 from core.case_log import record_feedback, record_outcome, set_before_image_ref
+from core.query_context import resolve_query_context
 from core.simple_french import (
     apply_simple_style_to_query,
     is_simple_mode,
@@ -237,7 +238,7 @@ _CITATION_STOPWORDS = {
 
 _CROP_TOKENS = {
     "arachide", "coton", "fonio", "mais", "mil", "niebe", "riz",
-    "sesame", "sorgho",
+    "sesame", "soja", "sorgho",
 }
 
 # Generic or off-scope titles that often pollute crop-specific answers.
@@ -490,8 +491,13 @@ def _field_context_from_request() -> dict[str, str]:
     }
 
 
+def _prior_question_from_request() -> str:
+    """Previous user question for short follow-ups (client-supplied)."""
+    return (request.form.get("prior_question") or "").strip()[:500]
+
+
 def _query_with_field_context(query: str, context: dict[str, str]) -> str:
-    """Append parcelle context for retrieval without changing the user wording."""
+    """Append parcelle context for retrieval (legacy helper; prefer resolve_query_context)."""
     parts = []
     if context.get("crop"):
         parts.append(f"culture: {context['crop']}")
@@ -1174,18 +1180,27 @@ def ask():
         return limited
 
     field_context = _field_context_from_request()
+    prior_question = _prior_question_from_request()
     simple_french = _simple_french_from_request()
+    resolved = resolve_query_context(
+        query,
+        field_context,
+        prior_question=prior_question,
+    )
+    effective_context = resolved.as_case_fields()
     weather_signals, weather_payload = _weather_signals_for_location(
-        field_context.get("location", "")
+        effective_context.get("location", "")
     )
     _set_log_fields(
-        crop_provided=bool(field_context["crop"]),
-        growth_stage_provided=bool(field_context["growth_stage"]),
-        location_provided=bool(field_context["location"]),
+        crop_provided=bool(effective_context["crop"]),
+        growth_stage_provided=bool(effective_context["growth_stage"]),
+        location_provided=bool(effective_context["location"]),
         weather_enriched=bool(weather_signals),
         simple_french=simple_french,
+        crop_conflict=resolved.crop_conflict,
+        followup_expanded=resolved.expanded_from_prior,
     )
-    retrieval_query = _query_with_field_context(query, field_context)
+    retrieval_query = resolved.retrieval_query
     if simple_french:
         retrieval_query = apply_simple_style_to_query(retrieval_query)
 
@@ -1214,20 +1229,29 @@ def ask():
 
     # Route by intent. Fertilizer questions get deterministic, grounded, cited
     # doses (never LLM-invented); everything else falls through to RAG.
-    # Form crop can complete a fertilizer question that omits the crop in text.
-    if is_fertilizer_query(query) or classify(query) == INTENT_FERTILIZER:
+    # Effective crop (question wins over form) completes fertilizer questions.
+    fert_query = resolved.retrieval_query if resolved.expanded_from_prior else query
+    if is_fertilizer_query(fert_query) or classify(fert_query) == INTENT_FERTILIZER:
         advice = get_fertilizer_advice(
-            query,
-            crop=field_context["crop"] or None,
-            growth_stage=field_context["growth_stage"],
-            location=field_context["location"],
+            fert_query,
+            crop=effective_context["crop"] or None,
+            growth_stage=effective_context["growth_stage"],
+            location=effective_context["location"],
         )
         if advice is not None:
             answer = _maybe_simplify(advice["answer"], simple_french)
             case = advice.get("case")
-            if case is not None and weather_signals:
+            if case is not None:
                 case = dict(case)
-                case["weather_signals"] = weather_signals
+                case["crop"] = effective_context["crop"] or case.get("crop", "")
+                case["growth_stage"] = effective_context["growth_stage"] or case.get(
+                    "growth_stage", ""
+                )
+                case["location"] = effective_context["location"] or case.get(
+                    "location", ""
+                )
+                if weather_signals:
+                    case["weather_signals"] = weather_signals
             case = _maybe_simplify_case(case, simple_french)
             audio_url = text_to_speech_to_static(answer)
             _set_log_fields(
@@ -1265,9 +1289,9 @@ def ask():
         case_kwargs = {
             "question": query,
             "input_type": "text",
-            "crop": field_context["crop"],
-            "growth_stage": field_context["growth_stage"],
-            "location": field_context["location"],
+            "crop": effective_context["crop"],
+            "growth_stage": effective_context["growth_stage"],
+            "location": effective_context["location"],
             "weather_signals": weather_signals,
         }
         if not source_docs:

@@ -49,3 +49,6 @@ def test_prompt_requires_evidence_first_safety():
     assert "ALWAYS reply in French" in template
     assert "Je ne sais pas encore" in template
     assert "Je ne peux pas confirmer" in template
+    assert "Topic priority" in template
+    assert "soja" in template.lower() or "Soybean" in template
+    assert "Follow-ups" in template

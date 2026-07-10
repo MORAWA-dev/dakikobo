@@ -445,8 +445,9 @@ $(function() {
                 meta.push(caseData.location);
             }
             if (meta.length) {
+                // "Sujet" = effective topic (question wins over stale form crop).
                 $case.append(
-                    $('<p class="case-meta-line"></p>').text('Parcelle : ' + meta.join(' · '))
+                    $('<p class="case-meta-line"></p>').text('Sujet : ' + meta.join(' · '))
                 );
             }
 
@@ -1296,6 +1297,29 @@ $(function() {
         setExamplesOpen($('#examplesListWrap').prop('hidden'));
     });
 
+    // Keep the last substantive user question so short follow-ups
+    // ("ok à Ouagadougou") stay on topic server-side.
+    var lastUserQuestion = '';
+
+    function looksLikeShortFollowup(text) {
+        var t = (text || '').trim();
+        if (!t) {
+            return false;
+        }
+        var words = t.split(/\s+/).filter(Boolean);
+        if (words.length > 12) {
+            return false;
+        }
+        if (/^(ok|oui|non|et|donc|alors|merci)\b/i.test(t) && words.length <= 8) {
+            return true;
+        }
+        // Place-only style clarifications without a long new topic.
+        if (words.length <= 6 && !/\b(sorgho|mil|ma[iï]s|ni[eé]b[eé]|arachide|soja|coton|riz)\b/i.test(t)) {
+            return true;
+        }
+        return false;
+    }
+
     function sendMessage() {
         var message = $('#messageText').val().trim();
         if (message && !isProcessing) {
@@ -1307,6 +1331,11 @@ $(function() {
             var ctxLabel = fieldContextLabel(ctx);
             if (ctxLabel) {
                 display = message + '\n(' + ctxLabel + ')';
+            }
+
+            var prior = '';
+            if (looksLikeShortFollowup(message) && lastUserQuestion) {
+                prior = lastUserQuestion;
             }
 
             appendMessage(display, true);
@@ -1321,7 +1350,8 @@ $(function() {
                     crop: ctx.crop,
                     growth_stage: ctx.growth_stage,
                     location: ctx.location,
-                    simple_french: ctx.simple_french ? '1' : '0'
+                    simple_french: ctx.simple_french ? '1' : '0',
+                    prior_question: prior
                 },
                 success: function(response) {
                     removeTypingIndicator();
@@ -1331,6 +1361,15 @@ $(function() {
                         var answer = response.answer;
                         var audioUrl = response.audio_url;
                         var sources = response.sources;
+
+                        // Remember this turn for the next short follow-up.
+                        if (!looksLikeShortFollowup(message)) {
+                            lastUserQuestion = message;
+                        } else if (prior) {
+                            lastUserQuestion = prior + ' ' + message;
+                        } else {
+                            lastUserQuestion = message;
+                        }
 
                         if (response.case) {
                             appendCaseMessage(
