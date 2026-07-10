@@ -56,15 +56,40 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **When climate hosts UP:** health probe + refresh (skips DOWN URLs).
-2. **Optional KB:** curated pending only if new field value.
-3. **Vision (Colab):** run 03/04 on phone photos; export only if notebook 05 gates pass.
+1. **When climate hosts UP:** scrape WASCAL/INERA/AGRHYMET (preflight already skips DOWN).
+2. **Optional KB:** curated pending only if new field value (UP refresh had no new files to promote).
+3. **Vision (Colab):** fill `Data/vision_eval` manifest with real photos; run 03/04; export only if 05 gates pass.
 4. **Fill** local crop labels in `Data/glossaries/crop_labels.json` with human review.
 5. Optional: local agent review of French field phrasing.
 
 ---
 
 ## Session entries
+
+### 2026-07-10 — UP-only refresh + crop-labels API + vision eval kit
+
+**Decided**
+
+- Preflight refresh: 5/9 UP (MAERAH, CILSS, FAO×3); climate hosts still DOWN.
+- Firecrawl refused overwrite of existing pending files — no new promote needed.
+- Add `GET /crop-labels` for French crop UI labels (no local-language generation).
+- Add `Data/vision_eval/` manifest template for Colab phone-photo runs.
+
+**Files changed**
+
+- `app.py`, `static/js/index.js`, tests
+- `Data/vision_eval/*`, `.gitignore` samples
+- `SESSION.md`, `notebooks/README.md`
+
+**Git / deploy**
+
+- (filled at commit)
+
+**Next action**
+
+- Climate when UP, or real phone photos for vision, or local crop names.
+
+---
 
 ### 2026-07-10 — Owner sign-off MAERAH/CILSS (morawa-dev)
 

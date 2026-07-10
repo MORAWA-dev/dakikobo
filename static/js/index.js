@@ -1361,6 +1361,37 @@ $(function() {
     setFieldContextOpen(true);
     syncToolsFromFieldLocation();
 
+    // Optional French labels from /crop-labels (local-language slots stay unused).
+    function applyCropLabels(crops) {
+        if (!crops || !crops.length || !$('#fieldCrop').length) {
+            return;
+        }
+        var byId = {};
+        crops.forEach(function(c) {
+            if (c && c.id) {
+                byId[c.id] = c;
+            }
+        });
+        $('#fieldCrop option').each(function() {
+            var val = $(this).val();
+            if (!val || val === 'autre') {
+                return;
+            }
+            var meta = byId[val];
+            if (meta && meta.fr) {
+                $(this).text(meta.fr);
+            }
+        });
+    }
+
+    $.getJSON('/crop-labels')
+        .done(function(data) {
+            applyCropLabels(data.crops || []);
+        })
+        .fail(function() {
+            // Keep hardcoded French options in the template.
+        });
+
     var welcomeMessage = "🌾 Bienvenue à DakiKobo. Parcours terrain : (1) renseignez le contexte parcelle si vous le pouvez, (2) posez votre question ou envoyez une photo de feuille, (3) utilisez Outils pour météo et sol. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
 
     $('#chatbot-form-btn-clear').click(function(e) {

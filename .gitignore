@@ -54,3 +54,6 @@ reports/trusted_source_health.md
 
 # Local planning docs with prompts (optional — remove line to track)
 # suggestions/
+
+# Private / large vision samples
+Data/vision_eval/samples/

@@ -43,6 +43,7 @@ from core.simple_french import (
     light_replacements,
     simplify_answer,
 )
+from core.crop_labels import load_crop_labels
 from core import ops_metrics as ops_metrics_mod
 from core.weather import (
     WeatherError,
@@ -953,6 +954,39 @@ def _rag_runtime_status() -> dict:
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/crop-labels")
+def crop_labels_route():
+    """French-primary crop labels for the field UI (local names optional later)."""
+    try:
+        data = load_crop_labels()
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        return jsonify({"error": str(exc), "crops": []}), 500
+    crops = []
+    for crop in data.get("crops") or []:
+        crop_id = (crop.get("id") or "").strip()
+        if not crop_id:
+            continue
+        # Align with form values that use accents for maïs / niébé.
+        form_id = {
+            "mais": "maïs",
+            "niebe": "niébé",
+        }.get(crop_id, crop_id)
+        crops.append(
+            {
+                "id": form_id,
+                "fr": crop.get("fr") or form_id,
+                "fr_simple": crop.get("fr_simple") or crop.get("fr") or form_id,
+            }
+        )
+    return jsonify(
+        {
+            "primary_language": (data.get("meta") or {}).get("primary_language", "fr"),
+            "status": (data.get("meta") or {}).get("status", "experimental"),
+            "crops": crops,
+        }
+    )
 
 
 @app.route("/healthz")

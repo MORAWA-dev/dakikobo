@@ -18,3 +18,4 @@ Shared helpers (unit-tested): `scripts/vision_eval_helpers.py`
 - Do not train a custom disease model just for show.
 - Ship a custom model only if it beats Gemini on real phone photos **and** refuses blurry/non-plant cases safely.
 - Prefer the shared label mapper in `vision_eval_helpers.classify_from_text` so Colab and pytest stay aligned.
+- Phone-photo manifests: start from `Data/vision_eval/manifest_template.csv` (see `Data/vision_eval/README.md`).

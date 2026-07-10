@@ -153,6 +153,19 @@ def test_health_route_is_lightweight():
     assert payload["rag_warmup"]["status"] == payload["rag_status"]
 
 
+def test_crop_labels_route_returns_french_crops():
+    client = app_module.app.test_client()
+    response = client.get("/crop-labels")
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["primary_language"] == "fr"
+    ids = {c["id"] for c in payload["crops"]}
+    assert "mil" in ids
+    assert "maïs" in ids
+    assert "niébé" in ids
+    assert all(c.get("fr") for c in payload["crops"])
+
+
 def test_version_route_reports_runtime_metadata(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setenv("APP_COMMIT_SHA", "abc123")

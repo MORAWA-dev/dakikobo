@@ -90,6 +90,12 @@ def test_simple_french_toggle_is_wired():
     assert "function isSimpleFrenchEnabled" in js
     assert "simple_french" in js
     assert ".field-simple-french" in css
+
+
+def test_crop_labels_client_is_wired():
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    assert "function applyCropLabels" in js
+    assert "/crop-labels" in js
     assert "case-badge uncertain" in js
     assert "Non confirmé" in js
 
