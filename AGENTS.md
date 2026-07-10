@@ -45,6 +45,12 @@ Models/config:
 
 ## Useful Commands
 
+Ops metrics (privacy-safe; no question/answer text):
+
+```bash
+curl -s http://127.0.0.1:5000/ops/metrics | python -m json.tool
+```
+
 Install dependencies:
 
 ```bash

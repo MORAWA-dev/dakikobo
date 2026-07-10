@@ -1,5 +1,7 @@
 """Tests for Firecrawl candidate source ingestion."""
 
+from pathlib import Path
+
 import requests
 
 from scripts.firecrawl_ingest import (
@@ -171,6 +173,27 @@ def test_promote_reviewed_markdown_removes_pending_checklist(tmp_path):
     assert "## Review checklist" not in text
     assert "<!-- DAKIKOBO_SCRAPED_CONTENT_START -->" not in text
     assert "Conseil source." in text
+
+
+def test_production_allowlist_includes_ministry_inera_wascal():
+    entries = load_allowlist(
+        Path(__file__).resolve().parents[1] / "Data" / "scraped" / "source_allowlist.csv"
+    )
+    enabled_ids = {e.source_id for e in entries if e.enabled}
+    for source_id in (
+        "bf_agriculture_ministry",
+        "inera_burkina",
+        "wascal_org",
+        "agrhymet_cilss",
+        "fao_mafap_burkina",
+    ):
+        assert source_id in enabled_ids
+
+    assert match_allowlist_entry("https://www.agriculture.bf/docs", entries)
+    assert match_allowlist_entry("https://www.inera.bf/recherche", entries)
+    assert match_allowlist_entry("https://wascal.org/climate", entries)
+    assert match_allowlist_entry("https://www.agrhymet.ne/bulletin", entries)
+    assert match_allowlist_entry("https://evil.example.org/x", entries) is None
 
 
 def test_load_allowlist_matches_seed_url(tmp_path):

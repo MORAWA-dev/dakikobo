@@ -57,7 +57,15 @@ path until reviewed.
 ## Firecrawl Allowlist And Seed Batch
 
 - Allowlist: `Data/scraped/source_allowlist.csv`
-- First seed batch: `Data/scraped/seed_urls_fao_burkina.txt`
+- First seed batch (FAO): `Data/scraped/seed_urls_fao_burkina.txt`
+- Expanded trusted seeds (ministry / INERA / WASCAL / AGRHYMET / CILSS):
+  `Data/scraped/seed_urls_trusted_bf.txt`
+- Allowlist expanded 2026-07-10 for:
+  - `agriculture.bf` / `www.agriculture.bf` (ministry)
+  - `inera.bf` / `inera.org` patterns
+  - WASCAL, AGRHYMET, CILSS climate/agriculture pages
+- Scraped pages remain **pending** until human promotion into
+  `Data/markdown/scraped_reviewed/`.
 - Current seed scope: FAO Burkina Faso MAFAP, FAO AGRISurvey Burkina Faso, and FAO Country Profiles Burkina Faso.
 - Local pending outputs generated on 2026-07-02 UTC are ignored by git under `Data/scraped/pending/*.md`.
 - Reviewed output promoted on 2026-07-03: `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`.

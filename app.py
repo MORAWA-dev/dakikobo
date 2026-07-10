@@ -37,6 +37,7 @@ from core.speech import (
 from core.examples import get_demo_example
 from core.case import build_advice_case
 from core.case_log import record_feedback, record_outcome
+from core import ops_metrics as ops_metrics_mod
 from core.weather import (
     WeatherError,
     build_weather_context,
@@ -78,6 +79,8 @@ from config import (
     MAX_AUDIO_UPLOAD_BYTES,
     MAX_AUDIO_UPLOAD_MB,
     MAX_QUESTION_CHARS,
+    OPS_METRICS_ENABLED,
+    OPS_METRICS_MAX_EVENTS,
     CASE_LOG_DB_PATH,
 )
 
@@ -97,6 +100,10 @@ app.config["MAX_AUDIO_UPLOAD_MB"] = MAX_AUDIO_UPLOAD_MB
 
 # Runtime feedback/case log. SQLite file is generated and git-ignored.
 CASE_LOG_DB = CASE_LOG_DB_PATH
+
+# Privacy-safe in-process metrics (reconfigurable via env / tests).
+if OPS_METRICS_ENABLED:
+    ops_metrics_mod.configure_metrics_store(OPS_METRICS_MAX_EVENTS)
 
 
 def _set_log_fields(**fields) -> None:
@@ -138,6 +145,11 @@ def _request_log_finish(response):
     }
     payload.update(getattr(g, "log_fields", {}))
     _log_payload("http_request", **payload)
+    if OPS_METRICS_ENABLED:
+        ops_metrics_mod.metrics_store.record(
+            timestamp=_utc_now_iso(),
+            **payload,
+        )
     return response
 
 
@@ -180,23 +192,41 @@ _CROP_TOKENS = {
     "sesame", "sorgho",
 }
 
+# Generic or off-scope titles that often pollute crop-specific answers.
+# Ranking demotes these when stronger crop-matched sources are available.
+_WEAK_SOURCE_MARKERS = (
+    "farmer's handbook",
+    "farmer_training",
+    "basic agriculture",
+    "caracteristiques des menages",
+    "cartographie des zones socio",
+    "zones socio-rurales",
+)
+
 _CITATION_ALIASES = {
+    "arachide": {"groundnut", "cacahuete"},
     "bruche": {"bruches", "insecte", "insectes", "ravageur", "ravageurs"},
     "bruches": {"bruche", "insecte", "insectes", "ravageur", "ravageurs"},
+    "carence": {"carences", "chlorose", "jaunissement"},
+    "chlorose": {"carence", "carences", "jaunissement"},
     "conservation": {"conserver", "stockage", "stocker"},
     "conserver": {"conservation", "stockage", "stocker"},
     "engrais": {"fertilisation", "fertiliser", "fumure"},
     "fertilisation": {"engrais", "fertiliser", "fumure"},
     "fertiliser": {"engrais", "fertilisation", "fumure"},
+    "feuille": {"feuilles", "foliaire", "tache", "taches"},
+    "feuilles": {"feuille", "foliaire", "tache", "taches"},
     "fumure": {"engrais", "fertilisation", "fertiliser"},
-    "maladie": {"maladies", "symptome", "symptomes"},
-    "maladies": {"maladie", "symptome", "symptomes"},
+    "maladie": {"maladies", "symptome", "symptomes", "feuille", "tache"},
+    "maladies": {"maladie", "symptome", "symptomes", "feuille", "tache"},
     "semer": {"semis"},
     "semis": {"semer"},
     "stockage": {"conservation", "conserver", "stocker"},
     "stocker": {"conservation", "conserver", "stockage"},
-    "symptome": {"maladie", "maladies", "symptomes"},
-    "symptomes": {"maladie", "maladies", "symptome"},
+    "symptome": {"maladie", "maladies", "symptomes", "tache", "feuille"},
+    "symptomes": {"maladie", "maladies", "symptome", "tache", "feuille"},
+    "tache": {"taches", "feuille", "feuilles", "maladie"},
+    "taches": {"tache", "feuille", "feuilles", "maladie"},
 }
 
 
@@ -234,6 +264,16 @@ def _source_overlap(source: dict, query_tokens: set[str], match_text: str = "") 
     if not query_tokens:
         return 0
     return len(query_tokens.intersection(_source_tokens(source, match_text)))
+
+
+def _source_rank_score(title: str, base_score: float) -> float:
+    """Adjust retrieval score for ranking: demote known weak/generic titles."""
+    normalized = _normalize_for_match(title)
+    penalty = 0.0
+    for marker in _WEAK_SOURCE_MARKERS:
+        if marker in normalized:
+            penalty = max(penalty, 0.10)
+    return float(base_score) - penalty
 
 
 def _safe_source_url(metadata: dict) -> str:
@@ -383,7 +423,7 @@ def _source_scores(query: str) -> dict:
     if _rag_db is None:
         return {}
     try:
-        scored = _rag_db.similarity_search_with_relevance_scores(query, k=6)
+        scored = _rag_db.similarity_search_with_relevance_scores(query, k=8)
     except Exception as e:  # never let scoring break an answer
         print(f"Score lookup failed; using count-based confidence: {e}")
         return {}
@@ -400,8 +440,8 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
     """Build the source cards and confidence from retrieval relevance scores.
 
     Drops secondary citations that either miss the query's crop/topic concepts
-    or score far below the best match. Falls back to the count-based heuristic
-    when no scores are available.
+    or score far below the best match. Demotes known weak/generic titles when
+    ranking. Falls back to the count-based heuristic when no scores exist.
     """
     sources = _format_rag_sources(source_docs)
     scores = _source_scores(query)
@@ -422,8 +462,10 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
         title: len(tokens.intersection(query_crop_tokens))
         for title, tokens in source_tokens.items()
     }
+    had_crop_filter = False
     if query_crop_tokens and any(crop_overlaps.values()):
         sources = [s for s in sources if crop_overlaps.get(s["title"], 0) > 0]
+        had_crop_filter = True
 
     topic_overlaps = {
         title: len(tokens.intersection(query_topic_tokens))
@@ -453,12 +495,27 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
     ]
     if not kept:
         kept = [s for s in sources if s["title"] in scores and scores[s["title"]] == top]
+
+    # Prefer crop-overlap and demote weak generic handbooks when ranking.
     ranked = sorted(
         kept,
-        key=lambda source: scores.get(source["title"], -1.0),
+        key=lambda source: (
+            crop_overlaps.get(source["title"], 0),
+            _source_rank_score(source["title"], scores.get(source["title"], -1.0)),
+        ),
         reverse=True,
     )
-    return ranked[:MAX_RAG_SOURCES], _confidence_from_score(top)
+
+    max_sources = MAX_RAG_SOURCES
+    confidence = _confidence_from_score(top)
+    # Crop-focused questions without any crop-matching source: keep one card
+    # and avoid overstating confidence.
+    if query_crop_tokens and not had_crop_filter:
+        max_sources = 1
+        if confidence == "Fort":
+            confidence = "Moyen"
+
+    return ranked[:max_sources], confidence
 
 
 def _confidence_for_screen(case: dict | None, has_context: bool) -> str:
@@ -724,6 +781,25 @@ def healthz():
         "rag_status": rag_runtime["status"],
         "rag_warmup": rag_runtime,
     })
+
+
+@app.route("/ops")
+@app.route("/ops/metrics")
+def ops_metrics_view():
+    """Privacy-safe demo observability snapshot (JSON)."""
+    if not OPS_METRICS_ENABLED:
+        return jsonify({
+            "enabled": False,
+            "error": "Les métriques ops sont désactivées.",
+        }), 503
+    try:
+        limit = int(request.args.get("limit", "50"))
+    except (TypeError, ValueError):
+        limit = 50
+    snapshot = ops_metrics_mod.metrics_store.snapshot(limit=limit)
+    snapshot["enabled"] = True
+    snapshot["bot"] = BOT_NAME
+    return jsonify(snapshot)
 
 
 @app.route("/version")

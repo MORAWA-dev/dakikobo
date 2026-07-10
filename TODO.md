@@ -42,9 +42,9 @@ traceable sources.
 - [x] Optional field context (crop, growth stage, location) for text questions and photos.
 - [ ] RAG citations now show source cards and relevance filtering, but still need live tuning against noisy edge cases.
 - [x] Feedback is stored in a SQLite case log instead of a CSV-only file.
-- [ ] Structured JSON logs exist, but there is no observability dashboard for failures, quotas, slow responses, or bad answers.
-- [ ] No scheduled knowledge refresh from trusted web sources.
-- [ ] No benchmark suite for vision/photo diagnosis quality.
+- [x] Privacy-safe ops metrics ring + `/ops/metrics` snapshot (latency, failures, recent routes).
+- [ ] No scheduled knowledge refresh from trusted web sources (allowlist expanded; scrapes still offline/manual).
+- [x] Vision evaluation helpers + Colab notebook path for real phone-photo runs.
 - [ ] No weather, soil, or rainfall-onset intelligence.
 - [x] Markdown is now the primary RAG source, with PDF fallback if Markdown is missing or disabled.
 - [x] Clear public demo story: sample cases, citations, confidence, and a compact sources/limits panel.
@@ -155,10 +155,10 @@ Candidate source:
 - [x] Add `scripts/firecrawl_ingest.py` that uses `FIRECRAWL_API_KEY`.
 - [x] Do not scrape at user request time. Scrape offline, review, then ingest.
 - [x] Maintain an allowlist of trusted sources:
-  - [ ] Burkina Faso agriculture ministry pages
+  - [x] Burkina Faso agriculture ministry pages (allowlisted; scrape still offline/reviewed)
   - [x] FAO Burkina Faso pages
-  - [ ] WASCAL / AGRHYMET / CILSS climate-agriculture resources
-  - [ ] INERA / extension manuals where accessible
+  - [x] WASCAL / AGRHYMET / CILSS climate-agriculture resources (allowlisted)
+  - [x] INERA patterns allowlisted (public pages only; promote after human review)
 - [x] Scrape the first FAO Burkina Faso seed batch into local pending review files.
 - [x] Store crawled output as pending Markdown under `Data/scraped/pending/`.
 - [x] Promote a curated FAO Burkina policy/data synthesis from the first seed batch into active Markdown.
@@ -250,7 +250,7 @@ Candidate resources:
 Use the Colab Pro credits for experiments that produce reusable artifacts:
 
 - [x] Notebook 1: build a disease-photo evaluation set and metrics (`notebooks/01_disease_photo_eval.ipynb`).
-- [ ] Notebook 2: benchmark Gemini prompt variants against public datasets and real phone photos.
+- [x] Notebook 2 scaffold: Gemini prompt variants + optional live REST call for phone photos (helpers in `scripts/vision_eval_helpers.py`).
 - [ ] Notebook 3: test SCOLD/foundation image embeddings for retrieval and few-shot classification.
 - [ ] Notebook 4: train a small baseline classifier only as a research comparison.
 - [ ] Notebook 5: export a lightweight model only if it is clearly useful.

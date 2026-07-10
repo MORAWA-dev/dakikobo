@@ -37,6 +37,8 @@ CONFIDENCE_STRONG_SCORE = float(os.getenv("CONFIDENCE_STRONG_SCORE", 0.35))
 CONFIDENCE_MEDIUM_SCORE = float(os.getenv("CONFIDENCE_MEDIUM_SCORE", 0.2))
 # A secondary citation is dropped when it scores this far below the best source,
 # which suppresses unrelated cards next to the correct one.
+# Live HF eval 2026-07-10: margin 0.12 worked; keep default, allow env override.
+# Weak-title demotion is applied in ranking (see app._source_rank_score).
 CITATION_SCORE_MARGIN = float(os.getenv("CITATION_SCORE_MARGIN", 0.12))
 MAX_RAG_SOURCES = int(os.getenv("MAX_RAG_SOURCES", "2"))
 
@@ -113,6 +115,10 @@ MAX_IMAGE_UPLOAD_MB = float(os.getenv("MAX_IMAGE_UPLOAD_MB", "5.0"))
 MAX_IMAGE_UPLOAD_BYTES = int(MAX_IMAGE_UPLOAD_MB * 1024 * 1024)
 # Reject oversized text questions before RAG/TTS work.
 MAX_QUESTION_CHARS = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
+
+# In-process observability ring buffer (privacy-safe aggregates only).
+OPS_METRICS_MAX_EVENTS = int(os.getenv("OPS_METRICS_MAX_EVENTS", "200"))
+OPS_METRICS_ENABLED = os.getenv("OPS_METRICS_ENABLED", "true").lower() == "true"
 
 # --- Bot Identity ---
 BOT_NAME = "DakiKobo"

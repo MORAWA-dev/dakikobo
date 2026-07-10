@@ -662,10 +662,11 @@ Highest-impact next tasks:
 
 1. [x] Add a text-question context flow for crop, location, and growth stage.
 2. [x] Add follow-up outcome feedback for advice.
-3. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
-   policy/data retrieval smoke questions.
-4. Add log aggregation or a simple observability dashboard.
-5. Continue live retrieval evaluation and tune citation thresholds if needed.
+3. [x] Verify hosted RAG warm-up (2026-07-10 live eval 8/8 + citation ranking tune).
+4. [x] Privacy-safe ops metrics at `/ops/metrics`.
+5. [x] Vision eval helpers + Colab real-photo path.
+6. [x] Expand Firecrawl allowlist (ministry, INERA, WASCAL, AGRHYMET, CILSS).
+7. Continue scraping/promoting new allowlisted pages only after human review.
 
 ## Evaluation Principle
 

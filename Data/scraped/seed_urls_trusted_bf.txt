@@ -1,0 +1,13 @@
+# Trusted-source seed batch for offline Firecrawl review (not auto-ingested into RAG).
+# Ministry / research / regional climate partners — scrape only public pages, then review.
+https://www.agriculture.bf/
+https://agriculture.bf/
+https://www.inera.bf/
+https://wascal.org/
+https://www.wascal.org/
+https://www.agrhymet.ne/
+https://www.cilss.int/
+# Existing FAO seeds also allowed via source_allowlist.csv
+https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en
+https://www.fao.org/in-action/agrisurvey/access-to-data/burkina-faso/en
+https://www.fao.org/countryprofiles/index/en/?iso3=BFA

@@ -816,13 +816,21 @@ def test_rag_route_exposes_source_metadata(monkeypatch):
     ]
 
 
+def test_source_rank_score_demotes_weak_handbook():
+    strong = app_module._source_rank_score("IITA 2018 - Production du niebe", 0.40)
+    weak = app_module._source_rank_score(
+        "Farmer's Handbook on Basic Agriculture", 0.40
+    )
+    assert strong > weak
+
+
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
     client = app_module.app.test_client()
 
     class FakeDb:
         def similarity_search_with_relevance_scores(self, query, k):
             assert query == "Comment stocker le niébé contre les bruches ?"
-            assert k == 6
+            assert k == 8
             return [
                 (
                     SimpleNamespace(
