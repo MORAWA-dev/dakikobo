@@ -656,13 +656,11 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
     practice_query = _is_field_practice_query(query_tokens)
 
     # Drop weak generic titles when at least one stronger source remains.
-    # For field-practice questions, drop weak titles even if that empties the
-    # list — better Faible/no FEWS card than a misleading livelihood profile.
+    # If only weak titles remain, keep them but force low confidence below
+    # (still better than answering with zero citations after the LLM saw chunks).
     strong = [s for s in kept if not _is_weak_source_title(s["title"])]
     if strong:
         kept = strong
-    elif practice_query:
-        kept = []
 
     if not kept:
         return [], "Faible"
