@@ -1016,6 +1016,9 @@ $(function() {
         return selected;
     }
 
+    var FIELD_STORAGE_KEY = 'dakikobo_field_context_v1';
+    var _cropLabelCache = null;
+
     function isSimpleFrenchEnabled() {
         return $('#simpleFrenchToggle').is(':checked');
     }
@@ -1027,6 +1030,53 @@ $(function() {
             location: getFieldLocationValue(),
             simple_french: isSimpleFrenchEnabled()
         };
+    }
+
+    function saveFieldContextToStorage() {
+        try {
+            var selected = ($('#fieldLocationSelect').val() || '').trim();
+            var payload = {
+                crop: ($('#fieldCrop').val() || '').trim(),
+                growth_stage: ($('#fieldStage').val() || '').trim(),
+                location_select: selected,
+                location_custom: ($('#fieldLocationCustom').val() || '').trim(),
+                simple_french: isSimpleFrenchEnabled()
+            };
+            window.localStorage.setItem(FIELD_STORAGE_KEY, JSON.stringify(payload));
+        } catch (e) {
+            // Private mode / blocked storage — ignore.
+        }
+    }
+
+    function loadFieldContextFromStorage() {
+        try {
+            var raw = window.localStorage.getItem(FIELD_STORAGE_KEY);
+            if (!raw) {
+                return;
+            }
+            var data = JSON.parse(raw);
+            if (data.crop && $('#fieldCrop option[value="' + data.crop + '"]').length) {
+                $('#fieldCrop').val(data.crop);
+            }
+            if (data.growth_stage && $('#fieldStage option[value="' + data.growth_stage + '"]').length) {
+                $('#fieldStage').val(data.growth_stage);
+            }
+            if (data.location_select) {
+                if ($('#fieldLocationSelect option[value="' + data.location_select + '"]').length) {
+                    $('#fieldLocationSelect').val(data.location_select);
+                }
+                var isCustom = data.location_select === '__custom__';
+                $('#fieldLocationCustom').prop('hidden', !isCustom);
+                if (isCustom && data.location_custom) {
+                    $('#fieldLocationCustom').val(data.location_custom);
+                }
+            }
+            if (typeof data.simple_french === 'boolean') {
+                $('#simpleFrenchToggle').prop('checked', data.simple_french);
+            }
+        } catch (e) {
+            // Ignore corrupt storage.
+        }
     }
 
 
@@ -1072,10 +1122,25 @@ $(function() {
             $('#fieldLocationCustom').val('');
             syncToolsFromFieldLocation();
         }
+        saveFieldContextToStorage();
     });
 
     $('#fieldCrop').on('change', function() {
         syncToolsFromFieldLocation();
+        saveFieldContextToStorage();
+    });
+
+    $('#fieldStage').on('change', function() {
+        saveFieldContextToStorage();
+    });
+
+    $('#fieldLocationCustom').on('change input', function() {
+        saveFieldContextToStorage();
+    });
+
+    $('#simpleFrenchToggle').on('change', function() {
+        applyCropLabels(_cropLabelCache || []);
+        saveFieldContextToStorage();
     });
 
     function fieldContextLabel(ctx) {
@@ -1359,6 +1424,7 @@ $(function() {
     // Welcome message (French — primary language for Burkina Faso farmers)
     // Field workflow: keep parcelle context visible by default.
     setFieldContextOpen(true);
+    loadFieldContextFromStorage();
     syncToolsFromFieldLocation();
 
     // Optional French labels from /crop-labels (local-language slots stay unused).
@@ -1366,20 +1432,26 @@ $(function() {
         if (!crops || !crops.length || !$('#fieldCrop').length) {
             return;
         }
+        _cropLabelCache = crops;
         var byId = {};
         crops.forEach(function(c) {
             if (c && c.id) {
                 byId[c.id] = c;
             }
         });
+        var useSimple = isSimpleFrenchEnabled();
         $('#fieldCrop option').each(function() {
             var val = $(this).val();
             if (!val || val === 'autre') {
                 return;
             }
             var meta = byId[val];
-            if (meta && meta.fr) {
-                $(this).text(meta.fr);
+            if (!meta) {
+                return;
+            }
+            var label = useSimple && meta.fr_simple ? meta.fr_simple : meta.fr;
+            if (label) {
+                $(this).text(label);
             }
         });
     }
@@ -1392,7 +1464,7 @@ $(function() {
             // Keep hardcoded French options in the template.
         });
 
-    var welcomeMessage = "🌾 Bienvenue à DakiKobo. Parcours terrain : (1) renseignez le contexte parcelle si vous le pouvez, (2) posez votre question ou envoyez une photo de feuille, (3) utilisez Outils pour météo et sol. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
+    var welcomeMessage = "🌾 Bienvenue à DakiKobo. Parcours terrain : (1) contexte parcelle (mémorisé sur cet appareil), (2) question / photo ou un exemple, (3) Outils météo-sol si besoin. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
 
     $('#chatbot-form-btn-clear').click(function(e) {
         e.preventDefault();

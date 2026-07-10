@@ -96,6 +96,20 @@ def test_crop_labels_client_is_wired():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
     assert "function applyCropLabels" in js
     assert "/crop-labels" in js
+
+
+def test_field_context_local_storage_is_wired():
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+
+    assert "dakikobo_field_context_v1" in js
+    assert "function saveFieldContextToStorage" in js
+    assert "function loadFieldContextFromStorage" in js
+    assert "loadFieldContextFromStorage()" in js
+    assert "fr_simple" in js
+    assert "max-height: 168px" in css
+    assert "sans consommer l'API" in html
     assert "case-badge uncertain" in js
     assert "Non confirmé" in js
 

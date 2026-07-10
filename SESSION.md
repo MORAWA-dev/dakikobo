@@ -65,6 +65,26 @@ cd - && git worktree remove "$WT" --force
 
 ## Session entries
 
+### 2026-07-10 — Persist field context + examples scroll
+
+**Decided**
+
+- Continue code-only while owner collects A/B/C data later.
+- Persist parcelle context + Français simple in `localStorage` (device only, no server PII).
+- Crop select uses `fr_simple` labels when Français simple is on.
+- Examples panel scrolls when many cards; heading notes quota-safe demos.
+
+**Files changed**
+
+- `static/js/index.js`, `static/css/style.css`, `templates/index.html`
+- `tests/test_frontend_assets.py`, `SESSION.md`
+
+**Git / deploy**
+
+- (filled at commit)
+
+---
+
 ### 2026-07-10 — Code-only demo polish (CILSS + honest refusal)
 
 **Decided**
