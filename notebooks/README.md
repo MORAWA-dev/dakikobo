@@ -5,7 +5,7 @@ Colab-oriented experiments that stay **out of the production Flask path**.
 | Notebook | Purpose |
 |----------|---------|
 | `01_disease_photo_eval.ipynb` | Build a leaf-photo eval set, score Gemini prompt variants, export a ship/no-ship report |
-| `03_scold_retrieval_eval.ipynb` | Scaffold for SCOLD / foundation embedding retrieval + few-shot ranking (no training) |
+| `03_scold_retrieval_eval.ipynb` | SCOLD / foundation embedding retrieval scaffold with Colab `embed_image` wiring (no training; Gemini stays production) |
 
 Shared helpers (unit-tested): `scripts/vision_eval_helpers.py`
 (includes pure-Python `rank_by_embedding` / `retrieval_accuracy` for notebook 03).

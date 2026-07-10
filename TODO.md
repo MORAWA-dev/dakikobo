@@ -168,8 +168,9 @@ Candidate source:
 - [x] Verify hosted RAG warm-up after recent deploys (status ready/warming checked live).
 - [x] Curated MAERAH/OAPH orientation promoted to `Data/markdown/scraped_reviewed/` (not raw homepage).
 - [x] CILSS curated orientation added to active Markdown (regional, not field doses).
-- [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later (failures logged under `Data/scraped/rejected/`).
-- [ ] AGRHYMET site returned 502 — retry when online; bad-gateway/404 pages rejected, not promoted.
+- [x] Trusted URL health probe script (`scripts/check_trusted_sources.py`) for pre-scrape reachability.
+- [ ] WASCAL / INERA still unreachable (timeout) — retry when online; failures under `Data/scraped/rejected/`.
+- [ ] AGRHYMET still down — retry when online; never promote error pages.
 - [x] Source verification of MAERAH/CILSS synthesis (OAPH expansion, filières, license notes, audit file) — owner sign-off still open.
 - [ ] Final **owner** validation of MAERAH/CILSS before marketing-wide claims.
 - [x] Feedback evaluation CSV/JSONL export script (`scripts/export_feedback_eval.py`).
@@ -261,7 +262,7 @@ Use the Colab Pro credits for experiments that produce reusable artifacts:
 
 - [x] Notebook 1: build a disease-photo evaluation set and metrics (`notebooks/01_disease_photo_eval.ipynb`).
 - [x] Notebook 2 scaffold: Gemini prompt variants + optional live REST call for phone photos (helpers in `scripts/vision_eval_helpers.py`).
-- [x] Notebook 3 scaffold: SCOLD/foundation embedding retrieval helpers + `03_scold_retrieval_eval.ipynb` (wire real encoder in Colab).
+- [x] Notebook 3 scaffold: SCOLD helpers + Colab `embed_image` wiring in `03_scold_retrieval_eval.ipynb` (run real weights in Colab; Gemini stays production).
 - [ ] Notebook 4: train a small baseline classifier only as a research comparison.
 - [ ] Notebook 5: export a lightweight model only if it is clearly useful.
 

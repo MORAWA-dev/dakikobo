@@ -50,6 +50,7 @@ reports/feedback_eval.csv
 reports/feedback_eval.jsonl
 reports/FEEDBACK_EVAL_PRIVACY.md
 reports/source_refresh_log.md
+reports/trusted_source_health.md
 
 # Local planning docs with prompts (optional — remove line to track)
 # suggestions/

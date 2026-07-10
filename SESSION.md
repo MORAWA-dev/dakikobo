@@ -56,16 +56,49 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **Owner sign-off** on MAERAH / CILSS synthesis (checkboxes in those Markdown files + `Data/reviews/SOURCE_VERIFICATION_AUDIT_2026-07-10.md`). Agent source-verification is done.
-2. **Retry Firecrawl / HTTP** for WASCAL / INERA / AGRHYMET when reachable; never promote 404/502 pages (see `Data/scraped/rejected/`).
+1. **Owner sign-off** on MAERAH / CILSS synthesis (checkboxes + `Data/reviews/SOURCE_VERIFICATION_AUDIT_2026-07-10.md`).
+2. **When online:** run `scripts/check_trusted_sources.py` then `refresh_trusted_sources.py` for WASCAL / INERA / AGRHYMET; never promote 404/502.
 3. **Optional KB:** curated synthesis only from pending ministry/FAO scrapes if new field value; keep raw pending out of RAG.
-4. **Vision lab:** wire real SCOLD encoder in Colab (`notebooks/03_scold_retrieval_eval.ipynb`); no production swap until it beats Gemini on phone photos.
-5. **Local languages later:** Mooré / Dioula / Fulfulde labels only after French-simple path; no rushed generation.
-6. **Notebook 4–5** only as research comparison, not demo hype.
+4. **Vision lab (Colab):** run notebook 03 with real phone-photo manifest + SCOLD weights; ship only if beats Gemini.
+5. **Local languages later:** Mooré / Dioula / Fulfulde labels only after French-simple path.
+6. **Notebook 4–5** research comparison only.
 
 ---
 
 ## Session entries
+
+### 2026-07-10 — Trusted health probe + SCOLD Colab wiring
+
+**Decided**
+
+- Owner sign-off still human-only; skipped for agent work.
+- WASCAL / INERA / AGRHYMET still **unreachable** (HTTP fail/timeout) — no scrape/promote.
+- Pending ministry/FAO scrapes already covered by curated RAG (MAERAH/OAPH, CILSS, FAO profile); no new promote.
+- Add lightweight **`scripts/check_trusted_sources.py`** for pre-refresh HTTP probes (cron-friendly, no Firecrawl key required).
+- Notebook 03 gets a concrete Colab `embed_image` / HF AutoModel scaffold; production remains Gemini until eval wins.
+
+**Files changed**
+
+- `scripts/check_trusted_sources.py`, `tests/test_check_trusted_sources.py`
+- `notebooks/03_scold_retrieval_eval.ipynb`, `notebooks/README.md`
+- `.gitignore` — `reports/trusted_source_health.md`
+- `SESSION.md`, `TODO.md` (if updated)
+
+**Git / deploy**
+
+- (filled at commit)
+
+**Still open**
+
+- Owner MAERAH/CILSS sign-off
+- Climate/research sites when network allows
+- Real SCOLD run on phone photos in Colab
+
+**Next action**
+
+- Owner sign-off, or re-probe trusted sources later, or phone-photo Colab experiment.
+
+---
 
 ### 2026-07-10 — MAERAH/CILSS source verification (next-up #1)
 
