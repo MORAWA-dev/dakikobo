@@ -70,6 +70,18 @@ def test_landing_strip_is_wired_in_frontend_assets():
     assert "response.case" in js
 
 
+def test_uncertain_badge_and_known_limits_are_wired():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert "Limites connues" in html
+    assert "Je ne peux pas confirmer" in html
+    assert ".case-badge.uncertain" in css
+    assert "case-badge uncertain" in js
+    assert "Non confirmé" in js
+
+
 def test_voice_input_uses_server_side_stt():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
 

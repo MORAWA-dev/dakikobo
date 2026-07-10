@@ -48,3 +48,4 @@ def test_prompt_requires_evidence_first_safety():
     assert "fertilizer doses" in template.lower() or "exact fertilizer" in template.lower()
     assert "ALWAYS reply in French" in template
     assert "Je ne sais pas encore" in template
+    assert "Je ne peux pas confirmer" in template

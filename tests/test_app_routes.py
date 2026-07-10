@@ -100,6 +100,24 @@ class _NoSourceRagChain:
         }
 
 
+class _UncertainRagChain:
+    """Returns the first-class 'Je ne peux pas confirmer' uncertainty path."""
+    def invoke(self, query):
+        return {
+            "result": (
+                "Je ne peux pas confirmer. Les documents évoquent des pratiques "
+                "générales, mais le stade et la parcelle manquent. Vérifiez au "
+                "champ et demandez conseil à un agent agricole."
+            ),
+            "source_documents": [
+                SimpleNamespace(
+                    metadata={"source": "guide_general.pdf"},
+                    page_content="Pratiques générales de culture au Sahel.",
+                ),
+            ],
+        }
+
+
 def test_app_import_does_not_initialize_rag():
     assert app_module._rag_chain is None
 
@@ -802,6 +820,28 @@ def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):
     assert payload["sources"] == []
     assert payload["confidence"] == "Faible"
     assert "case" not in payload
+    assert payload.get("answer_kind") == "refusal"
+
+
+def test_rag_route_uncertain_is_first_class_not_failure(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _UncertainRagChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(app_module, "_source_scores", lambda query: {"guide_general.pdf": 0.4})
+
+    response = client.post(
+        "/ask",
+        data={"messageText": "Quelle maladie exacte touche mon sorgho ?"},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "je ne peux pas confirmer" in payload["answer"].lower()
+    assert payload["confidence"] == "Faible"
+    assert payload["answer_kind"] == "uncertain"
+    assert payload["case"]["risk_level"] == "Non confirmé"
+    assert payload["case"]["needs_human_confirmation"] is True
+    assert payload["case"]["confirmation"]
 
 
 def test_rag_route_without_retrieved_docs_forces_refusal(monkeypatch):

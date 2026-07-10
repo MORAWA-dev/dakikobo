@@ -1,6 +1,6 @@
 # DakiKobo Project State
 
-Last updated: 2026-07-10
+Last updated: 2026-07-10 (cannot-confirm + vision lab)
 
 This file is a compact state report for another model, reviewer, or engineer to
 evaluate what already exists before proposing new work.
@@ -79,6 +79,8 @@ Behavior:
 - Shows confidence labels: `Fort`, `Moyen`, `Faible`.
 - Non-refusal text and fertilizer answers also return a structured evidence-first
   `case` card: short answer, why/evidence, actions, what to avoid, confirmation.
+- First-class uncertainty: answers starting with « Je ne peux pas confirmer »
+  return `answer_kind=uncertain`, confidence `Faible`, and a Non confirmé case.
 - Uses off-topic fallback rather than inventing unsupported advice.
 - Generates French TTS audio when possible.
 - Shows a visible privacy note for photos and voice recordings.

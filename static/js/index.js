@@ -338,6 +338,9 @@ $(function() {
                 .text('Confiance : ' + confidence)
         );
         $badges.append($('<span class="case-badge risk"></span>').text(risk));
+        if (risk === 'Non confirmé') {
+            $badges.append($('<span class="case-badge uncertain"></span>').text('Incertain'));
+        }
         $head.append($badges);
         $case.append($head);
 

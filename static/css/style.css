@@ -704,6 +704,12 @@ body {
     color: #704900;
 }
 
+.case-badge.uncertain {
+    background-color: #fde8e8;
+    color: #7a1f1f;
+}
+
+
 .case-meta {
     display: flex;
     flex-wrap: wrap;

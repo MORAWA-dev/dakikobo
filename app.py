@@ -309,10 +309,30 @@ def _is_refusal(answer: str) -> bool:
     return "ne sais pas encore" in text or "n'est pas disponible dans la base" in text
 
 
+def _is_uncertain(answer: str) -> bool:
+    """True when the model used the first-class 'Je ne peux pas confirmer' path.
+
+    Uncertainty is not a failure: the app still returns a structured case with
+    low confidence and requires human confirmation.
+    """
+    text = (answer or "").lower()
+    return "je ne peux pas confirmer" in text
+
+
 def _no_rag_context_answer() -> str:
     return (
         "Je ne sais pas encore. Cette information n'est pas disponible "
         f"dans la base de données de {BOT_NAME} pour le Burkina Faso."
+    )
+
+
+def _uncertain_fallback_answer() -> str:
+    return (
+        "Je ne peux pas confirmer. Les documents disponibles ne suffisent pas "
+        "pour une réponse ferme sur ce point. Notez ce que vous observez au "
+        "champ (culture, stade, symptômes) et confirmez avec un agent agricole "
+        f"ou le service de vulgarisation local avant d'agir. {BOT_NAME} privilégie "
+        "l'incertitude honnête plutôt qu'une précision inventée."
     )
 
 
@@ -880,17 +900,40 @@ def ask():
         # how many chunks came back.
         source_docs = response.get("source_documents", [])
         case = None
+        answer_kind = "advice"
         if not source_docs:
             answer = _no_rag_context_answer()
             sources, confidence = [], "Faible"
             refusal = True
+            answer_kind = "refusal"
         elif _is_refusal(answer):
             # The model declined to answer; do not imply confidence or evidence.
             sources, confidence = [], "Faible"
             refusal = True
+            answer_kind = "refusal"
+        elif _is_uncertain(answer):
+            # First-class uncertainty: keep weak sources for transparency, force
+            # Faible confidence, and surface a non-confirmed field case.
+            sources, _ = _grounded_sources_and_confidence(query, source_docs)
+            confidence = "Faible"
+            refusal = False
+            answer_kind = "uncertain"
+            case = build_advice_case(
+                answer=answer,
+                question=query,
+                input_type="text",
+                sources=sources,
+                confidence=confidence,
+                risk_level="Non confirmé",
+                confirmation=(
+                    "Je ne peux pas confirmer sans observation de parcelle. "
+                    "Montrez le cas à un agent agricole avant d'agir."
+                ),
+            )
         else:
             sources, confidence = _grounded_sources_and_confidence(query, source_docs)
             refusal = False
+            answer_kind = "advice"
             case = build_advice_case(
                 answer=answer,
                 question=query,
@@ -907,6 +950,7 @@ def ask():
             source_count=len(sources),
             retrieved_doc_count=len(source_docs),
             refusal=refusal,
+            answer_kind=answer_kind,
             audio_generated=bool(audio_url),
             case_structured=case is not None,
         )
@@ -915,6 +959,7 @@ def ask():
             "sources": sources,
             "confidence": confidence,
             "audio_url": audio_url,
+            "answer_kind": answer_kind,
         }
         if case is not None:
             payload["case"] = case

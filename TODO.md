@@ -215,7 +215,7 @@ Candidate resources:
 - [x] Text and fertilizer `/ask` answers now return a structured field `case` card
   (image screening already did). Refusals stay plain text without fake evidence.
 - [x] Prompt safety: never invent exact fertilizer doses, pesticides, or precise dates.
-- [ ] Add "Je ne peux pas confirmer" as a first-class response, not a failure.
+- [x] Add "Je ne peux pas confirmer" as a first-class response, not a failure.
 - [ ] Further live tuning of evidence heuristics on real HF queries.
 
 ### 7. Local language path, carefully
@@ -236,9 +236,9 @@ Candidate resources:
   - supported crops
   - safety disclaimer
   - "Essayez ces exemples"
-- [ ] Add a public limitations page.
+- [x] Document known limits in the Sources panel (`Limites connues`) and `DEMO_SCRIPT.md`.
 - [ ] Add a short Hugging Face Space README story with screenshots.
-- [ ] Add a 60-second demo script:
+- [x] Add a 60-second demo script (`DEMO_SCRIPT.md`):
   - text question
   - fertilizer question
   - leaf image screening
@@ -249,7 +249,7 @@ Candidate resources:
 
 Use the Colab Pro credits for experiments that produce reusable artifacts:
 
-- [ ] Notebook 1: build a disease-photo evaluation set and metrics.
+- [x] Notebook 1: build a disease-photo evaluation set and metrics (`notebooks/01_disease_photo_eval.ipynb`).
 - [ ] Notebook 2: benchmark Gemini prompt variants against public datasets and real phone photos.
 - [ ] Notebook 3: test SCOLD/foundation image embeddings for retrieval and few-shot classification.
 - [ ] Notebook 4: train a small baseline classifier only as a research comparison.
@@ -290,7 +290,7 @@ to prove what works, what fails, and why.
 1. [x] Structured case cards for image and text answers.
 2. [x] Weather context card.
 3. [x] Follow-up feedback after advice.
-4. Colab evaluation notebooks for vision.
+4. [x] Colab evaluation notebooks for vision (scaffold in `notebooks/`).
 5. [x] Soil context.
 6. [x] Public demo story and example gallery (landing strip + examples panel).
 
