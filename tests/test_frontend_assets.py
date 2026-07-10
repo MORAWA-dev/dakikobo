@@ -78,6 +78,18 @@ def test_uncertain_badge_and_known_limits_are_wired():
     assert "Limites connues" in html
     assert "Je ne peux pas confirmer" in html
     assert ".case-badge.uncertain" in css
+
+
+def test_simple_french_toggle_is_wired():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert 'id="simpleFrenchToggle"' in html
+    assert "Français simple" in html
+    assert "function isSimpleFrenchEnabled" in js
+    assert "simple_french" in js
+    assert ".field-simple-french" in css
     assert "case-badge uncertain" in js
     assert "Non confirmé" in js
 

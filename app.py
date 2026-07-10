@@ -37,6 +37,12 @@ from core.speech import (
 from core.examples import get_demo_example
 from core.case import build_advice_case
 from core.case_log import record_feedback, record_outcome, set_before_image_ref
+from core.simple_french import (
+    apply_simple_style_to_query,
+    is_simple_mode,
+    light_replacements,
+    simplify_answer,
+)
 from core import ops_metrics as ops_metrics_mod
 from core.weather import (
     WeatherError,
@@ -454,6 +460,46 @@ def _query_with_field_context(query: str, context: dict[str, str]) -> str:
     if not parts:
         return query
     return f"{query}\n(Contexte parcelle: {'; '.join(parts)})"
+
+
+def _simple_french_from_request() -> bool:
+    """Optional Français simple toggle from form or query string."""
+    raw = request.form.get("simple_french")
+    if raw is None:
+        raw = request.args.get("simple_french")
+    return is_simple_mode(raw)
+
+
+def _maybe_simplify(answer: str, enabled: bool) -> str:
+    """Apply plain-French post-processing when the toggle is on."""
+    if not enabled or not answer:
+        return answer
+    return simplify_answer(answer)
+
+
+def _maybe_simplify_case(case: dict | None, enabled: bool) -> dict | None:
+    """Keep structured case text aligned with simplified mode (light touch)."""
+    if not enabled or not case:
+        return case
+    updated = dict(case)
+    # Prefer light wording swaps on list fields; full glossary only once on answer.
+    if updated.get("answer"):
+        updated["answer"] = simplify_answer(str(updated["answer"]))
+    for key in ("summary", "confirmation"):
+        if updated.get(key):
+            updated[key] = light_replacements(str(updated[key]))
+    for list_key in (
+        "observations",
+        "possible_causes",
+        "actions",
+        "evidence",
+        "do_not",
+        "weather_signals",
+    ):
+        items = updated.get(list_key)
+        if isinstance(items, list) and items:
+            updated[list_key] = [light_replacements(str(item)) for item in items]
+    return updated
 
 
 def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict | None]:
@@ -1033,6 +1079,7 @@ def ask():
         return limited
 
     field_context = _field_context_from_request()
+    simple_french = _simple_french_from_request()
     weather_signals, weather_payload = _weather_signals_for_location(
         field_context.get("location", "")
     )
@@ -1041,8 +1088,11 @@ def ask():
         growth_stage_provided=bool(field_context["growth_stage"]),
         location_provided=bool(field_context["location"]),
         weather_enriched=bool(weather_signals),
+        simple_french=simple_french,
     )
     retrieval_query = _query_with_field_context(query, field_context)
+    if simple_french:
+        retrieval_query = apply_simple_style_to_query(retrieval_query)
 
     # Bot self-identification (French + English triggers)
     identity_triggers = [
@@ -1078,11 +1128,13 @@ def ask():
             location=field_context["location"],
         )
         if advice is not None:
-            audio_url = text_to_speech_to_static(advice["answer"])
+            answer = _maybe_simplify(advice["answer"], simple_french)
             case = advice.get("case")
             if case is not None and weather_signals:
                 case = dict(case)
                 case["weather_signals"] = weather_signals
+            case = _maybe_simplify_case(case, simple_french)
+            audio_url = text_to_speech_to_static(answer)
             _set_log_fields(
                 intent="fertilizer",
                 model="deterministic",
@@ -1093,12 +1145,13 @@ def ask():
                 case_structured=bool(case),
             )
             payload = {
-                "answer": advice["answer"],
+                "answer": answer,
                 "sources": advice["sources"],
                 "confidence": "Fort",
                 "audio_url": audio_url,
                 "case": case,
                 "answer_kind": "advice",
+                "simple_french": simple_french,
             }
             if weather_payload is not None:
                 payload["weather"] = weather_payload
@@ -1139,6 +1192,7 @@ def ask():
             confidence = "Faible"
             refusal = False
             answer_kind = "uncertain"
+            answer = _maybe_simplify(answer, simple_french)
             case = build_advice_case(
                 answer=answer,
                 sources=sources,
@@ -1156,12 +1210,17 @@ def ask():
             )
             refusal = False
             answer_kind = "advice"
+            answer = _maybe_simplify(answer, simple_french)
             case = build_advice_case(
                 answer=answer,
                 sources=sources,
                 confidence=confidence,
                 **case_kwargs,
             )
+
+        # Refusals stay plain; still allow light simple-mode wording.
+        if refusal and simple_french:
+            answer = _maybe_simplify(answer, True)
 
         audio_url = text_to_speech_to_static(answer)
         _set_log_fields(
@@ -1181,6 +1240,7 @@ def ask():
             "confidence": confidence,
             "audio_url": audio_url,
             "answer_kind": answer_kind,
+            "simple_french": simple_french,
         }
         if case is not None:
             payload["case"] = case
@@ -1309,10 +1369,12 @@ def screen():
     crop = request.form.get("crop", "").strip()[:80]
     growth_stage = request.form.get("growth_stage", "").strip()[:80]
     location = request.form.get("location", "").strip()[:120]
+    simple_french = _simple_french_from_request()
     _set_log_fields(
         crop_provided=bool(crop),
         growth_stage_provided=bool(growth_stage),
         location_provided=bool(location),
+        simple_french=simple_french,
     )
     result = screen_leaf_image(
         image_bytes,
@@ -1321,7 +1383,7 @@ def screen():
         growth_stage=growth_stage,
         location=location,
     )
-    answer = result["answer"]
+    answer = _maybe_simplify(result["answer"], simple_french)
     case = result.get("case")
     confidence = _confidence_for_screen(
         case,
@@ -1330,6 +1392,7 @@ def screen():
     if case is not None:
         case = dict(case)
         case["confidence"] = confidence
+    case = _maybe_simplify_case(case, simple_french)
     audio_url = text_to_speech_to_static(answer)
     _set_log_fields(
         outcome="ok",
@@ -1343,6 +1406,7 @@ def screen():
         "sources": [],
         "confidence": confidence,
         "audio_url": audio_url,
+        "simple_french": simple_french,
     })
 
 

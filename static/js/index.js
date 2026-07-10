@@ -1016,11 +1016,16 @@ $(function() {
         return selected;
     }
 
+    function isSimpleFrenchEnabled() {
+        return $('#simpleFrenchToggle').is(':checked');
+    }
+
     function getFieldContext() {
         return {
             crop: ($('#fieldCrop').val() || '').trim(),
             growth_stage: ($('#fieldStage').val() || '').trim(),
-            location: getFieldLocationValue()
+            location: getFieldLocationValue(),
+            simple_french: isSimpleFrenchEnabled()
         };
     }
 
@@ -1084,6 +1089,9 @@ $(function() {
         if (ctx.location) {
             parts.push('Lieu : ' + ctx.location);
         }
+        if (ctx.simple_french) {
+            parts.push('Français simple');
+        }
         return parts.join(' · ');
     }
 
@@ -1125,7 +1133,8 @@ $(function() {
                     messageText: message,
                     crop: ctx.crop,
                     growth_stage: ctx.growth_stage,
-                    location: ctx.location
+                    location: ctx.location,
+                    simple_french: ctx.simple_french ? '1' : '0'
                 },
                 success: function(response) {
                     removeTypingIndicator();
@@ -1268,6 +1277,7 @@ $(function() {
         formData.append('crop', context.crop || '');
         formData.append('growth_stage', context.growth_stage || '');
         formData.append('location', context.location || '');
+        formData.append('simple_french', isSimpleFrenchEnabled() ? '1' : '0');
         showTypingIndicator();
 
         $.ajax({

@@ -168,8 +168,8 @@ Candidate source:
 - [x] Verify hosted RAG warm-up after recent deploys (status ready/warming checked live).
 - [x] Curated MAERAH/OAPH orientation promoted to `Data/markdown/scraped_reviewed/` (not raw homepage).
 - [x] CILSS curated orientation added to active Markdown (regional, not field doses).
-- [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later.
-- [ ] AGRHYMET site returned 502 — retry when online; do not promote bad-gateway pages.
+- [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later (failures logged under `Data/scraped/rejected/`).
+- [ ] AGRHYMET site returned 502 — retry when online; bad-gateway/404 pages rejected, not promoted.
 - [ ] Final human validation of MAERAH/CILSS synthesis license/details.
 - [x] Feedback evaluation CSV export script (`scripts/export_feedback_eval.py`).
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
@@ -227,12 +227,13 @@ Candidate resources:
 ### 7. Local language path, carefully
 
 - [ ] Do not rush local-language generation.
-- [ ] Start with a glossary:
+- [x] Start with a glossary:
   - crop names
   - symptoms
   - fertilizer terms
   - weather terms
-- [ ] Add "French simple" mode first.
+  - institutions (OAPH, MAERAH)
+- [x] Add "French simple" mode first (`core/simple_french.py` + UI toggle).
 - [ ] Later test Mooré / Dioula / Fulfulde snippets with human review.
 
 ### 8. Public demo polish

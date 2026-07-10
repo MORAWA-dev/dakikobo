@@ -19,12 +19,13 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `4e1c34c`
-- Live health verified on 2026-07-03:
+- Latest HF runtime commit verified: `b8c3a754` (GitHub `b9173ef0`)
+- Live health verified on 2026-07-10:
   - `ok=true`
   - `rag_ready=true`
   - `rag_status=ready`
-  - warm-up finished at `2026-07-03T10:16:55+00:00`
+  - warm-up finished at `2026-07-10T12:19:01+00:00`
+  - OAPH probe correct: **Offensive Agropastorale et Halieutique** (not invented expansion)
 
 Local git note:
 
@@ -102,6 +103,8 @@ Important curated additions:
 - `Data/markdown/prosol_fertilite_sols_burkina_2020.md`
 - `Data/markdown/iita_niebe_afrique_ouest_2018.md`
 - `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`
+- `Data/markdown/scraped_reviewed/maerah_oaph_orientation_burkina_2026.md`
+- `Data/markdown/scraped_reviewed/cilss_orientation_sahel_2026.md`
 
 Source governance:
 
