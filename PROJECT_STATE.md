@@ -19,7 +19,7 @@ screening, citations, confidence labels, and a mobile-first chat UI.
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `b8c3a754` (GitHub `b9173ef0`)
+- Latest HF runtime commit verified: `990b80e6` (GitHub `8028159b`)
 - Live health verified on 2026-07-10:
   - `ok=true`
   - `rag_ready=true`
