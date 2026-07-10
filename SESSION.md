@@ -56,11 +56,10 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **When climate hosts UP:** scrape WASCAL/INERA/AGRHYMET (preflight already skips DOWN).
-2. **Optional KB:** curated pending only if new field value (UP refresh had no new files to promote).
-3. **Vision (Colab):** fill `Data/vision_eval` manifest with real photos; run 03/04; export only if 05 gates pass.
-4. **Fill** local crop labels in `Data/glossaries/crop_labels.json` with human review.
-5. Optional: local agent review of French field phrasing.
+1. **You (async):** collect data using `Data/reviews/DATA_COLLECTION_TASKS.md` (tracks A climate, B photos, C crop names).
+2. **When you say “ingest what I collected”:** agent reviews inbox → curated RAG / vision / glossary (no raw auto-promote).
+3. **When climate hosts UP (agent):** health probe + refresh for WASCAL/INERA/AGRHYMET.
+4. Optional: local agent review of French field phrasing.
 
 ---
 

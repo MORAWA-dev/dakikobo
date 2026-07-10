@@ -33,7 +33,8 @@ File: `Data/markdown/scraped_reviewed/cilss_orientation_sahel_2026.md`
 
 ## Crop local-language labels (optional later)
 
-File: `Data/glossaries/crop_labels.json`
+File: `Data/glossaries/crop_labels.json`  
+**Collection checklist:** `DATA_COLLECTION_TASKS.md` → **Track C**
 
 - [ ] Mooré / Dioula / Fulfulde crop names filled by a native speaker.
 - [ ] Labels-only UI experiment approved (still no answer generation in local languages).
