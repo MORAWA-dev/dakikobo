@@ -65,6 +65,26 @@ cd - && git worktree remove "$WT" --force
 
 ## Session entries
 
+### 2026-07-10 — Chat-first UI (uncrowd interface)
+
+**Decided**
+
+- User report: UI too crowded to chat / upload image flow blocked by panels.
+- Default: **collapsed** field context + examples; compact landing (2 lines).
+- Chat area gets min-height; examples open as horizontal scroll strip.
+- Emoji keyboard in screenshot is OS/browser (not app) — not fixed in code.
+
+**Files changed**
+
+- `templates/index.html`, `static/css/style.css`, `static/js/index.js`, tests
+
+**Git / deploy**
+
+- GitHub: `c09c843a`
+- HF: `10dd1f2c`
+
+---
+
 ### 2026-07-10 — Persist field context + examples scroll
 
 **Decided**
