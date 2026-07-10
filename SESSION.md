@@ -86,8 +86,8 @@ cd - && git worktree remove "$WT" --force
 
 **Git / deploy**
 
-- GitHub: 
-- HF: optional deploy for scripts/notebooks
+- GitHub: `b6a48959` (feature `5662fdf8`)
+- HF Space: `d1ec8c6c`
 
 **Still open**
 
