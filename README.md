@@ -19,6 +19,21 @@ The focus crops are **mil (millet), sorgho (sorghum), maïs (maize), niébé (co
 and arachide (groundnut)**. All output — answers, UI labels and voice — is in French,
 and the interface is mobile-first for use on phones.
 
+## Essayer la démo (60 s)
+
+Live Space: **https://kimcomehome-dakikobo.hf.space/**
+
+1. **Contexte parcelle** (optionnel) — culture, stade, lieu ; activez **Français simple** pour des phrases plus claires.
+2. **Question texte** — ex. « Quand semer le mil ? » → carte *Conseil agricole* + sources.
+3. **Engrais** — ex. « Dose d'engrais pour le sorgho » → doses **déterministes** (pas inventées par le LLM) + disclaimer agent.
+4. **Photo de feuille** — dépistage prudent (*pas un diagnostic*).
+5. **Sources & limites** — preuves, météo/sol indicatifs, confirmation terrain obligatoire.
+
+Script détaillé : [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md).
+
+**Ce que DakiKobo n'est pas :** un oracle de rendement, un diagnostic officiel, ou un
+remplacement de l'agent agricole.
+
 ---
 
 ## Features
@@ -50,6 +65,8 @@ and the interface is mobile-first for use on phones.
 - **Soil-aware fertilizer context** — SoilGrids texture, organic carbon, pH and retention-risk
   classes combined with deterministic fertilizer guidance.
 - **Feedback capture** — 👍 / 👎 under each answer, with follow-up outcome tracking (was the advice applied? did it help?), stored in a local SQLite case log.
+- **Français simple** — optional plain-language mode with a field glossary (NPK, microdose, OAPH, etc.).
+- **Field weather enrichment** — known locations can attach rainfall / water-stress signals to answers.
 - **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
 
 ---

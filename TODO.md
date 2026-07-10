@@ -43,7 +43,7 @@ traceable sources.
 - [x] RAG citations: relevance filtering + weak-source demotion; live suite mostly green (soil external flaky).
 - [x] Feedback is stored in a SQLite case log instead of a CSV-only file.
 - [x] Privacy-safe ops metrics ring + `/ops/metrics` snapshot (latency, failures, recent routes).
-- [ ] No scheduled knowledge refresh from trusted web sources (allowlist expanded; scrapes still offline/manual).
+- [x] Offline trusted-source refresh script (`scripts/refresh_trusted_sources.py`; cron-ready, never auto-promotes).
 - [x] Vision evaluation helpers + Colab notebook path for real phone-photo runs.
 - [x] Weather and soil tools exist; field-context location can auto-enrich answers with weather signals.
 - [x] Markdown is now the primary RAG source, with PDF fallback if Markdown is missing or disabled.
@@ -171,7 +171,8 @@ Candidate source:
 - [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later (failures logged under `Data/scraped/rejected/`).
 - [ ] AGRHYMET site returned 502 — retry when online; bad-gateway/404 pages rejected, not promoted.
 - [ ] Final human validation of MAERAH/CILSS synthesis license/details.
-- [x] Feedback evaluation CSV export script (`scripts/export_feedback_eval.py`).
+- [x] Feedback evaluation CSV/JSONL export script (`scripts/export_feedback_eval.py`).
+- [x] Feedback export can feed smoke re-asks via `evaluate_rag.py --feedback-csv` (private only).
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:
@@ -207,7 +208,7 @@ Candidate resources:
   - worse
   - not sure
 - [x] Store before/after image references where possible (SQLite refs + optional after photo on follow-up).
-- [ ] Use this as an evaluation dataset, not as public training data without consent.
+- [x] Use this as a private evaluation dataset (export + smoke re-ask; not public training without consent).
 
 ### 6. Evidence-first answer format
 
@@ -244,7 +245,7 @@ Candidate resources:
   - safety disclaimer
   - "Essayez ces exemples"
 - [x] Document known limits in the Sources panel (`Limites connues`) and `DEMO_SCRIPT.md`.
-- [ ] Add a short Hugging Face Space README story with screenshots.
+- [x] Add a short Hugging Face Space README demo story (screenshots optional later).
 - [x] Add a 60-second demo script (`DEMO_SCRIPT.md`):
   - text question
   - fertilizer question

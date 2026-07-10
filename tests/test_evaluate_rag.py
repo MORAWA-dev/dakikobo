@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import requests
 
 from scripts.evaluate_rag import (
+    CASES,
     EvalCase,
     EvalResult,
     _as_answer,
@@ -14,6 +15,16 @@ from scripts.evaluate_rag import (
     main,
     wait_for_ready,
 )
+
+
+def test_builtin_suite_includes_oaph_and_simple_french():
+    ids = {case.id for case in CASES}
+    assert "rag_oaph_acronym" in ids
+    assert "tool_fertilizer_simple_french" in ids
+    oaph = next(case for case in CASES if case.id == "rag_oaph_acronym")
+    assert "offensive" in oaph.answer_terms_any
+    simple = next(case for case in CASES if case.id == "tool_fertilizer_simple_french")
+    assert simple.data.get("simple_french") == "1"
 
 
 def test_checks_pass_for_cited_niebe_payload():
@@ -273,7 +284,7 @@ def test_main_strict_uses_min_pass_rate_not_keyword_fails(monkeypatch, tmp_path)
     """9/10 hard-pass with keyword WARNs should succeed at min-pass-rate 0.75."""
     output = tmp_path / "report.md"
 
-    def fake_run(base_url, timeout, progress=False):
+    def fake_run(base_url, timeout, progress=False, cases=None):
         results = []
         for i in range(9):
             case = EvalCase(
@@ -332,7 +343,7 @@ def test_main_strict_uses_min_pass_rate_not_keyword_fails(monkeypatch, tmp_path)
 def test_main_strict_fails_when_pass_rate_too_low(monkeypatch, tmp_path):
     output = tmp_path / "report.md"
 
-    def fake_run(base_url, timeout, progress=False):
+    def fake_run(base_url, timeout, progress=False, cases=None):
         results = []
         for i in range(10):
             case = EvalCase(

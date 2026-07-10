@@ -211,6 +211,37 @@ CASES = [
         answer_terms_any=("maïs", "mais", "npk", "urée", "uree", "sol"),
         source_terms_any=("soilgrids", "sol", "maïs", "mais"),
     ),
+    EvalCase(
+        id="rag_oaph_acronym",
+        category="RAG",
+        label="Acronyme OAPH Burkina",
+        method="POST",
+        path="/ask",
+        data={"messageText": "C'est quoi l'OAPH au Burkina Faso ?"},
+        min_sources=1,
+        allowed_confidence=GOOD_CONFIDENCE,
+        answer_terms_any=(
+            "offensive",
+            "agropastorale",
+            "halieutique",
+        ),
+        source_terms_any=("maerah", "oaph", "agriculture"),
+    ),
+    EvalCase(
+        id="tool_fertilizer_simple_french",
+        category="Tool",
+        label="Fumure sorgho français simple",
+        method="POST",
+        path="/ask",
+        data={
+            "messageText": "Quelle dose d'engrais pour le sorgho ?",
+            "simple_french": "1",
+        },
+        min_sources=1,
+        allowed_confidence=("Fort",),
+        answer_terms_any=("npk", "urée", "uree", "mots simples", "agent"),
+        source_terms_any=("sorgho", "fumure", "sciences", "outil"),
+    ),
 ]
 
 
@@ -421,9 +452,60 @@ def wait_for_ready(base_url: str, timeout: float, poll_seconds: float = 5.0) -> 
     return last_payload
 
 
-def run_evaluation(base_url: str, timeout: float, *, progress: bool = False) -> list[EvalResult]:
+def load_feedback_eval_cases(
+    csv_path: str,
+    *,
+    limit: int = 20,
+) -> list[EvalCase]:
+    """Build smoke cases from a private feedback export CSV.
+
+    Only re-asks the stored question text. Does not publish feedback content.
+    Structural checks only (HTTP + non-empty answer); no keyword expectations.
+    """
+    import csv
+    from pathlib import Path
+
+    path = Path(csv_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Feedback CSV not found: {csv_path}")
+
+    cases: list[EvalCase] = []
+    with path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            question = (row.get("question") or "").strip()
+            if not question or len(question) < 8:
+                continue
+            # Skip obvious non-agri noise if present.
+            if len(question) > 500:
+                question = question[:500]
+            fid = str(row.get("id") or len(cases) + 1)
+            cases.append(
+                EvalCase(
+                    id=f"feedback_{fid}",
+                    category="Feedback",
+                    label=f"Feedback case {fid}",
+                    method="POST",
+                    path="/ask",
+                    data={"messageText": question},
+                    min_sources=0,
+                    allowed_confidence=("Fort", "Moyen", "Faible"),
+                )
+            )
+            if len(cases) >= max(1, limit):
+                break
+    return cases
+
+
+def run_evaluation(
+    base_url: str,
+    timeout: float,
+    *,
+    progress: bool = False,
+    cases: list[EvalCase] | None = None,
+) -> list[EvalResult]:
     results = []
-    for case in CASES:
+    for case in cases if cases is not None else CASES:
         if progress:
             print(f"Running {case.id}...", flush=True)
         results.append(request_case(base_url, case, timeout))
@@ -601,6 +683,25 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "exception occurs, or if readiness/run error is set."
         ),
     )
+    parser.add_argument(
+        "--feedback-csv",
+        default="",
+        help=(
+            "Optional private feedback export CSV (from export_feedback_eval.py). "
+            "Appends smoke cases that re-ask stored questions only."
+        ),
+    )
+    parser.add_argument(
+        "--feedback-limit",
+        type=int,
+        default=10,
+        help="Max feedback questions to re-ask when --feedback-csv is set (default 10).",
+    )
+    parser.add_argument(
+        "--feedback-only",
+        action="store_true",
+        help="Run only feedback smoke cases (requires --feedback-csv).",
+    )
     return parser.parse_args(argv)
 
 
@@ -614,6 +715,25 @@ def main(argv: list[str] | None = None) -> int:
         health = wait_for_ready(base_url, args.wait_timeout)
         print(f"Health: {health}", flush=True)
 
+    cases: list[EvalCase] = [] if args.feedback_only else list(CASES)
+    if args.feedback_csv:
+        try:
+            feedback_cases = load_feedback_eval_cases(
+                args.feedback_csv,
+                limit=args.feedback_limit,
+            )
+            print(f"Loaded {len(feedback_cases)} feedback smoke cases.", flush=True)
+            cases.extend(feedback_cases)
+        except FileNotFoundError as exc:
+            print(f"ERROR: {exc}", flush=True)
+            return 2
+    if args.feedback_only and not args.feedback_csv:
+        print("ERROR: --feedback-only requires --feedback-csv.", flush=True)
+        return 2
+    if not cases:
+        print("ERROR: no evaluation cases selected.", flush=True)
+        return 2
+
     run_error = ""
     if not args.no_wait and health.get("rag_status") not in READY_STATUSES:
         run_error = (
@@ -623,7 +743,7 @@ def main(argv: list[str] | None = None) -> int:
         print(run_error, flush=True)
         results = []
     else:
-        results = run_evaluation(base_url, args.timeout, progress=True)
+        results = run_evaluation(base_url, args.timeout, progress=True, cases=cases)
 
     report = format_report(
         base_url=base_url,
