@@ -81,7 +81,8 @@ cd - && git worktree remove "$WT" --force
 
 **Git / deploy**
 
-- (filled at commit)
+- GitHub: `dc73b453`
+- HF: deploy after push
 
 ---
 
