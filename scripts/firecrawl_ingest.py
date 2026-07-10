@@ -48,6 +48,9 @@ RETRYABLE_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 CONTENT_MARKER = "<!-- DAKIKOBO_SCRAPED_CONTENT_START -->"
 DEFAULT_ALLOWLIST_PATH = PROJECT_ROOT / "Data" / "scraped" / "source_allowlist.csv"
 DEFAULT_SEED_URLS_PATH = PROJECT_ROOT / "Data" / "scraped" / "seed_urls_fao_burkina.txt"
+DEFAULT_TRUSTED_SEED_URLS_PATH = (
+    PROJECT_ROOT / "Data" / "scraped" / "seed_urls_trusted_bf.txt"
+)
 
 
 class FirecrawlIngestError(RuntimeError):
@@ -212,6 +215,11 @@ def match_allowlist_entry(
         pattern = pattern.replace("wildcard", "*")
         if fnmatch.fnmatch(normalized_url, pattern):
             return entry
+        # Patterns like https://example.org/* should also allow the site root.
+        if pattern.endswith("/*"):
+            base = pattern[:-2].rstrip("/")
+            if normalized_url.rstrip("/") == base:
+                return entry
     return None
 
 
@@ -475,6 +483,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--url", action="append", default=[], help="URL to scrape; can be repeated.")
     parser.add_argument("--urls-file", help="Text file with one URL per line.")
     parser.add_argument("--seed-batch", action="store_true", help="Use the curated FAO Burkina Faso seed URL batch.")
+    parser.add_argument(
+        "--trusted-batch",
+        action="store_true",
+        help="Use the expanded trusted seed batch (ministry/INERA/WASCAL/AGRHYMET/CILSS/FAO).",
+    )
     parser.add_argument("--list-seeds", action="store_true", help="Print the curated seed URLs and exit.")
     parser.add_argument("--allowlist", default=str(DEFAULT_ALLOWLIST_PATH), help="CSV allowlist of trusted URL patterns.")
     parser.add_argument("--allow-unlisted", action="store_true", help="Scrape URLs outside the allowlist; use only for manual experiments.")
@@ -498,7 +511,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
 
     if args.list_seeds:
-        for url in _read_urls_file(DEFAULT_SEED_URLS_PATH):
+        seed_path = (
+            DEFAULT_TRUSTED_SEED_URLS_PATH if args.trusted_batch else DEFAULT_SEED_URLS_PATH
+        )
+        for url in _read_urls_file(seed_path):
             print(url)
         return 0
 
@@ -523,8 +539,13 @@ def main(argv: list[str] | None = None) -> int:
         urls.extend(_read_urls_file(args.urls_file))
     if args.seed_batch:
         urls.extend(_read_urls_file(DEFAULT_SEED_URLS_PATH))
+    if args.trusted_batch:
+        urls.extend(_read_urls_file(DEFAULT_TRUSTED_SEED_URLS_PATH))
     if not urls:
-        print("ERROR: provide --url, --urls-file, --seed-batch, or --promote.", file=sys.stderr)
+        print(
+            "ERROR: provide --url, --urls-file, --seed-batch, --trusted-batch, or --promote.",
+            file=sys.stderr,
+        )
         return 2
 
     allowlist_entries: list[AllowlistEntry] = []

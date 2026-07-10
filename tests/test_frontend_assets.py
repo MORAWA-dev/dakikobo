@@ -90,12 +90,15 @@ def test_text_field_context_panel_is_wired():
     assert 'id="fieldContextPanel"' in html
     assert 'id="fieldCrop"' in html
     assert 'id="fieldStage"' in html
-    assert 'id="fieldLocation"' in html
+    assert 'id="fieldLocationSelect"' in html
+    assert 'id="fieldLocationCustom"' in html
+    assert "Ouagadougou" in html
     assert "Contexte parcelle" in html
     assert ".field-context-panel" in css
     assert "function getFieldContext" in js
+    assert "function getFieldLocationValue" in js
     assert "growth_stage: ctx.growth_stage" in js
-    assert "location: ctx.location" in js
+    assert "location: getFieldLocationValue()" in js
     assert "Signaux météo" in js
     assert "weather_signals" in js
     assert "/ops/metrics" in html

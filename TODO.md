@@ -165,7 +165,8 @@ Candidate source:
 - [x] Add metadata: URL, title, publisher, date crawled, language, license/usage note.
 - [x] Add a review flag before documents enter RAG.
 - [x] Add source-manifest validation so Chroma rebuilds when the active corpus changes.
-- [ ] Verify hosted RAG warm-up and FAO retrieval after the promoted FAO synthesis is deployed.
+- [x] Verify hosted RAG warm-up after recent deploys (status ready/warming checked live).
+- [ ] Re-check FAO retrieval + new pending trusted scrapes after human review/promotion.
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:

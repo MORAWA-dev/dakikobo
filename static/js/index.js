@@ -978,13 +978,31 @@ $(function() {
         });
     }
 
+    function getFieldLocationValue() {
+        var selected = ($('#fieldLocationSelect').val() || '').trim();
+        if (selected === '__custom__') {
+            return ($('#fieldLocationCustom').val() || '').trim();
+        }
+        return selected;
+    }
+
     function getFieldContext() {
         return {
             crop: ($('#fieldCrop').val() || '').trim(),
             growth_stage: ($('#fieldStage').val() || '').trim(),
-            location: ($('#fieldLocation').val() || '').trim()
+            location: getFieldLocationValue()
         };
     }
+
+    $('#fieldLocationSelect').on('change', function() {
+        var isCustom = $(this).val() === '__custom__';
+        $('#fieldLocationCustom').prop('hidden', !isCustom);
+        if (isCustom) {
+            $('#fieldLocationCustom').trigger('focus');
+        } else {
+            $('#fieldLocationCustom').val('');
+        }
+    });
 
     function fieldContextLabel(ctx) {
         var parts = [];

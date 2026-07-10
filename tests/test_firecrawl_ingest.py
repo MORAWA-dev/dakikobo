@@ -190,8 +190,11 @@ def test_production_allowlist_includes_ministry_inera_wascal():
         assert source_id in enabled_ids
 
     assert match_allowlist_entry("https://www.agriculture.bf/docs", entries)
+    assert match_allowlist_entry("https://www.agriculture.bf/", entries)
     assert match_allowlist_entry("https://www.inera.bf/recherche", entries)
     assert match_allowlist_entry("https://wascal.org/climate", entries)
+    assert match_allowlist_entry("https://wascal.org/", entries)
+    assert match_allowlist_entry("https://www.wascal.org/", entries)
     assert match_allowlist_entry("https://www.agrhymet.ne/bulletin", entries)
     assert match_allowlist_entry("https://evil.example.org/x", entries) is None
 

@@ -183,15 +183,26 @@
               <option value="fructification / épi">Fructification / épi</option>
               <option value="maturité">Maturité</option>
             </select>
-            <label class="field-context-label" for="fieldLocation">Lieu</label>
+            <label class="field-context-label" for="fieldLocationSelect">Lieu</label>
+            <select id="fieldLocationSelect" name="location_select" aria-label="Localité connue">
+              <option value="">Je ne sais pas</option>
+              <option value="Ouagadougou">Ouagadougou</option>
+              <option value="Bobo-Dioulasso">Bobo-Dioulasso</option>
+              <option value="Kaya">Kaya</option>
+              <option value="Ouahigouya">Ouahigouya</option>
+              <option value="Fada N'Gourma">Fada N'Gourma</option>
+              <option value="Dori">Dori</option>
+              <option value="__custom__">Autre commune / village…</option>
+            </select>
             <input
               type="text"
-              id="fieldLocation"
-              name="location"
+              id="fieldLocationCustom"
+              name="location_custom"
               maxlength="120"
               autocomplete="off"
-              placeholder="Commune ou village (optionnel)"
-              aria-label="Commune ou village"
+              placeholder="Nom de la commune ou du village"
+              aria-label="Autre commune ou village"
+              hidden
             />
           </div>
         </div>

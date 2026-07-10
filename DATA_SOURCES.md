@@ -66,6 +66,12 @@ path until reviewed.
   - WASCAL, AGRHYMET, CILSS climate/agriculture pages
 - Scraped pages remain **pending** until human promotion into
   `Data/markdown/scraped_reviewed/`.
+- Allowlist matching treats `https://example.org/*` as also covering the site root
+  (`https://example.org` / `https://example.org/`).
+- Offline scrape log 2026-07-10:
+  - FAO country profile seed → pending Markdown written (review before promote).
+  - WASCAL homepage → Firecrawl proxy/site load error (retry later).
+  - Use `python scripts/firecrawl_ingest.py --trusted-batch` for the expanded seed list.
 - Current seed scope: FAO Burkina Faso MAFAP, FAO AGRISurvey Burkina Faso, and FAO Country Profiles Burkina Faso.
 - Local pending outputs generated on 2026-07-02 UTC are ignored by git under `Data/scraped/pending/*.md`.
 - Reviewed output promoted on 2026-07-03: `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`.
