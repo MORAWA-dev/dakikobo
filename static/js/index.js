@@ -370,6 +370,7 @@ $(function() {
             renderCaseSection($case, 'Pourquoi / preuves', caseData.evidence);
             renderCaseSection($case, 'Actions immédiates', caseData.actions);
             renderCaseSection($case, 'À éviter', caseData.do_not);
+            renderCaseSection($case, 'Signaux météo', caseData.weather_signals);
             if (caseData.confirmation) {
                 renderCaseSection($case, 'À confirmer', [caseData.confirmation]);
             }

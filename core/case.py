@@ -257,6 +257,7 @@ class FieldCase:
     disclaimer: str = ""
     sources: list[dict[str, str]] = field(default_factory=list)
     case_title: str = ""
+    weather_signals: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -327,6 +328,7 @@ def build_disease_case(
             }
         ],
         case_title=case_title_for("image"),
+        weather_signals=[],
     )
     return case.to_dict()
 
@@ -348,6 +350,7 @@ def build_advice_case(
     disclaimer: str = "",
     confirmation: str = DEFAULT_ADVICE_CONFIRMATION,
     risk_level: str = "À vérifier",
+    weather_signals=None,
 ) -> dict:
     """Build a JSON-ready evidence-first case for text or fertilizer advice."""
     cleaned_type = _clean_text(input_type) or "text"
@@ -398,5 +401,6 @@ def build_advice_case(
         disclaimer=_clean_text(disclaimer),
         sources=source_cards,
         case_title=case_title_for(cleaned_type),
+        weather_signals=_clean_items(weather_signals)[:4],
     )
     return case.to_dict()

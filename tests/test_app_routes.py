@@ -697,6 +697,41 @@ def test_fertilizer_route_uses_form_crop_when_text_omits_crop(monkeypatch):
     assert payload["case"]["location"] == "Dori"
 
 
+def test_ask_enriches_case_with_weather_when_location_known(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: None)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module,
+        "build_weather_context",
+        lambda location_id: {
+            "location": {"id": location_id, "name": "Kaya"},
+            "insights": [
+                {
+                    "label": "Pluie utile (7 jours)",
+                    "status": "watch",
+                    "text": "12.0 mm récents : surveillez l'humidité.",
+                }
+            ],
+            "sources": [{"title": "Open-Meteo", "type": "Météo", "snippet": "x"}],
+        },
+    )
+
+    response = client.post(
+        "/ask",
+        data={
+            "messageText": "dose d'engrais pour le sorgho",
+            "location": "Kaya",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["case"]["weather_signals"]
+    assert "Pluie utile" in payload["case"]["weather_signals"][0]
+    assert payload["weather"]["location"]["id"] == "kaya"
+
+
 def test_rag_route_returns_unique_sources(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setattr(app_module, "get_rag_chain", lambda: _FakeRagChain())
@@ -822,6 +857,8 @@ def test_source_rank_score_demotes_weak_handbook():
         "Farmer's Handbook on Basic Agriculture", 0.40
     )
     assert strong > weak
+    assert app_module._is_weak_source_title("Agrobusiness au Burkina Faso")
+    assert not app_module._is_weak_source_title("ProSol 2020 - fertilite des sols")
 
 
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):

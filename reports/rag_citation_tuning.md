@@ -41,3 +41,17 @@ already green; tuning focuses on ranking quality, not hard cutoffs.
 ```
 
 After deploy, re-check maize leaf and arachide cases manually for source titles.
+
+## Post-deploy follow-up (2026-07-10 later)
+
+Live suite after deploy: **9/10** (SoilGrids `/soil` returned HTTP 502 — external
+API cold start / timeout, not a RAG regression).
+
+Manual maize/arachide still sometimes surface generic Burkina reports. Additional
+hardening:
+
+- Drop weak titles entirely when any non-weak source remains.
+- Expand weak markers (`agrobusiness`, `comprehensive report`, …).
+- Prefer crop tokens in **title** when ranking.
+- Cap confidence at Moyen when the only remaining source is weak.
+- SoilGrids: default timeout 18s + one retry on 5xx/timeout.

@@ -235,23 +235,43 @@ def _retention_indicator(sand_percent, soc_percent, cec_cmol_kg) -> dict:
 
 
 def _fetch_soilgrids(location: SoilLocation) -> dict:
-    response = requests.get(
-        SOILGRIDS_QUERY_URL,
-        params=[
-            ("lon", location.longitude),
-            ("lat", location.latitude),
-            ("property", "clay"),
-            ("property", "sand"),
-            ("property", "soc"),
-            ("property", "phh2o"),
-            ("property", "cec"),
-            ("depth", "0-5cm"),
-            ("value", "mean"),
-        ],
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    response.raise_for_status()
-    return response.json()
+    params = [
+        ("lon", location.longitude),
+        ("lat", location.latitude),
+        ("property", "clay"),
+        ("property", "sand"),
+        ("property", "soc"),
+        ("property", "phh2o"),
+        ("property", "cec"),
+        ("depth", "0-5cm"),
+        ("value", "mean"),
+    ]
+    last_error: Exception | None = None
+    # One retry for transient SoilGrids timeouts / 5xx.
+    for attempt in range(2):
+        try:
+            response = requests.get(
+                SOILGRIDS_QUERY_URL,
+                params=params,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            status_code = getattr(response, "status_code", 200)
+            if status_code in {429, 500, 502, 503, 504} and attempt == 0:
+                last_error = requests.HTTPError(
+                    f"SoilGrids temporary status {status_code}",
+                    response=response,
+                )
+                continue
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt == 0:
+                continue
+            raise
+    if last_error is not None:
+        raise last_error
+    raise SoilError("Les indicateurs de sol ne sont pas disponibles.")
 
 
 def _metrics_available(metrics: dict) -> bool:

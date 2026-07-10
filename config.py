@@ -104,7 +104,8 @@ MAX_AUDIO_UPLOAD_BYTES = int(MAX_AUDIO_UPLOAD_MB * 1024 * 1024)
 
 # --- External context APIs ---
 WEATHER_TIMEOUT_SECONDS = float(os.getenv("WEATHER_TIMEOUT_SECONDS", "10.0"))
-SOIL_TIMEOUT_SECONDS = float(os.getenv("SOIL_TIMEOUT_SECONDS", "12.0"))
+# SoilGrids can be slow/cold on free hosting; allow a bit more time by default.
+SOIL_TIMEOUT_SECONDS = float(os.getenv("SOIL_TIMEOUT_SECONDS", "18.0"))
 
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"

@@ -56,6 +56,43 @@ def list_weather_locations() -> list[dict]:
     ]
 
 
+def resolve_weather_location_id(text: str) -> str | None:
+    """Map free-text commune/location to a supported weather location id.
+
+    Returns None when the text does not match a known Burkina demo city.
+    """
+    raw = (text or "").strip().lower()
+    if not raw:
+        return None
+    # Exact id match first.
+    if raw in LOCATIONS:
+        return raw
+    # Common aliases / partial names.
+    aliases = {
+        "ouaga": "ouagadougou",
+        "ouagadougou": "ouagadougou",
+        "bobo": "bobo",
+        "bobo-dioulasso": "bobo",
+        "bobo dioulasso": "bobo",
+        "kaya": "kaya",
+        "ouahigouya": "ouahigouya",
+        "fada": "fada",
+        "fada n'gourma": "fada",
+        "fada ngourma": "fada",
+        "dori": "dori",
+    }
+    if raw in aliases:
+        return aliases[raw]
+    for alias, loc_id in aliases.items():
+        if alias in raw or raw in alias:
+            return loc_id
+    for loc in LOCATIONS.values():
+        name = loc.name.lower()
+        if raw == name or raw in name or name in raw:
+            return loc.id
+    return None
+
+
 def clear_weather_cache() -> None:
     _CACHE.clear()
 

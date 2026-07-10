@@ -40,12 +40,12 @@ traceable sources.
 - [ ] The UI is still mostly a chat widget; it should feel like a real field workflow.
 - [x] Image diagnosis answers use structured case cards (inspection sections).
 - [x] Optional field context (crop, growth stage, location) for text questions and photos.
-- [ ] RAG citations now show source cards and relevance filtering, but still need live tuning against noisy edge cases.
+- [x] RAG citations: relevance filtering + weak-source demotion; live suite mostly green (soil external flaky).
 - [x] Feedback is stored in a SQLite case log instead of a CSV-only file.
 - [x] Privacy-safe ops metrics ring + `/ops/metrics` snapshot (latency, failures, recent routes).
 - [ ] No scheduled knowledge refresh from trusted web sources (allowlist expanded; scrapes still offline/manual).
 - [x] Vision evaluation helpers + Colab notebook path for real phone-photo runs.
-- [ ] No weather, soil, or rainfall-onset intelligence.
+- [x] Weather and soil tools exist; field-context location can auto-enrich answers with weather signals.
 - [x] Markdown is now the primary RAG source, with PDF fallback if Markdown is missing or disabled.
 - [x] Clear public demo story: sample cases, citations, confidence, and a compact sources/limits panel.
 

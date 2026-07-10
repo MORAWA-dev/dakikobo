@@ -42,6 +42,7 @@ from core.weather import (
     WeatherError,
     build_weather_context,
     list_weather_locations,
+    resolve_weather_location_id,
 )
 from core.soil import (
     SoilError,
@@ -201,6 +202,11 @@ _WEAK_SOURCE_MARKERS = (
     "caracteristiques des menages",
     "cartographie des zones socio",
     "zones socio-rurales",
+    "agrobusiness",
+    "modernisation agricole",
+    "comprehensive report",
+    "foncier",
+    "profil des moyens d'existence",  # seasonal calendar ok for semis; still weak for disease
 )
 
 _CITATION_ALIASES = {
@@ -266,14 +272,21 @@ def _source_overlap(source: dict, query_tokens: set[str], match_text: str = "") 
     return len(query_tokens.intersection(_source_tokens(source, match_text)))
 
 
+def _is_weak_source_title(title: str) -> bool:
+    normalized = _normalize_for_match(title)
+    return any(marker in normalized for marker in _WEAK_SOURCE_MARKERS)
+
+
 def _source_rank_score(title: str, base_score: float) -> float:
     """Adjust retrieval score for ranking: demote known weak/generic titles."""
-    normalized = _normalize_for_match(title)
-    penalty = 0.0
-    for marker in _WEAK_SOURCE_MARKERS:
-        if marker in normalized:
-            penalty = max(penalty, 0.10)
+    penalty = 0.12 if _is_weak_source_title(title) else 0.0
     return float(base_score) - penalty
+
+
+def _title_crop_hits(title: str, crop_tokens: set[str]) -> int:
+    if not crop_tokens:
+        return 0
+    return len(_citation_tokens(title).intersection(crop_tokens))
 
 
 def _safe_source_url(metadata: dict) -> str:
@@ -405,6 +418,27 @@ def _query_with_field_context(query: str, context: dict[str, str]) -> str:
     return f"{query}\n(Contexte parcelle: {'; '.join(parts)})"
 
 
+def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict | None]:
+    """Optional weather enrichment when field location maps to a known city."""
+    loc_id = resolve_weather_location_id(location_text)
+    if not loc_id:
+        return [], None
+    try:
+        weather = build_weather_context(loc_id)
+    except (WeatherError, ValueError, Exception) as exc:
+        print(f"Weather enrichment skipped for {loc_id}: {exc}")
+        return [], None
+    signals = []
+    for insight in weather.get("insights") or []:
+        label = (insight.get("label") or "").strip()
+        text = (insight.get("text") or "").strip()
+        if label and text:
+            signals.append(f"{label} : {text}")
+        elif text:
+            signals.append(text)
+    return signals[:4], weather
+
+
 def _confidence_from_score(top_score: float) -> str:
     """Map the best retrieval relevance score to a confidence label."""
     if top_score >= CONFIDENCE_STRONG_SCORE:
@@ -496,10 +530,16 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
     if not kept:
         kept = [s for s in sources if s["title"] in scores and scores[s["title"]] == top]
 
-    # Prefer crop-overlap and demote weak generic handbooks when ranking.
+    # Drop weak generic titles when at least one stronger source remains.
+    strong = [s for s in kept if not _is_weak_source_title(s["title"])]
+    if strong:
+        kept = strong
+
+    # Prefer title crop match, then content crop overlap, then adjusted score.
     ranked = sorted(
         kept,
         key=lambda source: (
+            _title_crop_hits(source["title"], query_crop_tokens),
             crop_overlaps.get(source["title"], 0),
             _source_rank_score(source["title"], scores.get(source["title"], -1.0)),
         ),
@@ -514,6 +554,10 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
         max_sources = 1
         if confidence == "Fort":
             confidence = "Moyen"
+    # If the best remaining citation is still a weak generic source, stay Moyen.
+    if ranked and _is_weak_source_title(ranked[0]["title"]) and confidence == "Fort":
+        confidence = "Moyen"
+        max_sources = min(max_sources, 1)
 
     return ranked[:max_sources], confidence
 
@@ -951,10 +995,14 @@ def ask():
         return limited
 
     field_context = _field_context_from_request()
+    weather_signals, weather_payload = _weather_signals_for_location(
+        field_context.get("location", "")
+    )
     _set_log_fields(
         crop_provided=bool(field_context["crop"]),
         growth_stage_provided=bool(field_context["growth_stage"]),
         location_provided=bool(field_context["location"]),
+        weather_enriched=bool(weather_signals),
     )
     retrieval_query = _query_with_field_context(query, field_context)
 
@@ -993,6 +1041,10 @@ def ask():
         )
         if advice is not None:
             audio_url = text_to_speech_to_static(advice["answer"])
+            case = advice.get("case")
+            if case is not None and weather_signals:
+                case = dict(case)
+                case["weather_signals"] = weather_signals
             _set_log_fields(
                 intent="fertilizer",
                 model="deterministic",
@@ -1000,16 +1052,19 @@ def ask():
                 confidence="Fort",
                 source_count=len(advice["sources"]),
                 audio_generated=bool(audio_url),
-                case_structured=bool(advice.get("case")),
+                case_structured=bool(case),
             )
-            return jsonify({
+            payload = {
                 "answer": advice["answer"],
                 "sources": advice["sources"],
                 "confidence": "Fort",
                 "audio_url": audio_url,
-                "case": advice.get("case"),
+                "case": case,
                 "answer_kind": "advice",
-            })
+            }
+            if weather_payload is not None:
+                payload["weather"] = weather_payload
+            return jsonify(payload)
 
     try:
         response = get_rag_chain().invoke(retrieval_query)
@@ -1027,6 +1082,7 @@ def ask():
             "crop": field_context["crop"],
             "growth_stage": field_context["growth_stage"],
             "location": field_context["location"],
+            "weather_signals": weather_signals,
         }
         if not source_docs:
             answer = _no_rag_context_answer()
@@ -1090,6 +1146,8 @@ def ask():
         }
         if case is not None:
             payload["case"] = case
+        if weather_payload is not None and not refusal:
+            payload["weather"] = weather_payload
         return jsonify(payload)
 
     except Exception as e:

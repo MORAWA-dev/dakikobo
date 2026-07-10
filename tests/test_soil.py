@@ -4,10 +4,15 @@ from core import soil
 
 
 class _FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self.payload = payload
+        self.status_code = status_code
 
     def raise_for_status(self):
+        if self.status_code >= 400:
+            import requests
+
+            raise requests.HTTPError(response=self)
         return None
 
     def json(self):
@@ -125,3 +130,37 @@ def test_soil_api_error_is_wrapped(monkeypatch):
         pass
     else:
         raise AssertionError("request errors should be wrapped")
+
+
+def test_fetch_soilgrids_retries_on_502(monkeypatch):
+    from core import soil as soil_mod
+
+    calls = {"n": 0}
+
+    class FakeResp:
+        def __init__(self, status_code, payload=None):
+            self.status_code = status_code
+            self._payload = payload or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                import requests
+                raise requests.HTTPError(response=self)
+
+        def json(self):
+            return self._payload
+
+    def fake_get(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return FakeResp(502)
+        return FakeResp(200, {"properties": {}})
+
+    monkeypatch.setattr(soil_mod.requests, "get", fake_get)
+    loc = soil_mod.LOCATIONS["ouagadougou"]
+    # May raise later on empty payload structure; ensure retry happened.
+    try:
+        soil_mod._fetch_soilgrids(loc)
+    except Exception:
+        pass
+    assert calls["n"] == 2

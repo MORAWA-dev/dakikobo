@@ -82,3 +82,14 @@ def test_weather_api_error_is_wrapped(monkeypatch):
 
     with pytest.raises(weather.WeatherError):
         weather.build_weather_context("bobo")
+
+
+def test_resolve_weather_location_id_matches_common_names():
+    from core.weather import resolve_weather_location_id
+
+    assert resolve_weather_location_id("Kaya") == "kaya"
+    assert resolve_weather_location_id("ouaga") == "ouagadougou"
+    assert resolve_weather_location_id("Bobo-Dioulasso") == "bobo"
+    assert resolve_weather_location_id("  Dori  ") == "dori"
+    assert resolve_weather_location_id("village inconnu") is None
+    assert resolve_weather_location_id("") is None

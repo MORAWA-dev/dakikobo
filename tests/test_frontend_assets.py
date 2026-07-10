@@ -96,6 +96,9 @@ def test_text_field_context_panel_is_wired():
     assert "function getFieldContext" in js
     assert "growth_stage: ctx.growth_stage" in js
     assert "location: ctx.location" in js
+    assert "Signaux météo" in js
+    assert "weather_signals" in js
+    assert "/ops/metrics" in html
 
 
 def test_voice_input_uses_server_side_stt():
