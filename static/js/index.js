@@ -168,15 +168,45 @@ $(function() {
         });
         $prompt.append($options);
 
+        var $afterBlock = $('<div class="followup-after-photo"></div>');
+        $afterBlock.append(
+            $('<label class="followup-after-label"></label>')
+                .text('Photo après (optionnel, pour le suivi de parcelle)')
+        );
+        var $afterInput = $('<input type="file" accept="image/*" capture="environment" class="followup-after-input">');
+        $afterBlock.append($afterInput);
+        $prompt.append($afterBlock);
+
         $options.on('click', '.followup-btn', function() {
             var outcome = $(this).data('outcome');
             $options.find('.followup-btn').prop('disabled', true);
-            $.post('/feedback/outcome', { feedback_id: feedbackId, outcome: outcome })
+            $afterInput.prop('disabled', true);
+
+            var formData = new FormData();
+            formData.append('feedback_id', feedbackId);
+            formData.append('outcome', outcome);
+            var file = $afterInput[0] && $afterInput[0].files && $afterInput[0].files[0];
+            if (file) {
+                formData.append('after_image', file);
+            }
+
+            $.ajax({
+                type: 'POST',
+                url: '/feedback/outcome',
+                data: formData,
+                processData: false,
+                contentType: false
+            })
                 .done(function() {
-                    $options.after($('<span class="followup-thanks"></span>').text('Merci pour le suivi !'));
+                    var thanks = 'Merci pour le suivi !';
+                    if (file) {
+                        thanks += ' Photo après enregistrée pour évaluation (privée).';
+                    }
+                    $options.after($('<span class="followup-thanks"></span>').text(thanks));
                 })
                 .fail(function() {
                     $options.find('.followup-btn').prop('disabled', false);
+                    $afterInput.prop('disabled', false);
                 });
         });
 

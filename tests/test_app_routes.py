@@ -1,6 +1,7 @@
 """Flask route smoke tests with live services mocked out."""
 
 import json
+from pathlib import Path
 import logging
 from types import SimpleNamespace
 
@@ -1275,7 +1276,9 @@ def test_feedback_writes_sqlite_case_log(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.get_json() == {"ok": True, "feedback_id": 1}
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["feedback_id"] == 1
     rows = list_feedback_events(str(case_log))
     assert len(rows) == 1
     assert rows[0]["rating"] == "up"
@@ -1300,7 +1303,7 @@ def test_feedback_outcome_route_updates_row(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.get_json() == {"ok": True}
+    assert response.get_json()["ok"] is True
     rows = list_feedback_events(str(case_log))
     assert rows[0]["outcome"] == "applied_improved"
     assert rows[0]["outcome_at"] is not None
@@ -1339,3 +1342,34 @@ def test_feedback_outcome_returns_404_for_missing_id(tmp_path, monkeypatch):
     assert response.status_code == 404
     assert response.get_json()["error"] == "feedback_id not found"
 
+
+
+def test_feedback_outcome_stores_after_image(tmp_path, monkeypatch):
+    case_log = tmp_path / "case_log.sqlite3"
+    img_dir = tmp_path / "feedback_images"
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(case_log))
+    monkeypatch.setattr(app_module, "FEEDBACK_IMAGES", str(img_dir))
+    client = app_module.app.test_client()
+
+    created = client.post(
+        "/feedback",
+        data={"rating": "up", "question": "Q", "answer": "A"},
+    )
+    feedback_id = created.get_json()["feedback_id"]
+
+    response = client.post(
+        "/feedback/outcome",
+        data={
+            "feedback_id": str(feedback_id),
+            "outcome": "applied_improved",
+            "after_image": (__import__("io").BytesIO(b"fakepng"), "after.jpg"),
+        },
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert payload["ok"] is True
+    assert payload["after_image_ref"]
+    rows = list_feedback_events(str(case_log))
+    assert rows[0]["after_image_ref"]
+    assert Path(rows[0]["after_image_ref"]).is_file()

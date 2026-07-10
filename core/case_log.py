@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 VALID_OUTCOMES = frozenset({
     "applied_improved",
@@ -53,6 +53,18 @@ def _migrate_to_v2(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_to_v3(conn: sqlite3.Connection) -> None:
+    """Add optional before/after image reference columns (idempotent)."""
+    if not _column_exists(conn, "feedback_events", "before_image_ref"):
+        conn.execute(
+            "ALTER TABLE feedback_events ADD COLUMN before_image_ref TEXT"
+        )
+    if not _column_exists(conn, "feedback_events", "after_image_ref"):
+        conn.execute(
+            "ALTER TABLE feedback_events ADD COLUMN after_image_ref TEXT"
+        )
+
+
 def init_case_log(db_path: str) -> None:
     """Create the case-log database schema if needed and apply migrations."""
     with _connect(db_path) as conn:
@@ -65,11 +77,14 @@ def init_case_log(db_path: str) -> None:
                 question TEXT NOT NULL,
                 answer TEXT NOT NULL,
                 outcome TEXT,
-                outcome_at TEXT
+                outcome_at TEXT,
+                before_image_ref TEXT,
+                after_image_ref TEXT
             )
             """
         )
         _migrate_to_v2(conn)
+        _migrate_to_v3(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
@@ -80,6 +95,7 @@ def record_feedback(
     question: str,
     answer: str,
     created_at: str | None = None,
+    before_image_ref: str = "",
 ) -> int:
     """Persist one answer rating and return its row id."""
     if rating not in {"up", "down"}:
@@ -89,12 +105,43 @@ def record_feedback(
     with _connect(db_path) as conn:
         cursor = conn.execute(
             """
-            INSERT INTO feedback_events (created_at, rating, question, answer)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO feedback_events (
+                created_at, rating, question, answer, before_image_ref
+            )
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (created_at or _now_iso(), rating, question or "", answer or ""),
+            (
+                created_at or _now_iso(),
+                rating,
+                question or "",
+                answer or "",
+                (before_image_ref or "").strip() or None,
+            ),
         )
         return int(cursor.lastrowid)
+
+
+def set_before_image_ref(
+    db_path: str,
+    *,
+    feedback_id: int,
+    before_image_ref: str,
+) -> bool:
+    """Attach a before-image reference to an existing feedback row."""
+    ref = (before_image_ref or "").strip()
+    if not ref:
+        return False
+    init_case_log(db_path)
+    with _connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            UPDATE feedback_events
+            SET before_image_ref = ?
+            WHERE id = ?
+            """,
+            (ref, feedback_id),
+        )
+        return cursor.rowcount > 0
 
 
 def record_outcome(
@@ -102,6 +149,7 @@ def record_outcome(
     *,
     feedback_id: int,
     outcome: str,
+    after_image_ref: str = "",
 ) -> bool:
     """Update a feedback row with a follow-up outcome.
 
@@ -114,14 +162,29 @@ def record_outcome(
 
     init_case_log(db_path)
     with _connect(db_path) as conn:
-        cursor = conn.execute(
-            """
-            UPDATE feedback_events
-            SET outcome = ?, outcome_at = ?
-            WHERE id = ?
-            """,
-            (outcome, _now_iso(), feedback_id),
-        )
+        if (after_image_ref or "").strip():
+            cursor = conn.execute(
+                """
+                UPDATE feedback_events
+                SET outcome = ?, outcome_at = ?, after_image_ref = ?
+                WHERE id = ?
+                """,
+                (
+                    outcome,
+                    _now_iso(),
+                    after_image_ref.strip(),
+                    feedback_id,
+                ),
+            )
+        else:
+            cursor = conn.execute(
+                """
+                UPDATE feedback_events
+                SET outcome = ?, outcome_at = ?
+                WHERE id = ?
+                """,
+                (outcome, _now_iso(), feedback_id),
+            )
         return cursor.rowcount > 0
 
 
@@ -134,7 +197,7 @@ def list_feedback_events(db_path: str) -> list[dict]:
         rows = conn.execute(
             """
             SELECT id, created_at, rating, question, answer,
-                   outcome, outcome_at
+                   outcome, outcome_at, before_image_ref, after_image_ref
             FROM feedback_events
             ORDER BY id
             """

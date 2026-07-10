@@ -117,3 +117,14 @@ def test_voice_input_uses_server_side_stt():
     assert "new MediaRecorder" in js
     assert "function startNativeSpeechRecognition" in js
     assert "La saisie vocale a échoué" not in js
+
+
+def test_followup_supports_optional_after_photo():
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+
+    assert "followup-after-photo" in js
+    assert "after_image" in js
+    assert "FormData" in js
+    assert "/feedback/outcome" in js
+    assert ".followup-after-photo" in css

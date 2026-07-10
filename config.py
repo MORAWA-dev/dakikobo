@@ -71,6 +71,11 @@ WEB_FETCH_TIMEOUT_SECONDS = float(os.getenv("WEB_FETCH_TIMEOUT_SECONDS", "15.0")
 # --- Local case / feedback log ---
 # Runtime-generated SQLite database. Do not commit it.
 CASE_LOG_DB_PATH = os.getenv("CASE_LOG_DB_PATH", os.path.join("data", "case_log.sqlite3"))
+# Optional before/after leaf photos linked to feedback rows (git-ignored).
+FEEDBACK_IMAGE_DIR = os.getenv(
+    "FEEDBACK_IMAGE_DIR",
+    os.path.join("data", "feedback_images"),
+)
 
 # --- Firecrawl candidate source ingestion ---
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")

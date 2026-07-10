@@ -166,7 +166,9 @@ Candidate source:
 - [x] Add a review flag before documents enter RAG.
 - [x] Add source-manifest validation so Chroma rebuilds when the active corpus changes.
 - [x] Verify hosted RAG warm-up after recent deploys (status ready/warming checked live).
-- [ ] Re-check FAO retrieval + new pending trusted scrapes after human review/promotion.
+- [x] Curated MAERAH/OAPH orientation promoted to `Data/markdown/scraped_reviewed/` (not raw homepage).
+- [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later.
+- [ ] Final human validation of MAERAH synthesis license/details.
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.
 
 Firecrawl docs:
@@ -201,7 +203,7 @@ Candidate resources:
   - unchanged
   - worse
   - not sure
-- [ ] Store before/after image references where possible.
+- [x] Store before/after image references where possible (SQLite refs + optional after photo on follow-up).
 - [ ] Use this as an evaluation dataset, not as public training data without consent.
 
 ### 6. Evidence-first answer format

@@ -11,6 +11,7 @@ from core.case_log import (
     list_feedback_events,
     record_feedback,
     record_outcome,
+    set_before_image_ref,
 )
 
 
@@ -36,6 +37,8 @@ def test_record_feedback_creates_sqlite_case_log(tmp_path):
             "answer": "Après les pluies régulières.",
             "outcome": None,
             "outcome_at": None,
+            "before_image_ref": None,
+            "after_image_ref": None,
         }
     ]
 
@@ -163,3 +166,58 @@ def test_valid_outcomes_contains_expected_values():
         "not_applied",
         "not_sure",
     }
+
+
+def test_before_and_after_image_refs_are_stored(tmp_path):
+    db_path = str(tmp_path / "case_log.sqlite3")
+    feedback_id = record_feedback(
+        db_path,
+        rating="up",
+        question="Photo feuille",
+        answer="Dépistage prudent.",
+        before_image_ref="data/feedback_images/fb_1_before.jpg",
+    )
+    assert set_before_image_ref(
+        db_path,
+        feedback_id=feedback_id,
+        before_image_ref="data/feedback_images/fb_1_before.jpg",
+    )
+    assert record_outcome(
+        db_path,
+        feedback_id=feedback_id,
+        outcome="applied_improved",
+        after_image_ref="data/feedback_images/fb_1_after.jpg",
+    )
+    row = list_feedback_events(db_path)[0]
+    assert row["before_image_ref"] == "data/feedback_images/fb_1_before.jpg"
+    assert row["after_image_ref"] == "data/feedback_images/fb_1_after.jpg"
+    assert row["outcome"] == "applied_improved"
+
+
+def test_migration_adds_image_ref_columns(tmp_path):
+    db_path = str(tmp_path / "case_log.sqlite3")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE feedback_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                rating TEXT NOT NULL,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                outcome TEXT,
+                outcome_at TEXT
+            )
+            """
+        )
+        conn.execute("PRAGMA user_version = 2")
+        conn.execute(
+            "INSERT INTO feedback_events (created_at, rating, question, answer) "
+            "VALUES ('2026-01-01T00:00:00+00:00', 'up', 'Q', 'A')"
+        )
+    init_case_log(db_path)
+    row = list_feedback_events(db_path)[0]
+    assert "before_image_ref" in row
+    assert "after_image_ref" in row
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION

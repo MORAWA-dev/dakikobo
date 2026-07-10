@@ -36,7 +36,7 @@ from core.speech import (
 )
 from core.examples import get_demo_example
 from core.case import build_advice_case
-from core.case_log import record_feedback, record_outcome
+from core.case_log import record_feedback, record_outcome, set_before_image_ref
 from core import ops_metrics as ops_metrics_mod
 from core.weather import (
     WeatherError,
@@ -83,6 +83,7 @@ from config import (
     OPS_METRICS_ENABLED,
     OPS_METRICS_MAX_EVENTS,
     CASE_LOG_DB_PATH,
+    FEEDBACK_IMAGE_DIR,
 )
 
 logging.basicConfig(
@@ -101,10 +102,47 @@ app.config["MAX_AUDIO_UPLOAD_MB"] = MAX_AUDIO_UPLOAD_MB
 
 # Runtime feedback/case log. SQLite file is generated and git-ignored.
 CASE_LOG_DB = CASE_LOG_DB_PATH
+FEEDBACK_IMAGES = FEEDBACK_IMAGE_DIR
 
 # Privacy-safe in-process metrics (reconfigurable via env / tests).
 if OPS_METRICS_ENABLED:
     ops_metrics_mod.configure_metrics_store(OPS_METRICS_MAX_EVENTS)
+
+
+def _safe_feedback_image_ext(filename: str, mime_type: str) -> str:
+    name = (filename or "").lower()
+    mime = (mime_type or "").lower()
+    if name.endswith(".png") or "png" in mime:
+        return ".png"
+    if name.endswith(".webp") or "webp" in mime:
+        return ".webp"
+    if name.endswith(".gif") or "gif" in mime:
+        return ".gif"
+    return ".jpg"
+
+
+def _store_feedback_image(
+    *,
+    feedback_id: int,
+    kind: str,
+    file_storage,
+) -> str:
+    """Save an optional before/after photo; return opaque relative ref or ''."""
+    if file_storage is None or not getattr(file_storage, "filename", None):
+        return ""
+    raw = file_storage.read()
+    if not raw:
+        return ""
+    if len(raw) > app.config["MAX_IMAGE_UPLOAD_BYTES"]:
+        raise ValueError("image_too_large")
+    ext = _safe_feedback_image_ext(file_storage.filename, file_storage.mimetype or "")
+    os.makedirs(FEEDBACK_IMAGES, exist_ok=True)
+    filename = f"fb_{int(feedback_id)}_{kind}{ext}"
+    path = os.path.join(FEEDBACK_IMAGES, filename)
+    with open(path, "wb") as handle:
+        handle.write(raw)
+    # Store path relative to project for evaluation tooling (not a public URL).
+    return path
 
 
 def _set_log_fields(**fields) -> None:
@@ -1314,6 +1352,7 @@ def feedback():
     rating = request.form.get("rating", "").strip()
     question = request.form.get("question", "").strip()
     answer = request.form.get("answer", "").strip()
+    before_ref = (request.form.get("before_image_ref") or "").strip()[:240]
 
     if rating not in ("up", "down"):
         _set_log_fields(outcome="validation_error", failure_type="invalid_rating")
@@ -1325,9 +1364,38 @@ def feedback():
             rating=rating,
             question=question,
             answer=answer,
+            before_image_ref=before_ref,
         )
-        _set_log_fields(outcome="ok", rating=rating, feedback_id=feedback_id)
-        return jsonify({"ok": True, "feedback_id": feedback_id})
+        # Optional multipart before photo (stored only as opaque local ref).
+        before_file = request.files.get("before_image")
+        if before_file and before_file.filename:
+            try:
+                stored = _store_feedback_image(
+                    feedback_id=feedback_id,
+                    kind="before",
+                    file_storage=before_file,
+                )
+                if stored:
+                    set_before_image_ref(
+                        CASE_LOG_DB,
+                        feedback_id=feedback_id,
+                        before_image_ref=stored,
+                    )
+                    before_ref = stored
+            except ValueError:
+                _set_log_fields(outcome="validation_error", failure_type="image_too_large")
+                return jsonify({"ok": False, "error": "image too large"}), 413
+        _set_log_fields(
+            outcome="ok",
+            rating=rating,
+            feedback_id=feedback_id,
+            before_image_stored=bool(before_ref),
+        )
+        return jsonify({
+            "ok": True,
+            "feedback_id": feedback_id,
+            "before_image_ref": before_ref or "",
+        })
     except Exception as e:
         print(f"ERROR — feedback write failed: {e}")
         _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
@@ -1343,16 +1411,30 @@ def feedback_outcome():
     except (ValueError, TypeError):
         feedback_id = 0
     outcome_value = request.form.get("outcome", "").strip()
+    after_ref = (request.form.get("after_image_ref") or "").strip()[:240]
 
     if not feedback_id:
         _set_log_fields(outcome="validation_error", failure_type="missing_feedback_id")
         return jsonify({"ok": False, "error": "missing feedback_id"}), 400
+
+    after_file = request.files.get("after_image")
+    if after_file and after_file.filename:
+        try:
+            after_ref = _store_feedback_image(
+                feedback_id=feedback_id,
+                kind="after",
+                file_storage=after_file,
+            ) or after_ref
+        except ValueError:
+            _set_log_fields(outcome="validation_error", failure_type="image_too_large")
+            return jsonify({"ok": False, "error": "image too large"}), 413
 
     try:
         updated = record_outcome(
             CASE_LOG_DB,
             feedback_id=feedback_id,
             outcome=outcome_value,
+            after_image_ref=after_ref,
         )
     except ValueError:
         _set_log_fields(outcome="validation_error", failure_type="invalid_outcome")
@@ -1366,8 +1448,13 @@ def feedback_outcome():
         _set_log_fields(outcome="not_found", failure_type="feedback_id_not_found")
         return jsonify({"ok": False, "error": "feedback_id not found"}), 404
 
-    _set_log_fields(outcome="ok", rating_outcome=outcome_value, feedback_id=feedback_id)
-    return jsonify({"ok": True})
+    _set_log_fields(
+        outcome="ok",
+        rating_outcome=outcome_value,
+        feedback_id=feedback_id,
+        after_image_stored=bool(after_ref),
+    )
+    return jsonify({"ok": True, "after_image_ref": after_ref or ""})
 
 
 if RAG_WARMUP_ON_START:
