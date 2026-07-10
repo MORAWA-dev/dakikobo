@@ -136,7 +136,27 @@ DEMO_EXAMPLES = {
 
 def get_demo_example(example_id: str) -> dict | None:
     """Return a copy of a public demo example, or None if it does not exist."""
+    from core.case import build_advice_case
+
     example = DEMO_EXAMPLES.get(example_id)
     if example is None:
         return None
-    return deepcopy(example)
+    result = deepcopy(example)
+    # Text/fertilizer demos get the same evidence-first card shape as live /ask.
+    if result.get("kind") == "message" and not result.get("case"):
+        crop = "sorgho" if example_id == "fumure_sorgho" else ""
+        input_type = "fertilizer" if example_id == "fumure_sorgho" else "text"
+        result["case"] = build_advice_case(
+            answer=result.get("answer", ""),
+            question=result.get("question", ""),
+            input_type=input_type,
+            crop=crop,
+            sources=result.get("sources") or [],
+            confidence=result.get("confidence") or "Moyen",
+            risk_level=(
+                "Faible si confirmé localement"
+                if input_type == "fertilizer"
+                else "À vérifier"
+            ),
+        )
+    return result

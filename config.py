@@ -111,6 +111,8 @@ REQUEST_COOLDOWN_SECONDS = float(os.getenv("REQUEST_COOLDOWN_SECONDS", "2.0"))
 IMAGE_COOLDOWN_SECONDS = float(os.getenv("IMAGE_COOLDOWN_SECONDS", "6.0"))
 MAX_IMAGE_UPLOAD_MB = float(os.getenv("MAX_IMAGE_UPLOAD_MB", "5.0"))
 MAX_IMAGE_UPLOAD_BYTES = int(MAX_IMAGE_UPLOAD_MB * 1024 * 1024)
+# Reject oversized text questions before RAG/TTS work.
+MAX_QUESTION_CHARS = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
 
 # --- Bot Identity ---
 BOT_NAME = "DakiKobo"

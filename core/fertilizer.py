@@ -152,19 +152,48 @@ def _match_crop(text: str) -> str | None:
 def get_fertilizer_advice(text: str) -> dict | None:
     """Return grounded fertilizer advice for the crop in the question.
 
-    Returns a dict {"answer": str, "sources": list[dict]} when a supported crop is
-    detected, otherwise None (so the caller can fall back to RAG). The numbers are
-    fixed/cited — never generated — and the answer always carries the disclaimer.
+    Returns a dict with answer, sources, and a structured evidence-first case when
+    a supported crop is detected, otherwise None (so the caller can fall back to
+    RAG). The numbers are fixed/cited — never generated — and the answer always
+    carries the disclaimer.
     """
+    from core.case import build_advice_case
+
     crop = _match_crop(text)
     if crop is None or crop not in _RECOMMENDATIONS:
         return None
 
     rec = _RECOMMENDATIONS[crop]
+    sources = [dict(src) for src in rec["sources"]]
     body = "\n".join(f"• {line}" for line in rec["lines"])
     answer = (
         f"🌱 Fumure recommandée pour {_CROP_LABEL[crop]} au Burkina Faso :\n"
         f"{body}\n\n"
         f"{DISCLAIMER}"
     )
-    return {"answer": answer, "sources": [dict(src) for src in rec["sources"]]}
+    do_not = [
+        "N'augmentez pas les doses sans conseil local.",
+        "Évitez l'urée juste avant une forte pluie si possible.",
+    ]
+    if crop in {"niébé", "arachide"}:
+        do_not.append("Évitez les fortes doses d'urée sur les légumineuses.")
+
+    case = build_advice_case(
+        answer=answer,
+        question=text,
+        input_type="fertilizer",
+        crop=crop,
+        sources=sources,
+        confidence="Fort",
+        summary=f"Fumure recommandée pour {_CROP_LABEL[crop]} au Burkina Faso.",
+        evidence=[src.get("snippet", "") for src in sources],
+        actions=list(rec["lines"]),
+        do_not=do_not,
+        disclaimer=DISCLAIMER,
+        confirmation=(
+            "Confirmez toujours avec votre agent agricole : la bonne dose dépend "
+            "de votre sol, de la pluie et de vos moyens."
+        ),
+        risk_level="Faible si confirmé localement",
+    )
+    return {"answer": answer, "sources": sources, "case": case}

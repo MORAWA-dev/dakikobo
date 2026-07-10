@@ -21,6 +21,12 @@ def test_sorgho_dose_is_grounded_with_disclaimer():
     assert advice["sources"], "fertilizer advice must cite a source"
     assert advice["sources"][0]["type"] == "Outil engrais"
     assert advice["sources"][0]["snippet"]
+    assert advice["case"]["input_type"] == "fertilizer"
+    assert advice["case"]["crop"] == "sorgho"
+    assert advice["case"]["summary"]
+    assert advice["case"]["actions"]
+    assert advice["case"]["do_not"]
+    assert advice["case"]["case_title"] == "Conseil engrais"
 
 
 def test_each_supported_crop_returns_advice():

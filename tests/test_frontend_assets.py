@@ -53,6 +53,23 @@ def test_media_privacy_note_is_visible():
     assert ".media-privacy-note" in css
 
 
+def test_landing_strip_is_wired_in_frontend_assets():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert 'id="landingStrip"' in html
+    assert "Assistant agricole prudent" in html
+    assert "mil" in html and "sorgho" in html and "niébé" in html
+    assert "Essayez les exemples" in html
+    assert ".landing-strip" in css
+    assert ".landing-lead" in css
+    assert "Pourquoi / preuves" in js
+    assert "À éviter" in js
+    assert "Conseil engrais" in js
+    assert "response.case" in js
+
+
 def test_voice_input_uses_server_side_stt():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
 

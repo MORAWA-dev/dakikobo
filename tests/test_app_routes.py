@@ -321,6 +321,17 @@ def test_rebuild_clears_existing_vector_store(monkeypatch):
     assert db == {"doc_count": 1, "manifest": {"files": []}}
 
 
+def test_demo_example_route_returns_text_case_card(monkeypatch):
+    client = app_module.app.test_client()
+    response = client.get("/examples/semis_mil")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["case"]["input_type"] == "text"
+    assert payload["case"]["summary"]
+    assert payload["case"]["case_title"] == "Conseil agricole"
+
+
 def test_demo_example_route_returns_text_without_live_services(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setattr(
@@ -356,6 +367,8 @@ def test_demo_example_route_returns_fertilizer_case():
     assert payload["kind"] == "message"
     assert "100 kg/ha de NPK" in payload["answer"]
     assert payload["sources"][0]["type"] == "Outil engrais"
+    assert payload["case"]["input_type"] == "fertilizer"
+    assert payload["case"]["crop"] == "sorgho"
     assert payload["confidence"] == "Fort"
 
 
@@ -568,6 +581,22 @@ def test_soil_route_handles_api_error(monkeypatch):
     assert payload["confidence"] == "Faible"
 
 
+def test_ask_rejects_oversized_question(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "MAX_QUESTION_CHARS", 20)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: None)
+
+    response = client.post(
+        "/ask",
+        data={"messageText": "a" * 25},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 400
+    assert "trop longue" in payload["answer"].lower()
+    assert payload["confidence"] == "Faible"
+
+
 def test_ask_requires_message_text():
     client = app_module.app.test_client()
     response = client.post("/ask", data={})
@@ -621,6 +650,10 @@ def test_fertilizer_route_uses_tool_not_rag(monkeypatch):
     assert payload["sources"][0]["type"] == "Outil engrais"
     assert payload["confidence"] == "Fort"
     assert payload["audio_url"] == "/static/audio/fertilizer.mp3"
+    assert payload["case"]["input_type"] == "fertilizer"
+    assert payload["case"]["crop"] == "sorgho"
+    assert payload["case"]["actions"]
+    assert payload["case"]["do_not"]
 
 
 def test_rag_route_returns_unique_sources(monkeypatch):
@@ -651,6 +684,10 @@ def test_rag_route_returns_unique_sources(monkeypatch):
     ]
     assert payload["confidence"] == "Fort"
     assert payload["audio_url"] == "/static/audio/rag.mp3"
+    assert payload["case"]["input_type"] == "text"
+    assert payload["case"]["case_title"] == "Conseil agricole"
+    assert payload["case"]["summary"]
+    assert payload["case"]["needs_human_confirmation"] is True
 
 
 def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):
@@ -764,6 +801,7 @@ def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):
     assert "ne sais pas encore" in payload["answer"]
     assert payload["sources"] == []
     assert payload["confidence"] == "Faible"
+    assert "case" not in payload
 
 
 def test_rag_route_without_retrieved_docs_forces_refusal(monkeypatch):

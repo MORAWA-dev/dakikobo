@@ -35,6 +35,7 @@ from core.speech import (
     transcribe_audio,
 )
 from core.examples import get_demo_example
+from core.case import build_advice_case
 from core.case_log import record_feedback, record_outcome
 from core.weather import (
     WeatherError,
@@ -76,6 +77,7 @@ from config import (
     VOICE_COOLDOWN_SECONDS,
     MAX_AUDIO_UPLOAD_BYTES,
     MAX_AUDIO_UPLOAD_MB,
+    MAX_QUESTION_CHARS,
     CASE_LOG_DB_PATH,
 )
 
@@ -803,6 +805,21 @@ def ask():
             "confidence": "Faible",
             "audio_url": "",
         }), 400
+    if len(query) > MAX_QUESTION_CHARS:
+        _set_log_fields(
+            outcome="validation_error",
+            failure_type="question_too_long",
+            confidence="Faible",
+        )
+        return jsonify({
+            "answer": (
+                f"Votre question est trop longue (max. {MAX_QUESTION_CHARS} caractères). "
+                "Formulez une question plus courte et précise."
+            ),
+            "sources": [],
+            "confidence": "Faible",
+            "audio_url": "",
+        }), 400
 
     limited = _rate_limit_response("ask", REQUEST_COOLDOWN_SECONDS)
     if limited is not None:
@@ -844,12 +861,14 @@ def ask():
                 confidence="Fort",
                 source_count=len(advice["sources"]),
                 audio_generated=bool(audio_url),
+                case_structured=bool(advice.get("case")),
             )
             return jsonify({
                 "answer": advice["answer"],
                 "sources": advice["sources"],
                 "confidence": "Fort",
                 "audio_url": audio_url,
+                "case": advice.get("case"),
             })
 
     try:
@@ -860,6 +879,7 @@ def ask():
         # by retrieval relevance score so confidence reflects match quality, not
         # how many chunks came back.
         source_docs = response.get("source_documents", [])
+        case = None
         if not source_docs:
             answer = _no_rag_context_answer()
             sources, confidence = [], "Faible"
@@ -871,6 +891,13 @@ def ask():
         else:
             sources, confidence = _grounded_sources_and_confidence(query, source_docs)
             refusal = False
+            case = build_advice_case(
+                answer=answer,
+                question=query,
+                input_type="text",
+                sources=sources,
+                confidence=confidence,
+            )
 
         audio_url = text_to_speech_to_static(answer)
         _set_log_fields(
@@ -881,13 +908,17 @@ def ask():
             retrieved_doc_count=len(source_docs),
             refusal=refusal,
             audio_generated=bool(audio_url),
+            case_structured=case is not None,
         )
-        return jsonify({
+        payload = {
             "answer": answer,
             "sources": sources,
             "confidence": confidence,
             "audio_url": audio_url,
-        })
+        }
+        if case is not None:
+            payload["case"] = case
+        return jsonify(payload)
 
     except Exception as e:
         print(f"ERROR — LLM/RAG execution failed: {e}")

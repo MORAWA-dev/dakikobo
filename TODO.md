@@ -205,15 +205,18 @@ Candidate resources:
 
 ### 6. Evidence-first answer format
 
-- [ ] Make every sensitive answer use this structure:
+- [x] Make every sensitive answer use this structure:
   - short answer
   - why / evidence
   - what to do now
   - what not to do
   - confirm with agent
   - sources
+- [x] Text and fertilizer `/ask` answers now return a structured field `case` card
+  (image screening already did). Refusals stay plain text without fake evidence.
+- [x] Prompt safety: never invent exact fertilizer doses, pesticides, or precise dates.
 - [ ] Add "Je ne peux pas confirmer" as a first-class response, not a failure.
-- [ ] Stop the model from inventing pesticides, exact doses, or dates.
+- [ ] Further live tuning of evidence heuristics on real HF queries.
 
 ### 7. Local language path, carefully
 
@@ -228,7 +231,7 @@ Candidate resources:
 
 ### 8. Public demo polish
 
-- [ ] Add a landing strip above the chat:
+- [x] Add a landing strip above the chat:
   - what DakiKobo does
   - supported crops
   - safety disclaimer
@@ -277,19 +280,19 @@ to prove what works, what fails, and why.
 - [x] Harden TTS fallback/timeouts so slow gTTS cannot block an answer.
 - [x] Add timeout/retry handling around Groq chat, Groq STT, Gemini, TTS, weather, soil, and web fetches.
 - [x] Add Firecrawl ingestion script with timeout/retry handling and review workflow.
-- [ ] Add simple request size limits.
+- [x] Add simple request size limits (image/audio upload caps + `MAX_QUESTION_CHARS` for text).
 - [x] Add SQLite for local/dev case logs.
 - [x] Add Docker build test in CI.
 - [x] Add a nightly/manual smoke test against the Hugging Face Space.
 
 ## Priority order
 
-1. Structured case cards for image and text answers.
-2. Weather context card.
-3. Follow-up feedback after advice.
+1. [x] Structured case cards for image and text answers.
+2. [x] Weather context card.
+3. [x] Follow-up feedback after advice.
 4. Colab evaluation notebooks for vision.
-5. Soil context.
-6. Public demo story and example gallery.
+5. [x] Soil context.
+6. [x] Public demo story and example gallery (landing strip + examples panel).
 
 ## Definition of "incredible"
 

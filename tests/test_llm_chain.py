@@ -40,3 +40,11 @@ def test_get_llm_requires_api_key(monkeypatch):
 
     with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
         llm_chain.get_llm()
+
+
+def test_prompt_requires_evidence_first_safety():
+    template = llm_chain._PROMPT_TEMPLATE
+    assert "short answer" in template.lower() or "Structure" in template
+    assert "fertilizer doses" in template.lower() or "exact fertilizer" in template.lower()
+    assert "ALWAYS reply in French" in template
+    assert "Je ne sais pas encore" in template

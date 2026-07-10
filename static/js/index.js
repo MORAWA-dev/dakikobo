@@ -303,7 +303,21 @@ $(function() {
         $case.append($section);
     }
 
-    function appendCaseMessage(caseData, fallbackAnswer, sources, confidenceOverride, audioUrl) {
+    function caseTitleFor(caseData) {
+        if (caseData && caseData.case_title) {
+            return caseData.case_title;
+        }
+        var inputType = caseData && caseData.input_type ? caseData.input_type : '';
+        if (inputType === 'fertilizer') {
+            return 'Conseil engrais';
+        }
+        if (inputType === 'text') {
+            return 'Conseil agricole';
+        }
+        return 'Cas de terrain - feuille';
+    }
+
+    function appendCaseMessage(caseData, fallbackAnswer, sources, confidenceOverride, audioUrl, question) {
         var logoHTML = '<div class="bot-logo"><img src="' + BOT_AVATAR + '" alt="' + BOT_AVATAR_ALT + '"></div>';
         var messageElement = $('<div class="message-container bot-container">' +
                             logoHTML +
@@ -313,9 +327,10 @@ $(function() {
         var $case = $('<div class="diagnostic-case"></div>');
         var confidence = confidenceOverride || (caseData && caseData.confidence ? caseData.confidence : 'Moyen');
         var risk = caseData && caseData.risk_level ? caseData.risk_level : 'À vérifier';
+        var answerText = (caseData && caseData.answer) ? caseData.answer : (fallbackAnswer || '');
 
         var $head = $('<div class="case-head"></div>');
-        $head.append($('<div class="case-title"></div>').text('Cas de terrain - feuille'));
+        $head.append($('<div class="case-title"></div>').text(caseTitleFor(caseData)));
         var $badges = $('<div class="case-badges"></div>');
         $badges.append(
             $('<span class="case-badge confidence"></span>')
@@ -344,9 +359,14 @@ $(function() {
                 });
                 $case.append($meta);
             }
+            if (caseData.summary) {
+                renderCaseSection($case, 'Réponse courte', [caseData.summary]);
+            }
             renderCaseSection($case, 'Observations', caseData.observations);
             renderCaseSection($case, 'Problèmes possibles', caseData.possible_causes);
+            renderCaseSection($case, 'Pourquoi / preuves', caseData.evidence);
             renderCaseSection($case, 'Actions immédiates', caseData.actions);
+            renderCaseSection($case, 'À éviter', caseData.do_not);
             if (caseData.confirmation) {
                 renderCaseSection($case, 'À confirmer', [caseData.confirmation]);
             }
@@ -354,12 +374,17 @@ $(function() {
                 $case.append($('<p class="case-disclaimer"></p>').text(caseData.disclaimer));
             }
         } else {
-            renderCaseSection($case, 'Reponse', [fallbackAnswer]);
+            renderCaseSection($case, 'Réponse', [fallbackAnswer]);
         }
 
         bubble.append($case);
-        renderSources(bubble, caseData && caseData.sources ? caseData.sources : sources);
+        renderSources(bubble, caseData && caseData.sources && caseData.sources.length
+            ? caseData.sources
+            : sources);
         renderAudioReplay(bubble, audioUrl);
+        if (question) {
+            renderFeedback(bubble, question, answerText);
+        }
         $('.chat-messages').append(messageElement);
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
         return messageElement;
@@ -860,9 +885,16 @@ $(function() {
                 if (response.error) {
                     appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
                 } else if (response.case) {
-                    appendCaseMessage(response.case, response.answer, response.sources, response.confidence);
+                    appendCaseMessage(
+                        response.case,
+                        response.answer,
+                        response.sources,
+                        response.confidence,
+                        response.audio_url,
+                        prompt
+                    );
                 } else {
-                    appendMessage(response.answer, false, response.sources, null, response.confidence);
+                    appendMessage(response.answer, false, response.sources, prompt, response.confidence);
                 }
                 isProcessing = false;
                 enableInput();
@@ -961,13 +993,23 @@ $(function() {
                     removeTypingIndicator();
                     if (response.error) {
                         appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
-                    } else {
+                                        } else {
                         var answer = response.answer;
-                        var audioUrl = response.audio_url; // <-- Retrieve the audio URL from Flask
-                        var sources = response.sources;    // <-- Source filenames from RAG
+                        var audioUrl = response.audio_url;
+                        var sources = response.sources;
 
-                        // Append bot message (with source chips + feedback)
-                        appendMessage(answer, false, sources, message, response.confidence, audioUrl);
+                        if (response.case) {
+                            appendCaseMessage(
+                                response.case,
+                                answer,
+                                sources,
+                                response.confidence,
+                                audioUrl,
+                                message
+                            );
+                        } else {
+                            appendMessage(answer, false, sources, message, response.confidence, audioUrl);
+                        }
 
                         if ($('#voiceReadingCheckbox').is(':checked') && audioUrl) {
                             playAudio(audioUrl);
@@ -979,9 +1021,14 @@ $(function() {
                 error: function(jqXHR, textStatus, errorThrown) {
                     removeTypingIndicator();
                     console.log(errorThrown);
-                    appendMessage("Désolé, une erreur est survenue pendant le traitement. Veuillez réessayer plus tard.", false, null, null, 'Faible');
+                    var errPayload = jqXHR && jqXHR.responseJSON;
+                    var errText = (errPayload && errPayload.answer)
+                        ? errPayload.answer
+                        : "Désolé, une erreur est survenue pendant le traitement. Veuillez réessayer plus tard.";
+                    appendMessage(errText, false, null, null, (errPayload && errPayload.confidence) || 'Faible');
                     isProcessing = false;
                     enableInput();
+                }
                 }
             });
         }

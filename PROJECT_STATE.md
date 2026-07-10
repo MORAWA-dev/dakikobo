@@ -1,6 +1,6 @@
 # DakiKobo Project State
 
-Last updated: 2026-07-03
+Last updated: 2026-07-10
 
 This file is a compact state report for another model, reviewer, or engineer to
 evaluate what already exists before proposing new work.
@@ -77,9 +77,13 @@ Behavior:
 - Answers in French.
 - Shows source cards below answers.
 - Shows confidence labels: `Fort`, `Moyen`, `Faible`.
+- Non-refusal text and fertilizer answers also return a structured evidence-first
+  `case` card: short answer, why/evidence, actions, what to avoid, confirmation.
 - Uses off-topic fallback rather than inventing unsupported advice.
 - Generates French TTS audio when possible.
 - Shows a visible privacy note for photos and voice recordings.
+- Landing strip above chat states purpose, crops, and field-confirmation limits.
+- Oversized text questions are rejected via `MAX_QUESTION_CHARS` (default 1000).
 
 ### 2. RAG Knowledge Base
 
