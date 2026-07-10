@@ -170,7 +170,8 @@ Candidate source:
 - [x] CILSS curated orientation added to active Markdown (regional, not field doses).
 - [ ] WASCAL scrape still blocked by Firecrawl proxy errors — retry later (failures logged under `Data/scraped/rejected/`).
 - [ ] AGRHYMET site returned 502 — retry when online; bad-gateway/404 pages rejected, not promoted.
-- [ ] Final human validation of MAERAH/CILSS synthesis license/details.
+- [x] Source verification of MAERAH/CILSS synthesis (OAPH expansion, filières, license notes, audit file) — owner sign-off still open.
+- [ ] Final **owner** validation of MAERAH/CILSS before marketing-wide claims.
 - [x] Feedback evaluation CSV/JSONL export script (`scripts/export_feedback_eval.py`).
 - [x] Feedback export can feed smoke re-asks via `evaluate_rag.py --feedback-csv` (private only).
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.

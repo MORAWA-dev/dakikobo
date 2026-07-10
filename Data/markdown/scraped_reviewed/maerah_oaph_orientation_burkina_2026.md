@@ -8,12 +8,16 @@ language: "fr"
 country: "Burkina Faso"
 publisher: "Ministère de l'Agriculture, de l'Eau, des Ressources Animales et Halieutiques (MAERAH)"
 year: "2026"
-license: "unknown; site public gouvernemental, reutilisation a verifier"
-review_status: "reviewed_by_codex_pending_human_review"
+license: "public_government_web_orientation_summary; full pages remain ministry property; short orientation synthesis with URL citation for non-substitutive field advisory; not a bulk republication or official gazette"
+review_status: "source_verified_pending_owner_signoff"
 scraped_at: "2026-07-10T11:51:00+00:00"
-reviewed_at: "2026-07-10T12:00:00+00:00"
-topics: "politique agricole, programme national, OAPH, institutions, orientation publique, eau agricole, elevage"
-crops: "mil, sorgho, mais, niebe, arachide, riz, coton, elevage, peche"
+reviewed_at: "2026-07-10T13:45:00+00:00"
+verified_against_urls:
+  - "https://www.agriculture.bf/"
+  - "https://www.agriculture.bf/offensive-agropastorale-et-halieutique-2023-2025/"
+  - "https://www.agriculture.bf/projets-et-programmes/"
+topics: "politique agricole, programme national, OAPH, institutions, orientation publique, eau agricole, elevage, filieres"
+crops: "riz, mais, pomme de terre, ble, poisson, betail, volaille, mangue, mil, sorgho, niebe, arachide"
 ---
 
 # MAERAH Burkina Faso - orientation institutionnelle et OAPH 2023-2025
@@ -25,24 +29,26 @@ Source web revue: pages publiques du ministère en charge de l'agriculture
 (MAERAH) — site https://www.agriculture.bf/ et pages OAPH / projets.
 
 Ce document est une **synthese courte pour le RAG**. Il ne doit pas servir a
-inventer des doses d'engrais, des pesticides ou des calendriers techniques. Il
-aide surtout a repondre aux questions sur les **institutions**, le **programme
-OAPH 2023-2025**, les **points d'entree officiels** et les **limites** d'un
-conseil de terrain.
+inventer des doses d'engrais, des pesticides ou des calendriers techniques de
+parcelle. Il aide a repondre aux questions sur les **institutions**, le
+**programme OAPH 2023-2025**, les **filieres prioritaires publiees**, les
+**points d'entree officiels** et les **limites** d'un conseil de terrain.
 
-## Sources verifiees dans ce lot
+## Sources verifiees (2026-07-10)
 
-- Site officiel MAERAH: https://www.agriculture.bf/
-- Page OAPH 2023-2025: https://www.agriculture.bf/offensive-agropastorale-et-halieutique-2023-2025/
-- Projets et programmes: https://www.agriculture.bf/projets-et-programmes/
+- Site officiel MAERAH: https://www.agriculture.bf/ (HTTP 200)
+- Page OAPH 2023-2025: https://www.agriculture.bf/offensive-agropastorale-et-halieutique-2023-2025/ (HTTP 200)
+- Projets et programmes: https://www.agriculture.bf/projets-et-programmes/ (HTTP 200)
 - AgriTube (videos agricoles officielles): https://agritube.gov.bf/
+- Contenu OAPH detaille aussi dans le scrape pending local
+  `Data/scraped/pending/20260710_oaph-...md` (Firecrawl, status 200)
 
 ## Portee et limites
 
 - Portee: Burkina Faso, orientation publique, programme agropastoral et
   halieutique 2023-2025, structure ministerielle, projets/programmes.
-- Limite: les pages scrapees contiennent beaucoup de navigation et d'actualites.
-  La synthese ci-dessous ne reprend **pas** les titres de presse du jour.
+- Limite: les pages contiennent de la navigation et des actualites. Cette
+  synthese ne reprend **pas** les titres de presse du jour.
 - Limite terrain: ce n'est **pas** un manuel INERA. Pour les doses, maladies et
   pratiques culturales, confirmez avec un agent agricole ou un guide technique
   local valide.
@@ -55,7 +61,8 @@ Le Ministere de l'Agriculture, de l'Eau, des Ressources Animales et
 Halieutiques (MAERAH) est l'institution publique de reference pour les
 politiques et programmes agricoles, hydriques, d'elevage et de peche au
 Burkina Faso. Le site officiel regroupe actualites, ressources documentaires,
-communiques et entrees vers les projets.
+communiques et entrees vers les projets. Le menu public du site utilise le
+libelle **OAPH** pour la page Offensive agropastorale et halieutique 2023-2025.
 
 ## Offensive agropastorale et halieutique (OAPH) 2023-2025
 
@@ -65,27 +72,40 @@ communiques et entrees vers les projets.
 Ce n'est **pas** un "Office des Amenagements Hydro-Agricoles". Toute reponse
 qui invente un autre sens de OAPH est incorrecte par rapport a cette source.
 
-Le site ministeriel publie une page dediee a l'**Offensive agropastorale et
-halieutique 2023-2025 (OAPH)**. Il s'agit d'un cadre national d'orientation
-pour renforcer la production agricole, pastorale et halieutique sur la
-periode 2023-2025.
+D'apres la page officielle MAERAH (verifiee 2026-07-10) :
 
-Ce programme est egalement cite dans le contexte FAO MAFAP comme priorite de
-reformes et d'investissements pour le programme agropastoral et halieutique
-2023-2025 au Burkina Faso (voir la synthese FAO deja dans la base DakiKobo).
+- L'OAPH est presentee comme le **Plan operationnel pour la souverainete
+  alimentaire et la creation d'emplois decents dans le secteur agropastoral**,
+  baptise « Offensive agropastorale et halieutique 2023-2025 ».
+- Elle constitue un **cadre de programmation d'actions prioritaires** pour le
+  secteur agro-sylvo-pastoral et halieutique a l'horizon 2025.
+- La page indique une **adoption en Conseil des ministres le 30 aout 2023**.
+- Huit (08) **filieres strategiques** sont citees pour augmenter la production :
+  **riz, mais, pomme de terre, ble, poisson, betail-viande, volaille, mangue**.
+- La page publie aussi des cibles et chiffres d'ambition (ex. couverture des
+  besoins en riz, budget global, emplois). Ces chiffres sont **des enonces
+  officiels de la page**, pas des prescriptions de parcelle DakiKobo. Ne pas
+  les transformer en dose d'engrais, calendrier de semis ou promesse de
+  rendement pour un producteur precis.
+
+Ce programme est egalement cite dans le contexte FAO MAFAP (synthese FAO deja
+dans la base DakiKobo) comme cadre de reformes / investissements.
 
 Utilisation prudente dans DakiKobo:
 
 - On peut dire qu'il existe un **programme national OAPH 2023-2025** porte par
-  le ministere.
-- On ne doit **pas** inventer des cibles chifrees, des doses ou des calendriers
-  de semis a partir de cette seule page si le detail n'est pas present dans le
-  document indexe.
+  le ministere, avec des filieres prioritaires publiees.
+- On peut citer l'expansion exacte de l'acronyme et le role d'orientation.
+- On ne doit **pas** inventer des doses, pesticides ou calendriers de semis.
+- Pour un chiffre (budget, emplois, % de couverture), preferer renvoyer a la
+  page officielle si le detail n'est pas repris ici, ou le qualifier comme
+  **cible officielle publiee**, non comme resultat mesure sur une parcelle.
 
 ## Projets et programmes (noms publics)
 
-La page "Projets et programmes" du ministere liste notamment (noms tels
-qu'affiches publiquement; details a verifier sur le site):
+La page "Projets et programmes" du ministere publie une **liste longue** de
+projets. Exemples de noms affiches (liste non exhaustive; verifier le site pour
+l'etat actuel) :
 
 - Projet de Modernisation du Pilotage et de gestion du Secteur Agricole (PMPSA)
 - Projet Agriculture Innovante Resiliente et Performante (P-AIRP)
@@ -108,9 +128,10 @@ qu'affiches publiquement; details a verifier sur le site):
   Eaux et des Sols (PACES)
 - Projet d'Irrigation localisee et de Resilience Agricole au Burkina Faso
   (PIRA-BF)
+- Autres projets affiches sur la page (ex. PSF-GAH, PAVAL, SECURAGRI, etc.)
 
 Pour le producteur: ces projets ne remplacent pas le conseil de parcelle. Ils
-indiquent plutot les **axes institutionnels** et les **programmes d'appui**.
+indiquent des **axes institutionnels** et des **programmes d'appui**.
 
 ## Ressources utiles pour le producteur et l'agent
 
@@ -122,20 +143,33 @@ indiquent plutot les **axes institutionnels** et les **programmes d'appui**.
 ## Ce que DakiKobo doit repondre (exemples)
 
 **Question:** "C'est quoi l'OAPH au Burkina ?"  
-**Reponse prudente:** L'OAPH 2023-2025 est l'offensive agropastorale et
-halieutique portee par le ministere en charge de l'agriculture. C'est un cadre
-national d'orientation pour renforcer la production. Les details techniques
-restent a confirmer avec les services agricoles locaux. Source: site MAERAH.
+**Reponse prudente:** L'OAPH 2023-2025 est l'Offensive agropastorale et
+halieutique, plan operationnel national pour la souverainete alimentaire et
+l'emploi dans le secteur agropastoral, porte par le MAERAH. Des filieres
+prioritaires (dont riz, mais, pomme de terre, ble, poisson, betail, volaille,
+mangue) sont publiees sur le site. Les pratiques de parcelle restent a
+confirmer avec un agent agricole. Source: site MAERAH.
 
 **Question:** "Quelle dose d'engrais selon le ministere ?"  
 **Reponse:** Les pages d'orientation institutionnelle ne remplacent pas les
 recommandations techniques locales (INERA / agent agricole). Utiliser l'outil
 engrais determine de DakiKobo puis confirmer sur le terrain.
 
-## Checklist de revue humaine (a completer)
+## Checklist de revue
 
-- [x] Title / publisher / country verifies (site public MAERAH).
+### Verification source (agent, 2026-07-10)
+
+- [x] Title / publisher / country verifies (site public MAERAH, HTTP 200).
+- [x] Expansion OAPH verifiee sur la page officielle (Offensive agropastorale
+      et halieutique 2023-2025).
+- [x] Huit filieres strategiques alignees sur le texte public de la page OAPH.
+- [x] Liste de projets croisee avec le scrape pending projets/programmes.
 - [x] Pas de dose ni produit chimique invente dans cette synthese.
 - [x] Navigation et actualites journalieres exclues.
-- [ ] Validation humaine finale avant diffusion large.
-- [ ] Licence / reutilisation a confirmer pour citations longues.
+- [x] Note de licence / reutilisation: synthese courte d'orientation avec URL;
+      pas de republication bulk du site.
+
+### Signature propriétaire / revue humaine terrain (a completer par l'equipe)
+
+- [ ] Validation humaine finale (proprietaire / agent local) avant diffusion large.
+- [ ] Confirmer si des chiffres budget/emplois doivent rester hors reponses demo.

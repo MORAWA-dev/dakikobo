@@ -56,8 +56,8 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **Human validation** of MAERAH / CILSS curated Markdown license and factual details (`Data/markdown/scraped_reviewed/`).
-2. **Retry Firecrawl** for WASCAL / INERA / AGRHYMET when proxy is healthy; never promote 404/502 pages (see `Data/scraped/rejected/`).
+1. **Owner sign-off** on MAERAH / CILSS synthesis (checkboxes in those Markdown files + `Data/reviews/SOURCE_VERIFICATION_AUDIT_2026-07-10.md`). Agent source-verification is done.
+2. **Retry Firecrawl / HTTP** for WASCAL / INERA / AGRHYMET when reachable; never promote 404/502 pages (see `Data/scraped/rejected/`).
 3. **Optional KB:** curated synthesis only from pending ministry/FAO scrapes if new field value; keep raw pending out of RAG.
 4. **Vision lab:** wire real SCOLD encoder in Colab (`notebooks/03_scold_retrieval_eval.ipynb`); no production swap until it beats Gemini on phone photos.
 5. **Local languages later:** Mooré / Dioula / Fulfulde labels only after French-simple path; no rushed generation.
@@ -66,6 +66,42 @@ cd - && git worktree remove "$WT" --force
 ---
 
 ## Session entries
+
+### 2026-07-10 — MAERAH/CILSS source verification (next-up #1)
+
+**Decided**
+
+- Agent **source verification** completed for MAERAH/OAPH and CILSS; **owner sign-off** remains required (not claimed as full human approval).
+- OAPH facts locked: expansion confirmed on official page; 8 strategic value chains (riz, maïs, pomme de terre, blé, poisson, bétail-viande, volaille, mangue); adopted 30 Aug 2023 per page text.
+- License stance: short orientation synthesis + URL citation only; institutions keep full page rights; no bulk republication.
+- AGRHYMET / WASCAL / INERA still unreachable (timeout) — do not invent climate/INERA content.
+- Audit lives under `Data/reviews/` (not under `Data/markdown/`) so it is **not** RAG-ingested.
+- New review_status: `source_verified_pending_owner_signoff` (UI label in `app.py`).
+
+**Files changed**
+
+- `Data/markdown/scraped_reviewed/maerah_oaph_orientation_burkina_2026.md`
+- `Data/markdown/scraped_reviewed/cilss_orientation_sahel_2026.md`
+- `Data/reviews/SOURCE_VERIFICATION_AUDIT_2026-07-10.md`
+- `Data/scraped/rejected/_unreachable_20260710_session.md`
+- `app.py` — review status labels
+- `DATA_SOURCES.md`, `TODO.md`, `SESSION.md`
+
+**Git / deploy**
+
+- (filled at commit time)
+
+**Still open**
+
+- Owner checkboxes on MAERAH/CILSS files
+- WASCAL / INERA / AGRHYMET when online
+- Vision SCOLD encoder; local languages later
+
+**Next action for the following session**
+
+- Implement next open item after owner sign-off, or retry unreachable climate/research sites, or optional pending→curated KB only if high field value.
+
+---
 
 ### 2026-07-10 — Field citations, eval gate, French simple, session log
 

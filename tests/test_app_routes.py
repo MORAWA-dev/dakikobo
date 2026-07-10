@@ -852,6 +852,13 @@ def test_rag_route_exposes_source_metadata(monkeypatch):
     ]
 
 
+def test_review_status_label_includes_source_verified():
+    assert (
+        app_module._REVIEW_STATUS_LABELS["source_verified_pending_owner_signoff"]
+        == "Source vérifiée, signature propriétaire en attente"
+    )
+
+
 def test_source_rank_score_demotes_weak_handbook():
     strong = app_module._source_rank_score("IITA 2018 - Production du niebe", 0.40)
     weak = app_module._source_rank_score(

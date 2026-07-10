@@ -219,7 +219,9 @@ _DOC_TYPE_LABELS = {
 
 _REVIEW_STATUS_LABELS = {
     "reviewed_by_codex_pending_human_review": "Revu, validation humaine à finaliser",
+    "source_verified_pending_owner_signoff": "Source vérifiée, signature propriétaire en attente",
     "reviewed_by_codex": "Revu par Codex",
+    "reviewed_by_owner": "Validé par le propriétaire",
     "pending_human_review": "À vérifier humainement",
     "pending_verification": "Vérification requise",
 }
