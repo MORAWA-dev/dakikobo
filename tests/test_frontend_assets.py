@@ -61,13 +61,18 @@ def test_landing_strip_is_wired_in_frontend_assets():
     assert 'id="landingStrip"' in html
     assert "Assistant agricole prudent" in html
     assert "mil" in html and "sorgho" in html and "niébé" in html
-    assert "Parcours terrain" in html or "Essayez les exemples" in html
     assert ".landing-strip" in css
     assert ".landing-lead" in css
     assert "Pourquoi / preuves" in js
     assert "À éviter" in js
     assert "Conseil engrais" in js
     assert "response.case" in js
+    # Chat-first layout: context and examples start collapsed.
+    assert 'aria-expanded="false"' in html
+    assert 'id="examplesToggle"' in html
+    assert "function setExamplesOpen" in js
+    assert "setFieldContextOpen(false)" in js
+    assert "setExamplesOpen(false)" in js
 
 
 def test_uncertain_badge_and_known_limits_are_wired():
@@ -108,8 +113,8 @@ def test_field_context_local_storage_is_wired():
     assert "function loadFieldContextFromStorage" in js
     assert "loadFieldContextFromStorage()" in js
     assert "fr_simple" in js
-    assert "max-height: 168px" in css
-    assert "sans consommer l'API" in html
+    assert "examples-toggle" in css or "examplesToggle" in html
+    assert "Exemples rapides" in html
     assert "case-badge uncertain" in js
     assert "Non confirmé" in js
 
@@ -126,12 +131,11 @@ def test_text_field_context_panel_is_wired():
     assert 'id="fieldLocationCustom"' in html
     assert "Ouagadougou" in html
     assert "Contexte parcelle" in html or "1. Contexte parcelle" in html
-    assert "Parcours terrain" in html
     assert ".field-context-panel" in css
     assert "function getFieldContext" in js
     assert "function getFieldLocationValue" in js
     assert "function syncToolsFromFieldLocation" in js
-    assert "setFieldContextOpen(true)" in js
+    assert "setFieldContextOpen(false)" in js
     assert "growth_stage: ctx.growth_stage" in js
     assert "location: getFieldLocationValue()" in js
     assert "Signaux météo" in js

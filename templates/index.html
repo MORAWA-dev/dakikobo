@@ -130,35 +130,27 @@
       </div>
       <div class="landing-strip" id="landingStrip" aria-label="Présentation DakiKobo">
         <p class="landing-lead">
-          Assistant agricole prudent pour le Burkina Faso — conseils sourcés,
-          pas de doses inventées.
+          Assistant agricole prudent (Burkina) — sourcé · à confirmer avec un agent.
         </p>
-        <p class="landing-crops">
-          Cultures : <strong>mil</strong> · <strong>sorgho</strong> ·
-          <strong>maïs</strong> · <strong>niébé</strong> ·
-          <strong>arachide</strong>
+        <p class="landing-crops landing-meta">
+          mil · sorgho · maïs · niébé · arachide
         </p>
-        <p class="landing-safety">
-          Confirmez toujours sur le terrain avec un agent agricole. Photos et
-          météo restent des signaux, pas un diagnostic.
-        </p>
-        <p class="landing-cta">Parcours terrain : <strong>1)</strong> contexte parcelle · <strong>2)</strong> question / photo · <strong>3)</strong> outils météo-sol si besoin.</p>
       </div>
       <div class="field-context-panel" id="fieldContextPanel" aria-label="Contexte parcelle">
         <button
           type="button"
           id="fieldContextToggle"
           class="field-context-toggle"
-          aria-expanded="true"
+          aria-expanded="false"
           aria-controls="fieldContextFields"
         >
           <i class="fas fa-seedling" aria-hidden="true"></i>
-          <span>1. Contexte parcelle</span>
+          <span id="fieldContextToggleLabel">Contexte parcelle (optionnel)</span>
           <i class="fas fa-chevron-down field-context-chevron" aria-hidden="true"></i>
         </button>
-        <div class="field-context-fields" id="fieldContextFields">
+        <div class="field-context-fields" id="fieldContextFields" hidden>
           <p class="field-context-hint">
-            Étape 1 — culture, stade et lieu (optionnel). Le lieu connu active aussi les signaux météo.
+            Culture, stade et lieu (optionnel). Le lieu connu active aussi la météo.
           </p>
           <div class="field-context-grid">
             <label class="field-context-label" for="fieldCrop">Culture</label>
@@ -218,7 +210,18 @@
         <!-- Messages will be appended here -->
       </div>
       <div class="examples-panel" id="examplesPanel" aria-label="Exemples">
-        <div class="examples-heading">2. Exemples rapides (sans consommer l'API)</div>
+        <button
+          type="button"
+          id="examplesToggle"
+          class="examples-toggle"
+          aria-expanded="false"
+          aria-controls="examplesListWrap"
+        >
+          <span>Exemples rapides</span>
+          <span class="examples-toggle-hint">sans API</span>
+          <i class="fas fa-chevron-down examples-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="examples-list-wrap" id="examplesListWrap" hidden>
         <div class="examples-list" id="examplesList" role="list">
           <button
             type="button"
@@ -300,6 +303,7 @@
             <span class="example-title">Feuille de maïs</span>
             <span class="example-text">Carte de dépistage</span>
           </button>
+        </div>
         </div>
       </div>
       <div class="tools-drawer" id="toolsDrawer" hidden>

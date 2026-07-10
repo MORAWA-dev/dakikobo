@@ -1128,19 +1128,23 @@ $(function() {
     $('#fieldCrop').on('change', function() {
         syncToolsFromFieldLocation();
         saveFieldContextToStorage();
+        updateFieldContextToggleLabel();
     });
 
     $('#fieldStage').on('change', function() {
         saveFieldContextToStorage();
+        updateFieldContextToggleLabel();
     });
 
     $('#fieldLocationCustom').on('change input', function() {
         saveFieldContextToStorage();
+        updateFieldContextToggleLabel();
     });
 
     $('#simpleFrenchToggle').on('change', function() {
         applyCropLabels(_cropLabelCache || []);
         saveFieldContextToStorage();
+        updateFieldContextToggleLabel();
     });
 
     function fieldContextLabel(ctx) {
@@ -1168,10 +1172,44 @@ $(function() {
         }
         $fields.prop('hidden', !open);
         $toggle.attr('aria-expanded', open ? 'true' : 'false');
+        updateFieldContextToggleLabel();
+    }
+
+    function updateFieldContextToggleLabel() {
+        var $label = $('#fieldContextToggleLabel');
+        if (!$label.length) {
+            return;
+        }
+        var open = $('#fieldContextToggle').attr('aria-expanded') === 'true';
+        if (open) {
+            $label.text('Contexte parcelle');
+            return;
+        }
+        var ctx = getFieldContext();
+        var summary = fieldContextLabel(ctx);
+        if (summary) {
+            $label.text(summary.length > 42 ? summary.slice(0, 40) + '…' : summary);
+        } else {
+            $label.text('Contexte parcelle (optionnel)');
+        }
+    }
+
+    function setExamplesOpen(open) {
+        var $wrap = $('#examplesListWrap');
+        var $toggle = $('#examplesToggle');
+        if (!$wrap.length || !$toggle.length) {
+            return;
+        }
+        $wrap.prop('hidden', !open);
+        $toggle.attr('aria-expanded', open ? 'true' : 'false');
     }
 
     $('#fieldContextToggle').on('click', function() {
         setFieldContextOpen($('#fieldContextFields').prop('hidden'));
+    });
+
+    $('#examplesToggle').on('click', function() {
+        setExamplesOpen($('#examplesListWrap').prop('hidden'));
     });
 
     function sendMessage() {
@@ -1422,10 +1460,12 @@ $(function() {
     });
 
     // Welcome message (French — primary language for Burkina Faso farmers)
-    // Field workflow: keep parcelle context visible by default.
-    setFieldContextOpen(true);
+    // Keep chat first: context + examples collapsed by default (more space to talk).
     loadFieldContextFromStorage();
+    setFieldContextOpen(false);
+    setExamplesOpen(false);
     syncToolsFromFieldLocation();
+    updateFieldContextToggleLabel();
 
     // Optional French labels from /crop-labels (local-language slots stay unused).
     function applyCropLabels(crops) {
@@ -1464,7 +1504,7 @@ $(function() {
             // Keep hardcoded French options in the template.
         });
 
-    var welcomeMessage = "🌾 Bienvenue à DakiKobo. Parcours terrain : (1) contexte parcelle (mémorisé sur cet appareil), (2) question / photo ou un exemple, (3) Outils météo-sol si besoin. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
+    var welcomeMessage = "🌾 Bienvenue. Écrivez votre question ci-dessous, ou utilisez 📷 pour une feuille. Ouvrez « Contexte parcelle » ou « Exemples » seulement si besoin. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
 
     $('#chatbot-form-btn-clear').click(function(e) {
         e.preventDefault();
