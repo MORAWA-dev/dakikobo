@@ -15,7 +15,7 @@ country: "West Africa"
 regions: ["Afrique de l'Ouest", "Burkina Faso", "Nigeria", "Mali", "Ghana", "Niger"]
 agroecological_zones: ["Sahel", "Savanes soudanaises", "Savanes guineennes", "regional"]
 crops: ["niebe"]
-topics: ["semis", "varietes", "fumure", "maladie", "ravageur", "stockage"]
+topics: ["semis", "varietes", "fumure", "maladie", "ravageur", "stockage", "rotation", "azote", "cereales"]
 evidence_level: "medium"
 review_status: "reviewed_by_codex_pending_human_review"
 classification: "West Africa regional"
@@ -37,6 +37,17 @@ limitations:
 - Les dates de semis dependent de la zone agroecologique, de la pluviometrie, de la photoperiode et du type varietal.
 - Le guide decrit les principaux risques: Striga, Alectra, maladies fongiques, bacteriennes et virales, pucerons, mouches blanches, thrips, Maruca, punaises suceuses et bruches de stockage.
 - Pour le stockage, le guide met en avant les sacs PICS comme solution hermetique non chimique contre les bruches.
+
+## Rotation niebe-cereales (mil, sorgho, mais)
+
+Question type: "Pourquoi faire une rotation niebe-cereales ?"
+
+Reponse prudente basee sur ce guide:
+
+- Le **niebe fixe une partie de l'azote** atmospherique; place dans une **rotation avec des cereales** (mil, sorgho, mais), il aide la fertilite du systeme cultural et reduit la dependance a l'azote mineral pour la culture suivante.
+- La **rotation niebe-cereales** limite aussi la dominance de certaines mauvaises herbes et de ravageurs/maladies lies a une monoculture continue.
+- Les **associations niebe-cereales** (culture en meme saison) demandent une variete de niebe tolerante a l'ombrage et un calendrier adapte a la cereale; ce n'est pas le meme cas que la rotation d'une annee sur l'autre.
+- Confirmer le schema de rotation, les dates et la fertilisation avec un **agent agricole local** (sol, pluie, variete).
 
 ## Conseils pratiques
 

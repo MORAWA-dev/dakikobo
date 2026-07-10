@@ -223,7 +223,8 @@ Candidate resources:
   (image screening already did). Refusals stay plain text without fake evidence.
 - [x] Prompt safety: never invent exact fertilizer doses, pesticides, or precise dates.
 - [x] Add "Je ne peux pas confirmer" as a first-class response, not a failure.
-- [ ] Further live tuning of evidence heuristics on real HF queries.
+- [x] Further live tuning of evidence heuristics on real HF queries
+  (FEWS demotion, practice-query penalty, IITA rotation + ProSol humidite sections).
 
 ### 7. Local language path, carefully
 

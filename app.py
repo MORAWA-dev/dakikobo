@@ -250,8 +250,37 @@ _WEAK_SOURCE_MARKERS = (
     "modernisation agricole",
     "comprehensive report",
     "foncier",
-    "profil des moyens d'existence",  # seasonal calendar ok for semis; still weak for disease
+    "profil des moyens d'existence",  # seasonal calendar ok for semis; weak for agronomy
+    "fews net",
+    "fews",
+    "moyens d'existence",
+    "livelihood",
+    "household survey",
+    "orpaillage",
 )
+
+# Field-practice questions should not lead with livelihood/FEWS-style profiles
+# when stronger extension sources exist.
+_FIELD_PRACTICE_TOKENS = {
+    "rotation",
+    "humidite",
+    "paillage",
+    "mulching",
+    "mulch",
+    "fumure",
+    "engrais",
+    "semis",
+    "semer",
+    "stockage",
+    "stocker",
+    "bruche",
+    "maladie",
+    "tache",
+    "compost",
+    "azote",
+    "infiltration",
+    "ruissellement",
+}
 
 _CITATION_ALIASES = {
     "arachide": {"groundnut", "cacahuete"},
@@ -259,7 +288,7 @@ _CITATION_ALIASES = {
     "bruches": {"bruche", "insecte", "insectes", "ravageur", "ravageurs"},
     "carence": {"carences", "chlorose", "jaunissement"},
     "chlorose": {"carence", "carences", "jaunissement"},
-    "conservation": {"conserver", "stockage", "stocker"},
+    "conservation": {"conserver", "stockage", "stocker", "eau", "humidite"},
     "conserver": {"conservation", "stockage", "stocker"},
     "engrais": {"fertilisation", "fertiliser", "fumure"},
     "fertilisation": {"engrais", "fertiliser", "fumure"},
@@ -267,8 +296,11 @@ _CITATION_ALIASES = {
     "feuille": {"feuilles", "foliaire", "tache", "taches"},
     "feuilles": {"feuille", "foliaire", "tache", "taches"},
     "fumure": {"engrais", "fertilisation", "fertiliser"},
+    "humidite": {"paillage", "mulching", "eau", "infiltration", "evaporation"},
     "maladie": {"maladies", "symptome", "symptomes", "feuille", "tache"},
     "maladies": {"maladie", "symptome", "symptomes", "feuille", "tache"},
+    "paillage": {"mulching", "mulch", "residus", "humidite"},
+    "rotation": {"azote", "legumineuse", "cereales", "fertilite"},
     "semer": {"semis"},
     "semis": {"semer"},
     "stockage": {"conservation", "conserver", "stocker"},
@@ -321,10 +353,17 @@ def _is_weak_source_title(title: str) -> bool:
     return any(marker in normalized for marker in _WEAK_SOURCE_MARKERS)
 
 
-def _source_rank_score(title: str, base_score: float) -> float:
+def _source_rank_score(title: str, base_score: float, *, heavy: bool = False) -> float:
     """Adjust retrieval score for ranking: demote known weak/generic titles."""
-    penalty = 0.12 if _is_weak_source_title(title) else 0.0
+    if not _is_weak_source_title(title):
+        return float(base_score)
+    # Heavier demotion for field-practice questions (rotation, humidite, etc.).
+    penalty = 0.28 if heavy else 0.12
     return float(base_score) - penalty
+
+
+def _is_field_practice_query(query_tokens: set[str]) -> bool:
+    return bool(query_tokens.intersection(_FIELD_PRACTICE_TOKENS))
 
 
 def _title_crop_hits(title: str, crop_tokens: set[str]) -> int:
@@ -619,13 +658,19 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
     if strong:
         kept = strong
 
+    practice_query = _is_field_practice_query(query_tokens)
+
     # Prefer title crop match, then content crop overlap, then adjusted score.
     ranked = sorted(
         kept,
         key=lambda source: (
             _title_crop_hits(source["title"], query_crop_tokens),
             crop_overlaps.get(source["title"], 0),
-            _source_rank_score(source["title"], scores.get(source["title"], -1.0)),
+            _source_rank_score(
+                source["title"],
+                scores.get(source["title"], -1.0),
+                heavy=practice_query,
+            ),
         ),
         reverse=True,
     )
@@ -638,10 +683,14 @@ def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict
         max_sources = 1
         if confidence == "Fort":
             confidence = "Moyen"
-    # If the best remaining citation is still a weak generic source, stay Moyen.
-    if ranked and _is_weak_source_title(ranked[0]["title"]) and confidence == "Fort":
-        confidence = "Moyen"
+    # If the best remaining citation is still a weak generic source, stay Moyen
+    # (or Faible for field-practice questions).
+    if ranked and _is_weak_source_title(ranked[0]["title"]):
         max_sources = min(max_sources, 1)
+        if practice_query:
+            confidence = "Faible"
+        elif confidence == "Fort":
+            confidence = "Moyen"
 
     return ranked[:max_sources], confidence
 

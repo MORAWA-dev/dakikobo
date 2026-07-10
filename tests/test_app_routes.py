@@ -859,7 +859,14 @@ def test_source_rank_score_demotes_weak_handbook():
     )
     assert strong > weak
     assert app_module._is_weak_source_title("Agrobusiness au Burkina Faso")
+    assert app_module._is_weak_source_title(
+        "Burkina Faso - Profil des moyens d'existence (FEWS NET)"
+    )
     assert not app_module._is_weak_source_title("ProSol 2020 - fertilite des sols")
+    light = app_module._source_rank_score("FEWS NET profile", 0.40, heavy=False)
+    heavy = app_module._source_rank_score("FEWS NET profile", 0.40, heavy=True)
+    assert heavy < light
+    assert app_module._is_field_practice_query({"rotation", "niebe"})
 
 
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):

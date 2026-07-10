@@ -15,7 +15,7 @@ country: "Burkina Faso"
 regions: ["Houet", "Tuy", "national"]
 agroecological_zones: ["national"]
 crops: ["mil", "sorgho", "mais", "niebe", "arachide", "legumineuses", "toutes"]
-topics: ["fumure", "sol", "conservation_eau_sol", "compost", "agroforesterie"]
+topics: ["fumure", "sol", "conservation_eau_sol", "compost", "agroforesterie", "humidite", "paillage", "infiltration", "sorgho", "mil", "mais"]
 evidence_level: "high"
 review_status: "reviewed_by_codex_pending_human_review"
 classification: "Burkina-specific"
@@ -36,6 +36,18 @@ limitations:
 - Le document insiste sur la baisse de fertilite des sols comme contrainte majeure au Burkina Faso et sur la valorisation des residus de recolte, dejections animales, biomasse et pratiques agro-sylvo-pastorales.
 - Les donnees economiques du catalogue sont utiles comme exemples pedagogiques, mais le document avertit qu'elles doivent etre relativisees selon les regions.
 - Les sections sur pesticides et doses precises d'engrais ne doivent pas etre automatisees sans validation locale.
+
+## Garder l'humidite du sol (cereales: mil, sorgho, mais)
+
+Question type: "Comment garder l'humidite du sol pour le sorgho ?"
+
+Reponse prudente basee sur ce catalogue ProSol:
+
+- **Labour suivant les courbes de niveau** freine le ruissellement, ameliore l'infiltration et retient mieux l'eau utile pour les cereales (mil, sorgho, mais) sur parcelles en pente.
+- **Fumure organique / compost** ameliore la structure du sol et sa capacite a retenir l'eau; les residus de recolte et le compost aident a conserver l'humidite quand ils sont bien geres.
+- **Ouvrages CES** (cordons pierreux, diguettes) et leur vegetalisation reduisent l'erosion et aident a conserver l'eau dans la parcelle.
+- Le **paillage** (couverture du sol avec des residus) n'est pas detaille dose par dose ici; en pratique de terrain, une couverture legere de residus peut limiter l'evaporation, sous reserve de la disponibilite de paille et de l'avis local.
+- Confirmer les amenagements et le calendrier avec un **agent agricole** (pente, type de sol, pluie, moyens).
 
 ## Conseils pratiques
 
