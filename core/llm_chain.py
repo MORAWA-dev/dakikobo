@@ -71,7 +71,9 @@ def setup_retrieval_qa(db):
 
     retriever = db.as_retriever(
         search_type="similarity_score_threshold",
-        search_kwargs={"score_threshold": SIMILARITY_THRESHOLD, "k": 4},
+        # k=6 gives field-practice questions a better chance to surface
+        # extension manuals (IITA/ProSol) over livelihood profiles.
+        search_kwargs={"score_threshold": SIMILARITY_THRESHOLD, "k": 6},
     )
     chain = RetrievalQA.from_chain_type(
         llm=get_llm(),

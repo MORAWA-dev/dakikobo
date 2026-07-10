@@ -875,7 +875,7 @@ def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
     class FakeDb:
         def similarity_search_with_relevance_scores(self, query, k):
             assert query == "Comment stocker le niébé contre les bruches ?"
-            assert k == 8
+            assert k == 10
             return [
                 (
                     SimpleNamespace(
