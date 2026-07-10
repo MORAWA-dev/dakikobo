@@ -4,6 +4,7 @@ from core.case import (
     build_advice_case,
     build_disease_case,
     case_title_for,
+    is_usable_field_sentence,
     split_french_sentences,
 )
 
@@ -75,6 +76,38 @@ def test_build_advice_case_fertilizer_structure():
     assert case["needs_human_confirmation"] is True
     assert case["sources"][0]["type"] == "Outil engrais"
     assert "agent" in case["confirmation"].lower()
+
+
+def test_rejects_fews_market_dump_as_evidence():
+    garbage = (
+        "Porcs Volaille Maïs Vente de bois de chauffage Sorgho/Mil Bovins "
+        "Niébé Produit Route commerciale Céréales (sorgho, mil) Djibasso"
+    )
+    assert is_usable_field_sentence(garbage) is False
+    case = build_advice_case(
+        answer=(
+            "Alternez mil et sorgho d'une saison à l'autre. "
+            "Parce que la rotation aide la fertilité du sol. "
+            "Récoltez le sorgho avant de semer le mil."
+        ),
+        question="alterner mil et sorgho",
+        input_type="text",
+        crop="sorgho",
+        sources=[
+            {
+                "title": "Burkina Faso - Profil des moyens d'existence (FEWS NET)",
+                "type": "Profil pays",
+                "snippet": garbage,
+            }
+        ],
+        confidence="Moyen",
+    )
+    assert garbage not in case["evidence"]
+    assert all("Route commerciale" not in e for e in case["evidence"])
+    assert case["sources"][0]["snippet"] == ""
+    assert case["summary"]
+    assert len(case["actions"]) <= 3
+    assert len(case["weather_signals"]) <= 2
 
 
 def test_build_advice_case_parses_free_text():

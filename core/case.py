@@ -41,6 +41,51 @@ def _clean_items(values) -> list[str]:
     return cleaned
 
 
+def is_usable_field_sentence(text: str) -> bool:
+    """Reject market lists / livelihood-profile dumps as fake 'evidence'."""
+    t = _clean_text(text)
+    if len(t) < 18 or len(t) > 320:
+        return False
+    lower = t.lower()
+    # FEWS-style commercial route noise often appears in RAG snippets.
+    noise_hits = 0
+    for marker in (
+        "route commerciale",
+        "marchés villageois",
+        "marches villageois",
+        "vente de bois",
+        "produit route",
+        "→",
+        "",
+        "djibasso",
+        "natiaboani",
+        "pouytenga",
+        "kaibo",
+        "porcs volaille",
+        "bovins niébé",
+        "bovins niebe",
+    ):
+        if marker in lower:
+            noise_hits += 1
+    if noise_hits >= 1 and not any(
+        k in lower for k in ("parce que", "car ", "selon", "rotation", "azote", "semis")
+    ):
+        return False
+    if t.count(",") >= 5:
+        return False
+    if t.count("→") + t.count("") >= 1:
+        return False
+    # Too many title-case tokens in a row often means a market list.
+    caps = re.findall(r"\b[A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ][\w'’-]{2,}\b", t)
+    if len(caps) >= 6 and len(t) < 200:
+        return False
+    return True
+
+
+def filter_usable_sentences(values) -> list[str]:
+    return [item for item in _clean_items(values) if is_usable_field_sentence(item)]
+
+
 def _strip_disclaimer(answer: str, disclaimer: str) -> str:
     answer = _clean_text(answer)
     disclaimer = _clean_text(disclaimer)
@@ -371,12 +416,32 @@ def build_advice_case(
                 }
             )
 
-    # Prefer explicit evidence, then source snippets, then heuristic parse.
-    evidence_items = _clean_items(evidence) or [
-        _clean_text(card.get("snippet"))
-        for card in source_cards
-        if _clean_text(card.get("snippet"))
-    ] or parsed["evidence"]
+    # Prefer explicit evidence, then sentences from the answer, then only
+    # *usable* source snippets (never FEWS market-route dumps).
+    evidence_items = filter_usable_sentences(evidence)
+    if not evidence_items:
+        evidence_items = filter_usable_sentences(parsed["evidence"])
+    if not evidence_items:
+        evidence_items = filter_usable_sentences(
+            [card.get("snippet") for card in source_cards]
+        )
+
+    action_items = filter_usable_sentences(actions) or filter_usable_sentences(
+        parsed["actions"]
+    )
+    # If filters removed everything, keep short heuristic actions from the answer.
+    if not action_items:
+        action_items = [
+            s for s in _clean_items(parsed["actions"]) if 12 <= len(s) <= 220
+        ][:3]
+
+    # Clean noisy source snippets for display (title still shown).
+    for card in source_cards:
+        snip = _clean_text(card.get("snippet"))
+        if snip and not is_usable_field_sentence(snip):
+            card["snippet"] = ""
+
+    weather_items = _clean_items(weather_signals)[:2]
 
     case = FieldCase(
         case_id=f"case_{uuid4().hex[:12]}",
@@ -391,9 +456,9 @@ def build_advice_case(
         summary=_clean_text(summary) or parsed["summary"],
         observations=[],
         possible_causes=[],
-        evidence=_clean_items(evidence_items)[:4],
-        actions=_clean_items(actions) or parsed["actions"],
-        do_not=_clean_items(do_not) or parsed["do_not"],
+        evidence=evidence_items[:2],
+        actions=action_items[:3],
+        do_not=filter_usable_sentences(do_not) or filter_usable_sentences(parsed["do_not"])[:2],
         confidence=_clean_text(confidence) or "Moyen",
         risk_level=_clean_text(risk_level) or "À vérifier",
         needs_human_confirmation=True,
@@ -401,6 +466,6 @@ def build_advice_case(
         disclaimer=_clean_text(disclaimer),
         sources=source_cards,
         case_title=case_title_for(cleaned_type),
-        weather_signals=_clean_items(weather_signals)[:4],
+        weather_signals=weather_items,
     )
     return case.to_dict()

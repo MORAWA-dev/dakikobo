@@ -63,7 +63,7 @@ def test_landing_strip_is_wired_in_frontend_assets():
     assert "mil" in html and "sorgho" in html and "niébé" in html
     assert ".landing-strip" in css
     assert ".landing-lead" in css
-    assert "Pourquoi / preuves" in js
+    assert "Pourquoi" in js
     assert "À éviter" in js
     assert "Conseil engrais" in js
     assert "response.case" in js
@@ -117,6 +117,12 @@ def test_field_context_local_storage_is_wired():
     assert "Exemples rapides" in html
     assert "case-badge uncertain" in js
     assert "Non confirmé" in js
+    # Compact answer cards: lead paragraph, clean lists, filter FEWS dumps.
+    assert "case-lead" in js
+    assert "function cleanDisplayText" in js
+    assert "À faire" in js
+    assert "diagnostic-case-compact" in js
+    assert ".case-lead" in css
 
 
 def test_text_field_context_panel_is_wired():
@@ -138,7 +144,7 @@ def test_text_field_context_panel_is_wired():
     assert "setFieldContextOpen(false)" in js
     assert "growth_stage: ctx.growth_stage" in js
     assert "location: getFieldLocationValue()" in js
-    assert "Signaux météo" in js
+    assert "Météo" in js
     assert "weather_signals" in js
     assert "/ops/metrics" in html
     # Field context appears before the chat panel in the field workflow layout.

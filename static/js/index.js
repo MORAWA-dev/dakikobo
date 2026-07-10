@@ -277,8 +277,9 @@ $(function() {
                 });
                 $card.append($meta);
             }
-            if (snippet) {
-                $card.append($('<p class="source-snippet"></p>').text(snippet));
+            var cleanSnippet = cleanDisplayText(snippet);
+            if (cleanSnippet && cleanSnippet.length <= 160) {
+                $card.append($('<p class="source-snippet"></p>').text(cleanSnippet));
             }
             $box.append($card);
         });
@@ -318,8 +319,31 @@ $(function() {
         return [value];
     }
 
-    function renderCaseSection($case, title, values) {
-        var items = asList(values);
+    function cleanDisplayText(text) {
+        if (!text || typeof text !== 'string') {
+            return '';
+        }
+        var t = text.replace(/\s+/g, ' ').trim();
+        // Hide FEWS-style market dumps if they slipped through.
+        if (/route commerciale|march[eé]s villageois|vente de bois||→/i.test(t) && t.length > 40) {
+            return '';
+        }
+        if ((t.match(/,/g) || []).length >= 5) {
+            return '';
+        }
+        return t;
+    }
+
+    function asCleanList(value, maxItems) {
+        var max = maxItems || 3;
+        return asList(value)
+            .map(cleanDisplayText)
+            .filter(Boolean)
+            .slice(0, max);
+    }
+
+    function renderCaseSection($case, title, values, maxItems) {
+        var items = asCleanList(values, maxItems || 3);
         if (items.length === 0) {
             return;
         }
@@ -354,10 +378,11 @@ $(function() {
                             '<div class="message bot-message case-message"></div>' +
                            '</div>');
         var bubble = messageElement.find('.message');
-        var $case = $('<div class="diagnostic-case"></div>');
+        var $case = $('<div class="diagnostic-case diagnostic-case-compact"></div>');
         var confidence = confidenceOverride || (caseData && caseData.confidence ? caseData.confidence : 'Moyen');
         var risk = caseData && caseData.risk_level ? caseData.risk_level : 'À vérifier';
         var answerText = (caseData && caseData.answer) ? caseData.answer : (fallbackAnswer || '');
+        var isImage = caseData && caseData.input_type === 'image';
 
         var $head = $('<div class="case-head"></div>');
         $head.append($('<div class="case-title"></div>').text(caseTitleFor(caseData)));
@@ -365,9 +390,8 @@ $(function() {
         $badges.append(
             $('<span class="case-badge confidence"></span>')
                 .addClass(confidenceClass(confidence))
-                .text('Confiance : ' + confidence)
+                .text(confidence)
         );
-        $badges.append($('<span class="case-badge risk"></span>').text(risk));
         if (risk === 'Non confirmé') {
             $badges.append($('<span class="case-badge uncertain"></span>').text('Incertain'));
         }
@@ -377,13 +401,13 @@ $(function() {
         if (caseData) {
             var meta = [];
             if (caseData.crop) {
-                meta.push('Culture : ' + caseData.crop);
+                meta.push(caseData.crop);
             }
             if (caseData.growth_stage) {
-                meta.push('Stade : ' + caseData.growth_stage);
+                meta.push(caseData.growth_stage);
             }
             if (caseData.location) {
-                meta.push('Lieu : ' + caseData.location);
+                meta.push(caseData.location);
             }
             if (meta.length) {
                 var $meta = $('<div class="case-meta"></div>');
@@ -392,23 +416,43 @@ $(function() {
                 });
                 $case.append($meta);
             }
-            if (caseData.summary) {
-                renderCaseSection($case, 'Réponse courte', [caseData.summary]);
+
+            // Main answer first (plain paragraph — not a heavy section block).
+            var mainText = cleanDisplayText(caseData.summary) ||
+                cleanDisplayText(fallbackAnswer) ||
+                cleanDisplayText(caseData.answer);
+            if (mainText) {
+                // Prefer first sentence only for summary display if still long.
+                if (mainText.length > 220) {
+                    var cut = mainText.indexOf('. ');
+                    if (cut > 40 && cut < 200) {
+                        mainText = mainText.slice(0, cut + 1);
+                    }
+                }
+                $case.append($('<p class="case-lead"></p>').text(mainText));
             }
-            renderCaseSection($case, 'Observations', caseData.observations);
-            renderCaseSection($case, 'Problèmes possibles', caseData.possible_causes);
-            renderCaseSection($case, 'Pourquoi / preuves', caseData.evidence);
-            renderCaseSection($case, 'Actions immédiates', caseData.actions);
-            renderCaseSection($case, 'À éviter', caseData.do_not);
-            renderCaseSection($case, 'Signaux météo', caseData.weather_signals);
+
+            if (isImage) {
+                renderCaseSection($case, 'Observations', caseData.observations, 2);
+                renderCaseSection($case, 'Problèmes possibles', caseData.possible_causes, 2);
+            } else {
+                // Only show "Pourquoi" if sentences are clean and useful.
+                renderCaseSection($case, 'Pourquoi', caseData.evidence, 2);
+            }
+            renderCaseSection($case, 'À faire', caseData.actions, 3);
+            renderCaseSection($case, 'À éviter', caseData.do_not, 2);
+            // Weather: max 2 short lines, quieter label.
+            renderCaseSection($case, 'Météo', caseData.weather_signals, 2);
             if (caseData.confirmation) {
-                renderCaseSection($case, 'À confirmer', [caseData.confirmation]);
+                $case.append(
+                    $('<p class="case-confirm"></p>').text(caseData.confirmation)
+                );
             }
             if (caseData.disclaimer) {
                 $case.append($('<p class="case-disclaimer"></p>').text(caseData.disclaimer));
             }
-        } else {
-            renderCaseSection($case, 'Réponse', [fallbackAnswer]);
+        } else if (fallbackAnswer) {
+            $case.append($('<p class="case-lead"></p>').text(cleanDisplayText(fallbackAnswer) || fallbackAnswer));
         }
 
         bubble.append($case);
