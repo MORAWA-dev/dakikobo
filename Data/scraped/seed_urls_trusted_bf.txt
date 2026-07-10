@@ -1,7 +1,9 @@
 # Trusted-source seed batch for offline Firecrawl review (not auto-ingested into RAG).
 # Ministry / research / regional climate partners — scrape only public pages, then review.
+# Prefer https://www.agriculture.bf/ (bare agriculture.bf often fails SSL from some networks).
 https://www.agriculture.bf/
-https://agriculture.bf/
+# https://agriculture.bf/
+# Climate / research — often DOWN; refresh script preflight will skip unreachable hosts.
 https://www.inera.bf/
 https://wascal.org/
 https://www.wascal.org/

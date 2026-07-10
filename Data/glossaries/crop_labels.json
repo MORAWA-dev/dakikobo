@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "purpose": "UI/crop selector labels only — not production machine translation of answers.",
+    "primary_language": "fr",
+    "status": "experimental",
+    "warning": "Mooré / Dioula / Fulfulde strings are provisional stubs for human review. Do not enable in production UI until native-speaker validation.",
+    "updated": "2026-07-10"
+  },
+  "crops": [
+    {
+      "id": "mil",
+      "fr": "Mil",
+      "fr_simple": "mil (céréale)",
+      "en": "pearl millet",
+      "moore": "",
+      "dioula": "",
+      "fulfulde": "",
+      "notes": "Leave local names empty until validated with extension agents / native speakers."
+    },
+    {
+      "id": "sorgho",
+      "fr": "Sorgho",
+      "fr_simple": "sorgho",
+      "en": "sorghum",
+      "moore": "",
+      "dioula": "",
+      "fulfulde": "",
+      "notes": ""
+    },
+    {
+      "id": "mais",
+      "fr": "Maïs",
+      "fr_simple": "maïs",
+      "en": "maize",
+      "moore": "",
+      "dioula": "",
+      "fulfulde": "",
+      "notes": ""
+    },
+    {
+      "id": "niebe",
+      "fr": "Niébé",
+      "fr_simple": "niébé (haricot)",
+      "en": "cowpea",
+      "moore": "",
+      "dioula": "",
+      "fulfulde": "",
+      "notes": ""
+    },
+    {
+      "id": "arachide",
+      "fr": "Arachide",
+      "fr_simple": "arachide (cacahuète)",
+      "en": "groundnut",
+      "moore": "",
+      "dioula": "",
+      "fulfulde": "",
+      "notes": ""
+    }
+  ]
+}

@@ -56,16 +56,44 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **Owner sign-off** on MAERAH / CILSS synthesis (checkboxes + `Data/reviews/SOURCE_VERIFICATION_AUDIT_2026-07-10.md`).
-2. **When online:** run `scripts/check_trusted_sources.py` then `refresh_trusted_sources.py` for WASCAL / INERA / AGRHYMET; never promote 404/502.
-3. **Optional KB:** curated synthesis only from pending ministry/FAO scrapes if new field value; keep raw pending out of RAG.
-4. **Vision lab (Colab):** run notebook 03 with real phone-photo manifest + SCOLD weights; ship only if beats Gemini.
-5. **Local languages later:** Mooré / Dioula / Fulfulde labels only after French-simple path.
-6. **Notebook 4–5** research comparison only.
+1. **Owner sign-off** on MAERAH / CILSS synthesis (checkboxes + audit file).
+2. **When climate hosts UP:** `check_trusted_sources.py` then `refresh_trusted_sources.py` (auto-skips DOWN URLs).
+3. **Optional KB:** curated synthesis from pending only if new field value; no raw promote.
+4. **Vision (Colab):** run notebooks 03/04 on phone-photo manifests; Gemini stays production until beaten.
+5. **Fill** Mooré / Dioula / Fulfulde slots in `Data/glossaries/crop_labels.json` with human review (labels only).
+6. **Notebook 5** export only if a model is clearly useful.
 
 ---
 
 ## Session entries
+
+### 2026-07-10 — Refresh preflight skip + notebook 04 + crop glossary data
+
+**Decided**
+
+- Owner sign-off still human-only.
+- WASCAL/INERA/AGRHYMET still DOWN — no scrape.
+- `refresh_trusted_sources.py` now **preflight-probes** and scrapes only UP URLs (unless `--skip-health-check`).
+- Notebook 04 scaffold for baseline classifier research (no training hype).
+- Crop label glossary JSON: French primary; local-language fields **empty** until native-speaker fill; not wired to LLM generation.
+
+**Files changed**
+
+- `scripts/refresh_trusted_sources.py`, `tests/test_refresh_trusted_sources.py`
+- `notebooks/04_baseline_classifier.ipynb`, `notebooks/README.md`
+- `Data/glossaries/crop_labels.json`, `Data/glossaries/README.md`, `core/crop_labels.py`, `tests/test_crop_labels.py`
+- `Data/scraped/seed_urls_trusted_bf.txt` — comment bare agriculture.bf SSL issue
+- `SESSION.md`, `TODO.md`
+
+**Git / deploy**
+
+- (filled at commit)
+
+**Next action**
+
+- Owner sign-off, or Colab vision runs, or fill crop glossary with humans.
+
+---
 
 ### 2026-07-10 — Trusted health probe + SCOLD Colab wiring
 

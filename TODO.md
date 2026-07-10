@@ -238,7 +238,8 @@ Candidate resources:
   - weather terms
   - institutions (OAPH, MAERAH)
 - [x] Add "French simple" mode first (`core/simple_french.py` + UI toggle).
-- [ ] Later test Mooré / Dioula / Fulfulde snippets with human review.
+- [x] Crop label glossary data scaffold (`Data/glossaries/crop_labels.json`) — local names empty until human fill.
+- [ ] Later fill Mooré / Dioula / Fulfulde crop labels with native-speaker review (labels only, not generation).
 
 ### 8. Public demo polish
 
@@ -263,7 +264,7 @@ Use the Colab Pro credits for experiments that produce reusable artifacts:
 - [x] Notebook 1: build a disease-photo evaluation set and metrics (`notebooks/01_disease_photo_eval.ipynb`).
 - [x] Notebook 2 scaffold: Gemini prompt variants + optional live REST call for phone photos (helpers in `scripts/vision_eval_helpers.py`).
 - [x] Notebook 3 scaffold: SCOLD helpers + Colab `embed_image` wiring in `03_scold_retrieval_eval.ipynb` (run real weights in Colab; Gemini stays production).
-- [ ] Notebook 4: train a small baseline classifier only as a research comparison.
+- [x] Notebook 4 scaffold: small baseline classifier research path (`04_baseline_classifier.ipynb`) — train only with real labels.
 - [ ] Notebook 5: export a lightweight model only if it is clearly useful.
 
 Do not spend credits training a model just to say "we trained a model". Spend them
