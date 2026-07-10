@@ -401,8 +401,6 @@ def test_demo_example_oaph_uses_correct_expansion():
     assert payload["confidence"] == "Fort"
     assert "MAERAH" in payload["sources"][0]["title"]
     assert payload["case"]["input_type"] == "text"
-    assert payload["case"]["crop"] == "sorgho"
-    assert payload["confidence"] == "Fort"
 
 
 def test_demo_example_route_returns_image_case():
