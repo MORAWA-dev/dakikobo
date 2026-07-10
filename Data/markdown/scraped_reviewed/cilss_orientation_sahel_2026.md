@@ -9,7 +9,9 @@ country: "Sahel / Afrique de l'Ouest"
 publisher: "CILSS"
 year: "2026"
 license: "public_intergovernmental_web_orientation_summary; full portal remains CILSS property; short orientation synthesis with URL citation for non-substitutive advisory; not a bulk republication"
-review_status: "source_verified_pending_owner_signoff"
+review_status: "reviewed_by_owner"
+owner_signed_by: "morawa-dev"
+owner_signed_at: "2026-07-10"
 scraped_at: "2026-07-10T12:06:00+00:00"
 reviewed_at: "2026-07-10T13:45:00+00:00"
 verified_against_urls:
@@ -88,7 +90,8 @@ comme signal court terme, puis confirmer avec les services nationaux.
 - [x] Actualites journalieres reduites a des themes d'orientation.
 - [x] Note de licence: synthese courte d'orientation avec URL.
 
-### Signature propriétaire / revue humaine terrain (a completer)
+### Signature propriétaire
 
-- [ ] Validation humaine finale.
-- [ ] Reessayer AGRHYMET / WASCAL quand les sites repondent.
+- [x] Validation proprietaire pour la demo publique (2026-07-10).
+- [x] AGRHYMET manquant correctement indique; reessayer plus tard si besoin.
+- Signe: **morawa-dev** (GitHub), via instruction explicite a l'agent.

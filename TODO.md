@@ -171,8 +171,8 @@ Candidate source:
 - [x] Trusted URL health probe script (`scripts/check_trusted_sources.py`) for pre-scrape reachability.
 - [ ] WASCAL / INERA still unreachable (timeout) — retry when online; failures under `Data/scraped/rejected/`.
 - [ ] AGRHYMET still down — retry when online; never promote error pages.
-- [x] Source verification of MAERAH/CILSS synthesis (OAPH expansion, filières, license notes, audit file) — owner sign-off still open.
-- [ ] Final **owner** validation of MAERAH/CILSS before marketing-wide claims.
+- [x] Source verification of MAERAH/CILSS synthesis (OAPH expansion, filières, license notes, audit file).
+- [x] Owner sign-off MAERAH/CILSS: **morawa-dev** (2026-07-10) via `Data/reviews/OWNER_SIGNOFF.md`.
 - [x] Feedback evaluation CSV/JSONL export script (`scripts/export_feedback_eval.py`).
 - [x] Feedback export can feed smoke re-asks via `evaluate_rag.py --feedback-csv` (private only).
 - [ ] Keep generated research packs in `Data/research_pack/` until human review approves them for RAG.

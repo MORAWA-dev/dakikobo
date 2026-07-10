@@ -40,15 +40,17 @@ owner/field sign-off.
 - This is **not** a bulk mirror of the websites.
 - Owner should still confirm before commercial redistribution of long excerpts.
 
-## Owner / human sign-off still required
+## Owner sign-off (recorded)
 
-- [ ] Product owner accepts synthesis wording for public demo.
-- [ ] Decide whether budget/employment target figures may be spoken in demo
-      answers or only linked via the official page.
-- [ ] Local agent review of French field phrasing (optional but recommended).
+- [x] Product owner accepts synthesis wording for public demo.
+- [x] Budget/employment targets: only as *official published targets*, not field promises.
+- [ ] Local agent review of French field phrasing (optional, still recommended).
+
+**Signed:** morawa-dev (GitHub) on 2026-07-10  
+See `OWNER_SIGNOFF.md`. `review_status` on both docs is now `reviewed_by_owner`.
 
 ## Follow-ups
 
 1. Retry AGRHYMET, WASCAL, INERA when network/Firecrawl healthy.
 2. Do not promote raw pending scrapes (news-heavy) into RAG.
-3. After owner sign-off, set `review_status` to `reviewed_by_owner` if desired.
+3. Optional: local agent review of French field phrasing.

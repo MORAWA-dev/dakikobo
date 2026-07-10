@@ -30,7 +30,7 @@ _MAERAH_SOURCE = {
     "publisher": "MAERAH",
     "year": "2026",
     "country": "Burkina Faso",
-    "review_status": "Source vérifiée, signature propriétaire en attente",
+    "review_status": "Validé par le propriétaire",
     "url": "https://www.agriculture.bf/offensive-agropastorale-et-halieutique-2023-2025/",
 }
 

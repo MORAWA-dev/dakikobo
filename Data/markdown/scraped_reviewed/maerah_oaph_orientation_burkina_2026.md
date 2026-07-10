@@ -9,7 +9,9 @@ country: "Burkina Faso"
 publisher: "Ministère de l'Agriculture, de l'Eau, des Ressources Animales et Halieutiques (MAERAH)"
 year: "2026"
 license: "public_government_web_orientation_summary; full pages remain ministry property; short orientation synthesis with URL citation for non-substitutive field advisory; not a bulk republication or official gazette"
-review_status: "source_verified_pending_owner_signoff"
+review_status: "reviewed_by_owner"
+owner_signed_by: "morawa-dev"
+owner_signed_at: "2026-07-10"
 scraped_at: "2026-07-10T11:51:00+00:00"
 reviewed_at: "2026-07-10T13:45:00+00:00"
 verified_against_urls:
@@ -169,7 +171,9 @@ engrais determine de DakiKobo puis confirmer sur le terrain.
 - [x] Note de licence / reutilisation: synthese courte d'orientation avec URL;
       pas de republication bulk du site.
 
-### Signature propriétaire / revue humaine terrain (a completer par l'equipe)
+### Signature propriétaire
 
-- [ ] Validation humaine finale (proprietaire / agent local) avant diffusion large.
-- [ ] Confirmer si des chiffres budget/emplois doivent rester hors reponses demo.
+- [x] Validation proprietaire pour la demo publique (2026-07-10).
+- [x] Chiffres budget/emplois: uniquement comme **cibles officielles publiees**
+      sur le site MAERAH, jamais comme promesse de parcelle DakiKobo.
+- Signe: **morawa-dev** (GitHub), via instruction explicite a l'agent.

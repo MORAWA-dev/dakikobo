@@ -56,15 +56,42 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **Owner sign-off** using `Data/reviews/OWNER_SIGNOFF.md` (MAERAH / CILSS).
-2. **When climate hosts UP:** health probe + refresh (skips DOWN URLs).
-3. **Optional KB:** curated pending only if new field value.
-4. **Vision (Colab):** run 03/04 on phone photos; export only if notebook 05 gates pass.
-5. **Fill** local crop labels in `Data/glossaries/crop_labels.json` with human review.
+1. **When climate hosts UP:** health probe + refresh (skips DOWN URLs).
+2. **Optional KB:** curated pending only if new field value.
+3. **Vision (Colab):** run 03/04 on phone photos; export only if notebook 05 gates pass.
+4. **Fill** local crop labels in `Data/glossaries/crop_labels.json` with human review.
+5. Optional: local agent review of French field phrasing.
 
 ---
 
 ## Session entries
+
+### 2026-07-10 — Owner sign-off MAERAH/CILSS (morawa-dev)
+
+**Decided**
+
+- Owner **morawa-dev** authorized the agent to record sign-off on GitHub identity.
+- MAERAH and CILSS curated docs: `review_status` → `reviewed_by_owner`.
+- Budget/emploi figures: only as **official published targets**, never field promises.
+- Crop local-language labels left open (not part of this sign-off).
+
+**Files changed**
+
+- `Data/reviews/OWNER_SIGNOFF.md`
+- `Data/reviews/SOURCE_VERIFICATION_AUDIT_2026-07-10.md`
+- `Data/markdown/scraped_reviewed/maerah_oaph_orientation_burkina_2026.md`
+- `Data/markdown/scraped_reviewed/cilss_orientation_sahel_2026.md`
+- `DATA_SOURCES.md`, `TODO.md`, `SESSION.md`, `core/examples.py` (demo card label)
+
+**Git / deploy**
+
+- (filled at commit)
+
+**Next action**
+
+- Climate scrape when UP, or vision Colab, or crop glossary human fill.
+
+---
 
 ### 2026-07-10 — Demo OAPH example + owner sign-off form + notebook 05
 
