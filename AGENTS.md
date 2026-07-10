@@ -86,6 +86,8 @@ Last local check:
 
 ## Notes For Future Codex Work
 
+- **Session continuity:** read and append `SESSION.md` (not chat history alone).
+  After major steps, log decisions, files changed, and next open items there.
 - Prefer small targeted edits.
 - Keep README, `IMPLEMENTATION_PLAN.md`, and config defaults in sync.
 - `DATA_FOLDER` intentionally points at the full `Data` tree so recursive ingestion
