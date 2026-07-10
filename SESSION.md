@@ -89,7 +89,8 @@ cd - && git worktree remove "$WT" --force
 
 **Git / deploy**
 
-- (filled at commit time)
+- GitHub:  (this entry)
+- HF: deploy after push for reindex
 
 **Still open**
 
