@@ -144,6 +144,55 @@
       <div class="chat-messages" id="chatPanel">
         <!-- Messages will be appended here -->
       </div>
+      <div class="field-context-panel" id="fieldContextPanel" aria-label="Contexte parcelle">
+        <button
+          type="button"
+          id="fieldContextToggle"
+          class="field-context-toggle"
+          aria-expanded="false"
+          aria-controls="fieldContextFields"
+        >
+          <i class="fas fa-seedling" aria-hidden="true"></i>
+          <span>Contexte parcelle (optionnel)</span>
+          <i class="fas fa-chevron-down field-context-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="field-context-fields" id="fieldContextFields" hidden>
+          <p class="field-context-hint">
+            Culture, stade et lieu aident DakiKobo a mieux trier votre cas.
+          </p>
+          <div class="field-context-grid">
+            <label class="field-context-label" for="fieldCrop">Culture</label>
+            <select id="fieldCrop" name="crop" aria-label="Culture">
+              <option value="">Je ne sais pas</option>
+              <option value="mil">Mil</option>
+              <option value="sorgho">Sorgho</option>
+              <option value="maïs">Maïs</option>
+              <option value="niébé">Niébé</option>
+              <option value="arachide">Arachide</option>
+              <option value="autre">Autre</option>
+            </select>
+            <label class="field-context-label" for="fieldStage">Stade</label>
+            <select id="fieldStage" name="growth_stage" aria-label="Stade de croissance">
+              <option value="">Je ne sais pas</option>
+              <option value="levée / jeune plant">Levée / jeune plant</option>
+              <option value="croissance végétative">Croissance végétative</option>
+              <option value="floraison">Floraison</option>
+              <option value="fructification / épi">Fructification / épi</option>
+              <option value="maturité">Maturité</option>
+            </select>
+            <label class="field-context-label" for="fieldLocation">Lieu</label>
+            <input
+              type="text"
+              id="fieldLocation"
+              name="location"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="Commune ou village (optionnel)"
+              aria-label="Commune ou village"
+            />
+          </div>
+        </div>
+      </div>
       <div class="examples-panel" id="examplesPanel" aria-label="Exemples">
         <div class="examples-heading">Exemples</div>
         <div class="examples-list">

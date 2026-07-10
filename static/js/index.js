@@ -977,26 +977,73 @@ $(function() {
         });
     }
 
+    function getFieldContext() {
+        return {
+            crop: ($('#fieldCrop').val() || '').trim(),
+            growth_stage: ($('#fieldStage').val() || '').trim(),
+            location: ($('#fieldLocation').val() || '').trim()
+        };
+    }
+
+    function fieldContextLabel(ctx) {
+        var parts = [];
+        if (ctx.crop) {
+            parts.push('Culture : ' + ctx.crop);
+        }
+        if (ctx.growth_stage) {
+            parts.push('Stade : ' + ctx.growth_stage);
+        }
+        if (ctx.location) {
+            parts.push('Lieu : ' + ctx.location);
+        }
+        return parts.join(' · ');
+    }
+
+    function setFieldContextOpen(open) {
+        var $fields = $('#fieldContextFields');
+        var $toggle = $('#fieldContextToggle');
+        if (!$fields.length || !$toggle.length) {
+            return;
+        }
+        $fields.prop('hidden', !open);
+        $toggle.attr('aria-expanded', open ? 'true' : 'false');
+    }
+
+    $('#fieldContextToggle').on('click', function() {
+        setFieldContextOpen($('#fieldContextFields').prop('hidden'));
+    });
+
     function sendMessage() {
         var message = $('#messageText').val().trim();
         if (message && !isProcessing) {
             isProcessing = true;
             disableInput();
-            
-            // Append user message
-            appendMessage(message, true); 
+
+            var ctx = getFieldContext();
+            var display = message;
+            var ctxLabel = fieldContextLabel(ctx);
+            if (ctxLabel) {
+                display = message + '\n(' + ctxLabel + ')';
+            }
+
+            appendMessage(display, true);
             $('#messageText').val('');
             showTypingIndicator();
 
             $.ajax({
                 type: "POST",
                 url: "/ask",
-                data: { messageText: message },
+                data: {
+                    messageText: message,
+                    crop: ctx.crop,
+                    growth_stage: ctx.growth_stage,
+                    location: ctx.location
+                },
                 success: function(response) {
                     removeTypingIndicator();
                     if (response.error) {
                         appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
-                                        } else {
+                    } else {
                         var answer = response.answer;
                         var audioUrl = response.audio_url;
                         var sources = response.sources;
@@ -1031,7 +1078,6 @@ $(function() {
                     appendMessage(errText, false, null, null, (errPayload && errPayload.confidence) || 'Faible');
                     isProcessing = false;
                     enableInput();
-                }
                 }
             });
         }

@@ -149,25 +149,34 @@ def _match_crop(text: str) -> str | None:
     return None
 
 
-def get_fertilizer_advice(text: str) -> dict | None:
+def get_fertilizer_advice(
+    text: str,
+    *,
+    crop: str | None = None,
+    growth_stage: str = "",
+    location: str = "",
+) -> dict | None:
     """Return grounded fertilizer advice for the crop in the question.
 
     Returns a dict with answer, sources, and a structured evidence-first case when
     a supported crop is detected, otherwise None (so the caller can fall back to
     RAG). The numbers are fixed/cited — never generated — and the answer always
     carries the disclaimer.
+
+    Optional ``crop`` (from the field-context form) is used when the free text
+    does not name a crop.
     """
     from core.case import build_advice_case
 
-    crop = _match_crop(text)
-    if crop is None or crop not in _RECOMMENDATIONS:
+    matched = _match_crop(crop or "") or _match_crop(text)
+    if matched is None or matched not in _RECOMMENDATIONS:
         return None
 
-    rec = _RECOMMENDATIONS[crop]
+    rec = _RECOMMENDATIONS[matched]
     sources = [dict(src) for src in rec["sources"]]
     body = "\n".join(f"• {line}" for line in rec["lines"])
     answer = (
-        f"🌱 Fumure recommandée pour {_CROP_LABEL[crop]} au Burkina Faso :\n"
+        f"🌱 Fumure recommandée pour {_CROP_LABEL[matched]} au Burkina Faso :\n"
         f"{body}\n\n"
         f"{DISCLAIMER}"
     )
@@ -175,17 +184,19 @@ def get_fertilizer_advice(text: str) -> dict | None:
         "N'augmentez pas les doses sans conseil local.",
         "Évitez l'urée juste avant une forte pluie si possible.",
     ]
-    if crop in {"niébé", "arachide"}:
+    if matched in {"niébé", "arachide"}:
         do_not.append("Évitez les fortes doses d'urée sur les légumineuses.")
 
     case = build_advice_case(
         answer=answer,
         question=text,
         input_type="fertilizer",
-        crop=crop,
+        crop=matched,
+        growth_stage=growth_stage,
+        location=location,
         sources=sources,
         confidence="Fort",
-        summary=f"Fumure recommandée pour {_CROP_LABEL[crop]} au Burkina Faso.",
+        summary=f"Fumure recommandée pour {_CROP_LABEL[matched]} au Burkina Faso.",
         evidence=[src.get("snippet", "") for src in sources],
         actions=list(rec["lines"]),
         do_not=do_not,

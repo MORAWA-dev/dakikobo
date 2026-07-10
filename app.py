@@ -26,7 +26,7 @@ from core.rag_pipeline import (
     text_to_speech_to_static,
 )
 from core.llm_chain import setup_retrieval_qa
-from core.fertilizer import get_fertilizer_advice
+from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
 from core.speech import (
@@ -334,6 +334,35 @@ def _uncertain_fallback_answer() -> str:
         f"ou le service de vulgarisation local avant d'agir. {BOT_NAME} privilégie "
         "l'incertitude honnête plutôt qu'une précision inventée."
     )
+
+
+def _field_context_from_request() -> dict[str, str]:
+    """Optional crop / stage / location supplied by the field-context form."""
+    crop = (request.form.get("crop") or "").strip()[:80]
+    growth_stage = (request.form.get("growth_stage") or "").strip()[:80]
+    location = (request.form.get("location") or "").strip()[:120]
+    # Treat explicit "je ne sais pas" as unset. Keep "autre" for display/meta.
+    if crop.lower() in {"je ne sais pas", "inconnu"}:
+        crop = ""
+    return {
+        "crop": crop,
+        "growth_stage": growth_stage,
+        "location": location,
+    }
+
+
+def _query_with_field_context(query: str, context: dict[str, str]) -> str:
+    """Append parcelle context for retrieval without changing the user wording."""
+    parts = []
+    if context.get("crop"):
+        parts.append(f"culture: {context['crop']}")
+    if context.get("growth_stage"):
+        parts.append(f"stade: {context['growth_stage']}")
+    if context.get("location"):
+        parts.append(f"lieu: {context['location']}")
+    if not parts:
+        return query
+    return f"{query}\n(Contexte parcelle: {'; '.join(parts)})"
 
 
 def _confidence_from_score(top_score: float) -> str:
@@ -845,6 +874,14 @@ def ask():
     if limited is not None:
         return limited
 
+    field_context = _field_context_from_request()
+    _set_log_fields(
+        crop_provided=bool(field_context["crop"]),
+        growth_stage_provided=bool(field_context["growth_stage"]),
+        location_provided=bool(field_context["location"]),
+    )
+    retrieval_query = _query_with_field_context(query, field_context)
+
     # Bot self-identification (French + English triggers)
     identity_triggers = [
         "who developed you?", "who created you?", "who made you?",
@@ -870,8 +907,14 @@ def ask():
 
     # Route by intent. Fertilizer questions get deterministic, grounded, cited
     # doses (never LLM-invented); everything else falls through to RAG.
-    if classify(query) == INTENT_FERTILIZER:
-        advice = get_fertilizer_advice(query)
+    # Form crop can complete a fertilizer question that omits the crop in text.
+    if is_fertilizer_query(query) or classify(query) == INTENT_FERTILIZER:
+        advice = get_fertilizer_advice(
+            query,
+            crop=field_context["crop"] or None,
+            growth_stage=field_context["growth_stage"],
+            location=field_context["location"],
+        )
         if advice is not None:
             audio_url = text_to_speech_to_static(advice["answer"])
             _set_log_fields(
@@ -889,10 +932,11 @@ def ask():
                 "confidence": "Fort",
                 "audio_url": audio_url,
                 "case": advice.get("case"),
+                "answer_kind": "advice",
             })
 
     try:
-        response = get_rag_chain().invoke(query)
+        response = get_rag_chain().invoke(retrieval_query)
         answer = response["result"]
 
         # Surface the documents the answer was grounded in, ranked and filtered
@@ -901,6 +945,13 @@ def ask():
         source_docs = response.get("source_documents", [])
         case = None
         answer_kind = "advice"
+        case_kwargs = {
+            "question": query,
+            "input_type": "text",
+            "crop": field_context["crop"],
+            "growth_stage": field_context["growth_stage"],
+            "location": field_context["location"],
+        }
         if not source_docs:
             answer = _no_rag_context_answer()
             sources, confidence = [], "Faible"
@@ -914,14 +965,12 @@ def ask():
         elif _is_uncertain(answer):
             # First-class uncertainty: keep weak sources for transparency, force
             # Faible confidence, and surface a non-confirmed field case.
-            sources, _ = _grounded_sources_and_confidence(query, source_docs)
+            sources, _ = _grounded_sources_and_confidence(retrieval_query, source_docs)
             confidence = "Faible"
             refusal = False
             answer_kind = "uncertain"
             case = build_advice_case(
                 answer=answer,
-                question=query,
-                input_type="text",
                 sources=sources,
                 confidence=confidence,
                 risk_level="Non confirmé",
@@ -929,17 +978,19 @@ def ask():
                     "Je ne peux pas confirmer sans observation de parcelle. "
                     "Montrez le cas à un agent agricole avant d'agir."
                 ),
+                **case_kwargs,
             )
         else:
-            sources, confidence = _grounded_sources_and_confidence(query, source_docs)
+            sources, confidence = _grounded_sources_and_confidence(
+                retrieval_query, source_docs
+            )
             refusal = False
             answer_kind = "advice"
             case = build_advice_case(
                 answer=answer,
-                question=query,
-                input_type="text",
                 sources=sources,
                 confidence=confidence,
+                **case_kwargs,
             )
 
         audio_url = text_to_speech_to_static(answer)

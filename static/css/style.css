@@ -935,6 +935,79 @@ body {
 }
 
 /* Public demo examples */
+/* Optional field context for text questions */
+.field-context-panel {
+    flex-shrink: 0;
+    padding: 8px 20px 0;
+}
+
+.field-context-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid #c9e9e5;
+    border-radius: 10px;
+    background: #f4fbfa;
+    color: #0f5c4c;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    text-align: left;
+}
+
+.field-context-toggle .field-context-chevron {
+    margin-left: auto;
+    transition: transform 0.15s ease;
+}
+
+.field-context-toggle[aria-expanded="true"] .field-context-chevron {
+    transform: rotate(180deg);
+}
+
+.field-context-fields {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid #c9e9e5;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.field-context-hint {
+    margin: 0 0 8px;
+    color: #5a6b5a;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.field-context-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.field-context-label {
+    color: #5a6b5a;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.field-context-grid select,
+.field-context-grid input {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid #bfe3dd;
+    border-radius: 8px;
+    background: white;
+    color: #243b2a;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 4px 8px;
+}
+
 .examples-panel {
     background-color: #f9f9f9;
     border-top: 1px solid #eef3f1;
@@ -1443,6 +1516,10 @@ body {
 
     .message-container {
         max-width: 90%;
+    }
+
+    .field-context-panel {
+        padding: 6px 15px 0;
     }
 
     .examples-panel {

@@ -43,3 +43,17 @@ def test_each_supported_crop_returns_advice():
 def test_no_crop_defers_to_rag():
     # Fertilizer intent but no crop named -> None so the caller falls back to RAG.
     assert get_fertilizer_advice("quelle dose d'engrais utiliser ?") is None
+
+
+def test_form_crop_fills_missing_crop_name():
+    advice = get_fertilizer_advice(
+        "quelle dose d'engrais utiliser ?",
+        crop="sorgho",
+        growth_stage="levée / jeune plant",
+        location="Kaya",
+    )
+    assert advice is not None
+    assert "100 kg/ha de NPK" in advice["answer"]
+    assert advice["case"]["crop"] == "sorgho"
+    assert advice["case"]["growth_stage"] == "levée / jeune plant"
+    assert advice["case"]["location"] == "Kaya"

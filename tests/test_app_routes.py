@@ -674,6 +674,29 @@ def test_fertilizer_route_uses_tool_not_rag(monkeypatch):
     assert payload["case"]["do_not"]
 
 
+def test_fertilizer_route_uses_form_crop_when_text_omits_crop(monkeypatch):
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: None)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = client.post(
+        "/ask",
+        data={
+            "messageText": "quelle dose d'engrais utiliser ?",
+            "crop": "mil",
+            "growth_stage": "croissance végétative",
+            "location": "Dori",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "100 kg/ha de NPK" in payload["answer"]
+    assert payload["case"]["crop"] == "mil"
+    assert payload["case"]["growth_stage"] == "croissance végétative"
+    assert payload["case"]["location"] == "Dori"
+
+
 def test_rag_route_returns_unique_sources(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setattr(app_module, "get_rag_chain", lambda: _FakeRagChain())
@@ -706,6 +729,42 @@ def test_rag_route_returns_unique_sources(monkeypatch):
     assert payload["case"]["case_title"] == "Conseil agricole"
     assert payload["case"]["summary"]
     assert payload["case"]["needs_human_confirmation"] is True
+
+
+def test_rag_route_attaches_field_context_to_case(monkeypatch):
+    client = app_module.app.test_client()
+    seen = {}
+
+    class _CtxChain:
+        def invoke(self, query):
+            seen["query"] = query
+            return {
+                "result": "Semez le mil au début de la saison des pluies.",
+                "source_documents": [
+                    SimpleNamespace(metadata={"source": "guide_mil.pdf"}),
+                ],
+            }
+
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _CtxChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = client.post(
+        "/ask",
+        data={
+            "messageText": "Quand semer le mil ?",
+            "crop": "mil",
+            "growth_stage": "levée / jeune plant",
+            "location": "Ouahigouya",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "Contexte parcelle" in seen["query"]
+    assert "culture: mil" in seen["query"]
+    assert payload["case"]["crop"] == "mil"
+    assert payload["case"]["growth_stage"] == "levée / jeune plant"
+    assert payload["case"]["location"] == "Ouahigouya"
 
 
 def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):

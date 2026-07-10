@@ -88,6 +88,9 @@ def test_build_advice_case_parses_free_text():
         answer=answer,
         question="Quand semer le mil ?",
         input_type="text",
+        crop="mil",
+        growth_stage="levée / jeune plant",
+        location="Kaya",
         confidence="Moyen",
     )
     assert case["input_type"] == "text"
@@ -96,3 +99,6 @@ def test_build_advice_case_parses_free_text():
     assert case["actions"]
     assert case["do_not"]
     assert case["image_present"] is False
+    assert case["crop"] == "mil"
+    assert case["growth_stage"] == "levée / jeune plant"
+    assert case["location"] == "Kaya"

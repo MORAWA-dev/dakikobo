@@ -660,8 +660,8 @@ Evaluate in this order:
 
 Highest-impact next tasks:
 
-1. Add a text-question context flow for crop, location, and growth stage.
-2. Add follow-up outcome feedback for advice.
+1. [x] Add a text-question context flow for crop, location, and growth stage.
+2. [x] Add follow-up outcome feedback for advice.
 3. Verify hosted RAG warm-up after the source-manifest rebuild and run the FAO
    policy/data retrieval smoke questions.
 4. Add log aggregation or a simple observability dashboard.

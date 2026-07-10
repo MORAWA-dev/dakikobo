@@ -82,6 +82,22 @@ def test_uncertain_badge_and_known_limits_are_wired():
     assert "Non confirmé" in js
 
 
+def test_text_field_context_panel_is_wired():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert 'id="fieldContextPanel"' in html
+    assert 'id="fieldCrop"' in html
+    assert 'id="fieldStage"' in html
+    assert 'id="fieldLocation"' in html
+    assert "Contexte parcelle" in html
+    assert ".field-context-panel" in css
+    assert "function getFieldContext" in js
+    assert "growth_stage: ctx.growth_stage" in js
+    assert "location: ctx.location" in js
+
+
 def test_voice_input_uses_server_side_stt():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
 

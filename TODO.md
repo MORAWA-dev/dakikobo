@@ -38,8 +38,8 @@ traceable sources.
 ## Current gaps
 
 - [ ] The UI is still mostly a chat widget; it should feel like a real field workflow.
-- [ ] Image diagnosis answers are useful but not structured enough for inspection.
-- [ ] The app does not yet ask for crop, growth stage, location, or recent weather.
+- [x] Image diagnosis answers use structured case cards (inspection sections).
+- [x] Optional field context (crop, growth stage, location) for text questions and photos.
 - [ ] RAG citations now show source cards and relevance filtering, but still need live tuning against noisy edge cases.
 - [x] Feedback is stored in a SQLite case log instead of a CSV-only file.
 - [ ] Structured JSON logs exist, but there is no observability dashboard for failures, quotas, slow responses, or bad answers.
@@ -293,6 +293,7 @@ to prove what works, what fails, and why.
 4. [x] Colab evaluation notebooks for vision (scaffold in `notebooks/`).
 5. [x] Soil context.
 6. [x] Public demo story and example gallery (landing strip + examples panel).
+7. [x] Text-question field context flow (crop / stade / lieu).
 
 ## Definition of "incredible"
 
