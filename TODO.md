@@ -265,7 +265,7 @@ Use the Colab Pro credits for experiments that produce reusable artifacts:
 - [x] Notebook 2 scaffold: Gemini prompt variants + optional live REST call for phone photos (helpers in `scripts/vision_eval_helpers.py`).
 - [x] Notebook 3 scaffold: SCOLD helpers + Colab `embed_image` wiring in `03_scold_retrieval_eval.ipynb` (run real weights in Colab; Gemini stays production).
 - [x] Notebook 4 scaffold: small baseline classifier research path (`04_baseline_classifier.ipynb`) — train only with real labels.
-- [ ] Notebook 5: export a lightweight model only if it is clearly useful.
+- [x] Notebook 5 scaffold: export criteria checklist only (`05_export_criteria.ipynb`) — no artifact until gates pass.
 
 Do not spend credits training a model just to say "we trained a model". Spend them
 to prove what works, what fails, and why.

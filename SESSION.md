@@ -56,16 +56,44 @@ cd - && git worktree remove "$WT" --force
 
 ## Next up (ordered)
 
-1. **Owner sign-off** on MAERAH / CILSS synthesis (checkboxes + audit file).
-2. **When climate hosts UP:** `check_trusted_sources.py` then `refresh_trusted_sources.py` (auto-skips DOWN URLs).
-3. **Optional KB:** curated synthesis from pending only if new field value; no raw promote.
-4. **Vision (Colab):** run notebooks 03/04 on phone-photo manifests; Gemini stays production until beaten.
-5. **Fill** Mooré / Dioula / Fulfulde slots in `Data/glossaries/crop_labels.json` with human review (labels only).
-6. **Notebook 5** export only if a model is clearly useful.
+1. **Owner sign-off** using `Data/reviews/OWNER_SIGNOFF.md` (MAERAH / CILSS).
+2. **When climate hosts UP:** health probe + refresh (skips DOWN URLs).
+3. **Optional KB:** curated pending only if new field value.
+4. **Vision (Colab):** run 03/04 on phone photos; export only if notebook 05 gates pass.
+5. **Fill** local crop labels in `Data/glossaries/crop_labels.json` with human review.
 
 ---
 
 ## Session entries
+
+### 2026-07-10 — Demo OAPH example + owner sign-off form + notebook 05
+
+**Decided**
+
+- Climate hosts still DOWN — no scrape this pass.
+- Add quota-safe **OAPH** demo example (correct expansion, MAERAH source card).
+- Align rotation demo answer with azote / IITA-style message.
+- Provide **OWNER_SIGNOFF.md** for human checkboxes (not agent-signed).
+- Notebook 05 = export criteria only (no model packaging).
+- DEMO_SCRIPT covers français simple + OAPH.
+
+**Files changed**
+
+- `core/examples.py`, `templates/index.html`
+- `DEMO_SCRIPT.md`
+- `Data/reviews/OWNER_SIGNOFF.md`
+- `notebooks/05_export_criteria.ipynb`, `notebooks/README.md`
+- `SESSION.md`, `TODO.md`, tests
+
+**Git / deploy**
+
+- (filled at commit)
+
+**Next action**
+
+- Human owner sign-off, or Colab vision, or climate scrape when UP.
+
+---
 
 ### 2026-07-10 — Refresh preflight skip + notebook 04 + crop glossary data
 

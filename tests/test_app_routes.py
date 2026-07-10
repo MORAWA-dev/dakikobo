@@ -129,6 +129,7 @@ def test_index_route_renders():
     assert response.status_code == 200
     assert response.content_type.startswith("text/html")
     assert b'data-example-id="semis_mil"' in response.data
+    assert b'data-example-id="oaph_burkina"' in response.data
     assert b'data-example-id="photo_mais"' in response.data
     assert b'id="credibilityToggle"' in response.data
     assert b'id="credibilityModal"' in response.data
@@ -387,6 +388,19 @@ def test_demo_example_route_returns_fertilizer_case():
     assert "100 kg/ha de NPK" in payload["answer"]
     assert payload["sources"][0]["type"] == "Outil engrais"
     assert payload["case"]["input_type"] == "fertilizer"
+
+
+def test_demo_example_oaph_uses_correct_expansion():
+    client = app_module.app.test_client()
+    response = client.get("/examples/oaph_burkina")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "Offensive Agropastorale et Halieutique" in payload["answer"]
+    assert "Office des" not in payload["answer"]
+    assert payload["confidence"] == "Fort"
+    assert "MAERAH" in payload["sources"][0]["title"]
+    assert payload["case"]["input_type"] == "text"
     assert payload["case"]["crop"] == "sorgho"
     assert payload["confidence"] == "Fort"
 

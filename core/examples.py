@@ -23,6 +23,23 @@ _VISION_SOURCE = {
     "snippet": "Cas de demonstration prepare pour montrer la carte de depistage sans appeler Gemini.",
 }
 
+_MAERAH_SOURCE = {
+    "title": "MAERAH Burkina Faso - orientation institutionnelle et OAPH 2023-2025",
+    "type": "Source web revue",
+    "snippet": "OAPH = Offensive Agropastorale et Halieutique 2023-2025 (programme national).",
+    "publisher": "MAERAH",
+    "year": "2026",
+    "country": "Burkina Faso",
+    "review_status": "Source vérifiée, signature propriétaire en attente",
+    "url": "https://www.agriculture.bf/offensive-agropastorale-et-halieutique-2023-2025/",
+}
+
+_IITA_SOURCE = {
+    "title": "IITA 2018 - Production du niebe en Afrique de l'Ouest",
+    "type": "Base locale",
+    "snippet": "Le niebe fixe une partie de l'azote et s'inscrit dans les rotations avec les cereales.",
+}
+
 
 DEMO_EXAMPLES = {
     "semis_mil": {
@@ -58,15 +75,29 @@ DEMO_EXAMPLES = {
         "kind": "message",
         "question": "Pourquoi faire une rotation niébé-céréales ?",
         "answer": (
-            "La rotation niébé-céréales aide a casser les cycles de ravageurs et de "
-            "maladies, et elle peut ameliorer la fertilite du sol parce que le niebe est "
-            "une legumineuse. Evitez de remettre la meme culture au meme endroit chaque "
-            "annee, surtout si vous avez observe beaucoup de maladies ou une baisse de "
-            "rendement. Apres le niebe, gardez si possible les residus au champ ou "
-            "valorisez-les avec le fumier."
+            "La rotation niébé-céréales aide la fertilite du systeme cultural parce que "
+            "le niebe fixe une partie de l'azote atmospherique, ce qui peut profiter "
+            "aux cereales (mil, sorgho, mais) qui suivent. Elle limite aussi la "
+            "dominance de certaines mauvaises herbes et de problemes lies a une "
+            "monoculture. Confirmez le schema de rotation avec un agent agricole "
+            "selon votre sol et vos pluies."
         ),
-        "sources": [_TEXT_SOURCE],
+        "sources": [_IITA_SOURCE],
         "confidence": "Moyen",
+        "audio_url": "",
+    },
+    "oaph_burkina": {
+        "kind": "message",
+        "question": "C'est quoi l'OAPH au Burkina Faso ?",
+        "answer": (
+            "L'OAPH 2023-2025 est l'Offensive Agropastorale et Halieutique, un plan "
+            "operationnel national porte par le MAERAH pour renforcer la production "
+            "agricole, pastorale et halieutique et la souverainete alimentaire. "
+            "Ce n'est pas un office d'amenagements. Les pratiques de parcelle "
+            "(doses, calendriers) restent a confirmer avec un agent agricole local."
+        ),
+        "sources": [_MAERAH_SOURCE],
+        "confidence": "Fort",
         "audio_url": "",
     },
     "fumure_sorgho": {
