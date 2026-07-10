@@ -98,16 +98,30 @@ def test_rejects_fews_market_dump_as_evidence():
                 "title": "Burkina Faso - Profil des moyens d'existence (FEWS NET)",
                 "type": "Profil pays",
                 "snippet": garbage,
-            }
+            },
+            {
+                "title": "Manuel extension mil et sorgho",
+                "type": "Manuel de formation",
+                "snippet": "La rotation mil-sorgho aide à maintenir la fertilité du sol.",
+            },
         ],
         confidence="Moyen",
+        weather_signals=[
+            "Risque de stress hydrique : Risque élevé.",
+            "Pluie utile (7 jours) : 6.4 mm récents.",
+            "Fenêtre de semis probable : Possible.",
+        ],
     )
     assert garbage not in case["evidence"]
     assert all("Route commerciale" not in e for e in case["evidence"])
-    assert case["sources"][0]["snippet"] == ""
+    assert all("FEWS" not in (s.get("title") or "") for s in case["sources"])
+    assert len(case["sources"]) <= 2
+    assert case["sources"][0]["title"].startswith("Manuel")
     assert case["summary"]
     assert len(case["actions"]) <= 3
-    assert len(case["weather_signals"]) <= 2
+    assert len(case["evidence"]) <= 1
+    assert len(case["weather_signals"]) <= 1
+    assert "Risque" in case["weather_signals"][0]
 
 
 def test_build_advice_case_parses_free_text():

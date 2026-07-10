@@ -357,6 +357,40 @@ $(function() {
         $case.append($section);
     }
 
+    function renderCompactSources(bubble, sources) {
+        if (!sources || sources.length === 0) {
+            return;
+        }
+        var $details = $('<details class="sources-details"></details>');
+        $details.append($('<summary class="sources-summary"></summary>').text('Sources'));
+        var $box = $('<div class="sources sources-compact"></div>');
+        sources.slice(0, 2).forEach(function(src) {
+            if (typeof src === 'string') {
+                $box.append($('<div class="source-line"></div>').text(src));
+                return;
+            }
+            var title = cleanDisplayText(src.title || '') || (src.title || 'Source');
+            var type = src.type || '';
+            var url = safeSourceUrl(src.url);
+            var $line = $('<div class="source-line"></div>');
+            if (type) {
+                $line.append($('<span class="source-type-quiet"></span>').text(type));
+            }
+            if (url) {
+                $line.append(
+                    $('<a class="source-title-link" target="_blank" rel="noopener noreferrer"></a>')
+                        .attr('href', url)
+                        .text(title)
+                );
+            } else {
+                $line.append($('<span class="source-title-quiet"></span>').text(title));
+            }
+            $box.append($line);
+        });
+        $details.append($box);
+        bubble.append($details);
+    }
+
     function caseTitleFor(caseData) {
         if (caseData && caseData.case_title) {
             return caseData.case_title;
@@ -384,7 +418,8 @@ $(function() {
         var answerText = (caseData && caseData.answer) ? caseData.answer : (fallbackAnswer || '');
         var isImage = caseData && caseData.input_type === 'image';
 
-        var $head = $('<div class="case-head"></div>');
+        // One quiet header line: title + confidence.
+        var $head = $('<div class="case-head case-head-inline"></div>');
         $head.append($('<div class="case-title"></div>').text(caseTitleFor(caseData)));
         var $badges = $('<div class="case-badges"></div>');
         $badges.append(
@@ -410,22 +445,19 @@ $(function() {
                 meta.push(caseData.location);
             }
             if (meta.length) {
-                var $meta = $('<div class="case-meta"></div>');
-                meta.forEach(function(item) {
-                    $meta.append($('<span></span>').text(item));
-                });
-                $case.append($meta);
+                $case.append(
+                    $('<p class="case-meta-line"></p>').text('Parcelle : ' + meta.join(' · '))
+                );
             }
 
-            // Main answer first (plain paragraph — not a heavy section block).
+            // Lead answer only — one short paragraph.
             var mainText = cleanDisplayText(caseData.summary) ||
                 cleanDisplayText(fallbackAnswer) ||
                 cleanDisplayText(caseData.answer);
             if (mainText) {
-                // Prefer first sentence only for summary display if still long.
-                if (mainText.length > 220) {
+                if (mainText.length > 200) {
                     var cut = mainText.indexOf('. ');
-                    if (cut > 40 && cut < 200) {
+                    if (cut > 40 && cut < 180) {
                         mainText = mainText.slice(0, cut + 1);
                     }
                 }
@@ -435,30 +467,38 @@ $(function() {
             if (isImage) {
                 renderCaseSection($case, 'Observations', caseData.observations, 2);
                 renderCaseSection($case, 'Problèmes possibles', caseData.possible_causes, 2);
-            } else {
-                // Only show "Pourquoi" if sentences are clean and useful.
-                renderCaseSection($case, 'Pourquoi', caseData.evidence, 2);
             }
+            // Text advice: actions first; optional single "Pourquoi" only if clean.
             renderCaseSection($case, 'À faire', caseData.actions, 3);
-            renderCaseSection($case, 'À éviter', caseData.do_not, 2);
-            // Weather: max 2 short lines, quieter label.
-            renderCaseSection($case, 'Météo', caseData.weather_signals, 2);
+            if (!isImage) {
+                renderCaseSection($case, 'Pourquoi', caseData.evidence, 1);
+            }
+            renderCaseSection($case, 'À éviter', caseData.do_not, 1);
+
+            // Single quiet weather line (no heavy section).
+            var weatherLines = asCleanList(caseData.weather_signals, 1);
+            if (weatherLines.length) {
+                $case.append(
+                    $('<p class="case-weather-line"></p>').text('Météo : ' + weatherLines[0])
+                );
+            }
             if (caseData.confirmation) {
                 $case.append(
                     $('<p class="case-confirm"></p>').text(caseData.confirmation)
                 );
-            }
-            if (caseData.disclaimer) {
-                $case.append($('<p class="case-disclaimer"></p>').text(caseData.disclaimer));
             }
         } else if (fallbackAnswer) {
             $case.append($('<p class="case-lead"></p>').text(cleanDisplayText(fallbackAnswer) || fallbackAnswer));
         }
 
         bubble.append($case);
-        renderSources(bubble, caseData && caseData.sources && caseData.sources.length
-            ? caseData.sources
-            : sources);
+        // Collapsed sources — titles only, no FEWS dumps.
+        renderCompactSources(
+            bubble,
+            caseData && caseData.sources && caseData.sources.length
+                ? caseData.sources
+                : sources
+        );
         renderAudioReplay(bubble, audioUrl);
         if (question) {
             renderFeedback(bubble, question, answerText);

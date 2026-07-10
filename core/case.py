@@ -8,9 +8,16 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 DEFAULT_DISEASE_CONFIRMATION = "Montrez la plante à un agent agricole pour confirmer."
-DEFAULT_ADVICE_CONFIRMATION = (
-    "Confirmez toujours avec un agent agricole ou un service de vulgarisation local "
-    "avant une décision coûteuse."
+DEFAULT_ADVICE_CONFIRMATION = "Confirmez avec un agent agricole local avant une décision coûteuse."
+
+# Livelihood / market profiles often match crop names but are weak field advice.
+_WEAK_DISPLAY_SOURCE_MARKERS = (
+    "fews",
+    "moyens d'existence",
+    "livelihood",
+    "profil des moyens",
+    "zones socio",
+    "household survey",
 )
 
 _CASE_TITLES = {
@@ -84,6 +91,37 @@ def is_usable_field_sentence(text: str) -> bool:
 
 def filter_usable_sentences(values) -> list[str]:
     return [item for item in _clean_items(values) if is_usable_field_sentence(item)]
+
+
+def is_weak_display_source(title: str) -> bool:
+    """True for livelihood/FEWS-style titles that clutter field advice cards."""
+    lower = _clean_text(title).lower()
+    return any(marker in lower for marker in _WEAK_DISPLAY_SOURCE_MARKERS)
+
+
+def compact_source_cards(sources) -> list[dict]:
+    """Keep at most 2 clean source cards; drop empty weak profiles when others exist."""
+    cards: list[dict] = []
+    for source in sources or []:
+        if isinstance(source, dict):
+            cards.append(dict(source))
+        elif source:
+            cards.append({"title": str(source), "type": "Base locale", "snippet": ""})
+
+    for card in cards:
+        snip = _clean_text(card.get("snippet"))
+        if snip and not is_usable_field_sentence(snip):
+            card["snippet"] = ""
+
+    strong = [
+        card
+        for card in cards
+        if not is_weak_display_source(card.get("title", ""))
+        or _clean_text(card.get("snippet"))
+    ]
+    if not strong:
+        strong = cards[:1]
+    return strong[:2]
 
 
 def _strip_disclaimer(answer: str, disclaimer: str) -> str:
@@ -435,13 +473,13 @@ def build_advice_case(
             s for s in _clean_items(parsed["actions"]) if 12 <= len(s) <= 220
         ][:3]
 
-    # Clean noisy source snippets for display (title still shown).
-    for card in source_cards:
-        snip = _clean_text(card.get("snippet"))
-        if snip and not is_usable_field_sentence(snip):
-            card["snippet"] = ""
+    # Prefer one weather signal only (risk first) so cards stay scannable.
+    weather_items = _clean_items(weather_signals)
+    risk_first = [w for w in weather_items if "risque" in w.lower()]
+    weather_items = (risk_first or weather_items)[:1]
 
-    weather_items = _clean_items(weather_signals)[:2]
+    # Evidence: at most one short why-line; never market dumps.
+    evidence_items = evidence_items[:1]
 
     case = FieldCase(
         case_id=f"case_{uuid4().hex[:12]}",
@@ -456,15 +494,18 @@ def build_advice_case(
         summary=_clean_text(summary) or parsed["summary"],
         observations=[],
         possible_causes=[],
-        evidence=evidence_items[:2],
+        evidence=evidence_items,
         actions=action_items[:3],
-        do_not=filter_usable_sentences(do_not) or filter_usable_sentences(parsed["do_not"])[:2],
+        do_not=(
+            filter_usable_sentences(do_not)
+            or filter_usable_sentences(parsed["do_not"])
+        )[:1],
         confidence=_clean_text(confidence) or "Moyen",
         risk_level=_clean_text(risk_level) or "À vérifier",
         needs_human_confirmation=True,
         confirmation=_clean_text(confirmation) or DEFAULT_ADVICE_CONFIRMATION,
         disclaimer=_clean_text(disclaimer),
-        sources=source_cards,
+        sources=compact_source_cards(source_cards),
         case_title=case_title_for(cleaned_type),
         weather_signals=weather_items,
     )

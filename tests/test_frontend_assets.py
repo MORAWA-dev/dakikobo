@@ -117,12 +117,16 @@ def test_field_context_local_storage_is_wired():
     assert "Exemples rapides" in html
     assert "case-badge uncertain" in js
     assert "Non confirmé" in js
-    # Compact answer cards: lead paragraph, clean lists, filter FEWS dumps.
+    # Compact answer cards: lead paragraph, clean lists, collapsed sources.
     assert "case-lead" in js
     assert "function cleanDisplayText" in js
+    assert "function renderCompactSources" in js
     assert "À faire" in js
+    assert "case-weather-line" in js
     assert "diagnostic-case-compact" in js
     assert ".case-lead" in css
+    assert ".sources-details" in css
+    assert ".case-meta-line" in css
 
 
 def test_text_field_context_panel_is_wired():

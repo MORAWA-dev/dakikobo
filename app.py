@@ -554,15 +554,20 @@ def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict |
     except (WeatherError, ValueError, Exception) as exc:
         print(f"Weather enrichment skipped for {loc_id}: {exc}")
         return [], None
-    signals = []
+    # Prefer one actionable signal (risk > watch > good) for compact cards.
+    ranked = []
     for insight in weather.get("insights") or []:
         label = (insight.get("label") or "").strip()
         text = (insight.get("text") or "").strip()
-        if label and text:
-            signals.append(f"{label} : {text}")
-        elif text:
-            signals.append(text)
-    return signals[:4], weather
+        status = (insight.get("status") or "watch").strip()
+        if not text:
+            continue
+        line = f"{label} : {text}" if label else text
+        priority = {"risk": 0, "watch": 1, "good": 2}.get(status, 1)
+        ranked.append((priority, line))
+    ranked.sort(key=lambda item: item[0])
+    signals = [line for _, line in ranked[:1]]
+    return signals, weather
 
 
 def _confidence_from_score(top_score: float) -> str:
