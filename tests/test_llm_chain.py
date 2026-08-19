@@ -96,6 +96,29 @@ def test_strip_reasoning_handles_empty_input():
     assert llm_chain.strip_reasoning(None) is None
 
 
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("Caution : évitez de semer tôt.", "Attention : évitez de semer tôt."),
+        ("**Caution:** évitez cela.", "Attention: évitez cela."),
+        ("- Warning : sol sec.", "- Attention : sol sec."),
+        ("Summary: le mil.", "Résumé: le mil."),
+        # Mid-sentence prose must not be rewritten.
+        ("Utilisez la caution : non.", "Utilisez la caution : non."),
+        ("Semez en juin.", "Semez en juin."),
+    ],
+)
+def test_normalize_french_labels(raw, expected):
+    assert llm_chain.normalize_french_labels(raw) == expected
+
+
+def test_sanitize_answer_strips_reasoning_and_translates_labels():
+    raw = "<think>hmm</think>Semez en juin.\nCaution : évitez le retard."
+    assert llm_chain.sanitize_answer(raw) == (
+        "Semez en juin.\nAttention : évitez le retard."
+    )
+
+
 def test_get_llm_requires_api_key(monkeypatch):
     monkeypatch.setattr(llm_chain, "_llm", None)
     monkeypatch.setattr(llm_chain, "GROQ_API_KEY", "")

@@ -255,6 +255,7 @@ def _advice_sections(answer: str, disclaimer: str) -> dict[str, list[str] | str]
         "fixe l’azote",
     )
     avoid_markers = (
+        "attention",
         "evitez",
         "évitez",
         "ne pas",

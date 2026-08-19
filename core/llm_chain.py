@@ -86,6 +86,53 @@ def strip_reasoning(text: str) -> str:
     return cleaned or text.strip()
 
 
+# English section labels gpt-oss tends to emit even when told to answer in
+# French. Prompt rules alone are not reliable, so normalise deterministically.
+_ENGLISH_LABELS = (
+    ("caution", "Attention"),
+    ("warning", "Attention"),
+    ("answer", "Réponse"),
+    ("summary", "Résumé"),
+    ("evidence", "Preuves"),
+    ("next steps", "Prochaines étapes"),
+    ("what to do now", "À faire maintenant"),
+    ("what not to do", "À éviter"),
+)
+
+
+def normalize_french_labels(text: str) -> str:
+    """Translate English section labels in an otherwise French answer.
+
+    All user-facing text must be French. Only labels are rewritten: the pattern
+    requires the word to start a line and be followed by a colon, so ordinary
+    prose containing these words is left untouched.
+    """
+    if not text:
+        return text
+
+    cleaned = text
+    for english, french in _ENGLISH_LABELS:
+        cleaned = re.sub(
+            # Optional bullet, then optional bold markers, the label, and a
+            # colon. Bold may close after the colon ("**Caution:**"), so trailing
+            # asterisks are consumed too. The bullet needs trailing whitespace so
+            # it cannot swallow the first "*" of a "**" wrapper.
+            rf"(?m)^([ \t]*(?:[-*][ \t]+)?)\*{{0,2}}{english}\*{{0,2}}([ \t]*[:：])\*{{0,2}}",
+            rf"\1{french}\2",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+    return cleaned
+
+
+def sanitize_answer(text: str) -> str:
+    """Make a raw model reply safe to show a farmer.
+
+    Strips leaked reasoning, then forces French section labels.
+    """
+    return normalize_french_labels(strip_reasoning(text))
+
+
 def get_llm():
     """Create the Groq client only when a RAG answer is requested."""
     global _llm
@@ -114,6 +161,7 @@ Your name is {BOT_NAME}, a specialized agricultural extension expert for smallho
 - **Focus:** Answer using knowledge relevant to the **Sahel** and **Sudanian Savanna** zones.
 - **Crops:** Prioritize **Sorghum, Millet, Maize, Cotton, Niébé (Cowpea), Groundnuts, Soybean (soja)**. Also help for other local field crops when the CONTEXT allows.
 - **Language:** ALWAYS reply in French (français), whatever the language of the question. Use simple, clear French that a farmer can understand, and address the user as "vous".
+- **No English words:** Never write English labels or headings such as "Caution", "Warning", "Answer", "Summary", "Next steps". If you add a warning line, start it with "Attention :". Every word the farmer reads must be French.
 - **Style:** Keep answers simple, practical, and under 100 words. Short sentences only. Be concrete (sol, semis, pluie, préparation) when CONTEXT supports it.
 - **Structure:** Prefer: (1) one direct answer sentence on the asked topic, (2) 1-3 concrete actions, (3) one caution if needed. No rigid markdown headings. Never paste market lists, place-name lists, or raw document tables.
 - **Topic priority (critical):** Answer the **crop and place named in the QUESTION**. If a "parcelle" form crop differs (e.g. form=sorgho but question=soja), ignore the form crop for the advice and answer the question crop. Do not talk about watering sorghum when the user asked about soybean sowing.
