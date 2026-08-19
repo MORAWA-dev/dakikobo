@@ -37,7 +37,9 @@ Optional:
 ```text
 APP_VERSION=0.1.0
 LOG_LEVEL=INFO
-LLM_MODEL=llama-3.3-70b-versatile
+LLM_MODEL=openai/gpt-oss-120b
+LLM_REASONING_FORMAT=hidden
+LLM_REASONING_EFFORT=low
 STT_MODEL=whisper-large-v3-turbo
 VECTORSTORE_DIR=chroma_db
 CITATION_SCORE_MARGIN=0.12

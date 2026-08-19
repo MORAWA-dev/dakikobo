@@ -30,7 +30,8 @@ Primary crops:
 - Persistent Chroma store: `chroma_db/`
 
 Models/config:
-- Groq chat model: `llama-3.3-70b-versatile`
+- Groq chat model: `openai/gpt-oss-120b` (reasoning hidden; replaced
+  `llama-3.3-70b-versatile`, decommissioned by Groq on 2026-08-16)
 - Embeddings: `paraphrase-multilingual-MiniLM-L12-v2`
 - Gemini vision default: `gemini-2.5-flash`
 

@@ -1,5 +1,7 @@
 # core/llm_chain.py — LLM initialization and RetrievalQA chain setup
 
+import re
+
 from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
@@ -10,6 +12,8 @@ from config import (
     LLM_MODEL,
     LLM_MAX_TOKENS,
     LLM_MAX_RETRIES,
+    LLM_REASONING_EFFORT,
+    LLM_REASONING_FORMAT,
     LLM_TEMPERATURE,
     LLM_TIMEOUT_SECONDS,
     SIMILARITY_THRESHOLD,
@@ -21,6 +25,65 @@ from config import (
 # =================================================================
 
 _llm = None
+
+# Groq model families that accept `reasoning_format` / `reasoning_effort`.
+# Sending these params to a non-reasoning model returns HTTP 400, so they are
+# opt-in by model prefix rather than always-on.
+_REASONING_MODEL_PREFIXES = ("openai/gpt-oss", "qwen/")
+
+
+def _reasoning_model_kwargs(model: str) -> dict:
+    """Return Groq reasoning params for reasoning-capable models only.
+
+    DakiKobo shows answers directly to farmers, so chain-of-thought must never
+    reach the UI. `reasoning_format="hidden"` keeps the response to the answer.
+    """
+    if not model.startswith(_REASONING_MODEL_PREFIXES):
+        return {}
+
+    kwargs = {}
+    if LLM_REASONING_FORMAT:
+        kwargs["reasoning_format"] = LLM_REASONING_FORMAT
+    if LLM_REASONING_EFFORT:
+        kwargs["reasoning_effort"] = LLM_REASONING_EFFORT
+    return kwargs
+
+
+def strip_reasoning(text: str) -> str:
+    """Remove any chain-of-thought that leaked into a farmer-facing answer.
+
+    `reasoning_format="hidden"` is the primary defence, but Groq has a known
+    gpt-oss bug where reasoning tokens still appear in `content`. Farmers must
+    never see the model thinking out loud, so strip it defensively.
+
+    Only reasoning wrappers are removed. If stripping would empty the answer,
+    the original text is returned so a real answer is never silently lost.
+    """
+    if not text:
+        return text
+
+    cleaned = text
+    # Tag-delimited reasoning, including an unclosed trailing block.
+    for tag in ("think", "thinking", "reasoning", "analysis"):
+        cleaned = re.sub(
+            rf"<{tag}>.*?</{tag}>", "", cleaned, flags=re.DOTALL | re.IGNORECASE
+        )
+        cleaned = re.sub(
+            rf"<{tag}>.*\Z", "", cleaned, flags=re.DOTALL | re.IGNORECASE
+        )
+
+    # Harmony-style channel markers used by gpt-oss.
+    cleaned = re.sub(
+        r"<\|(?:start|end|channel|message|return)\|>", "", cleaned, flags=re.IGNORECASE
+    )
+    cleaned = re.sub(
+        r"^\s*(?:analysis|commentary)\b.*?(?=\bfinal\b)", "", cleaned,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    cleaned = re.sub(r"^\s*final\s*[:>-]?\s*", "", cleaned, flags=re.IGNORECASE)
+
+    cleaned = cleaned.strip()
+    return cleaned or text.strip()
 
 
 def get_llm():
@@ -37,6 +100,8 @@ def get_llm():
             max_retries=LLM_MAX_RETRIES,
             groq_api_key=GROQ_API_KEY,
             default_headers={"User-Agent": GROQ_USER_AGENT},
+            # Passed through langchain-groq's model_kwargs to the Groq SDK.
+            model_kwargs=_reasoning_model_kwargs(LLM_MODEL),
         )
     return _llm
 

@@ -44,7 +44,8 @@ remplacement de l'agent agricole.
 - **Grounded French answers** — RAG over a local document corpus; off-topic questions
   fall back to an honest "je ne sais pas" instead of hallucinating.
 - **Source citations** — each answer shows which document(s) it was drawn from.
-- **Fast inference** — Groq-hosted `llama-3.3-70b-versatile`.
+- **Fast inference** — Groq-hosted `openai/gpt-oss-120b`, with reasoning tokens
+  hidden so answers stay short and farmer-readable.
 - **Multilingual retrieval** — `paraphrase-multilingual-MiniLM-L12-v2` embeddings for
   good French matching, stored in a **persistent ChromaDB** (built once, fast on restart).
 - **Hosted warm-up** — the Docker Space can prepare RAG in the background after startup so the
@@ -79,7 +80,7 @@ remplacement de l'agent agricole.
 | Component        | Technology                                            |
 | ---------------- | ----------------------------------------------------- |
 | Web framework    | Flask                                                 |
-| LLM inference    | Groq — `llama-3.3-70b-versatile`                       |
+| LLM inference    | Groq — `openai/gpt-oss-120b`                          |
 | RAG orchestration| LangChain (core + community)                          |
 | Embeddings       | `sentence-transformers` — multilingual MiniLM L12     |
 | Vector store     | ChromaDB (persistent)                                 |
@@ -147,7 +148,9 @@ python scripts/test_gemini.py
 Optional overrides (defaults in `config.py` are fine for development):
 
 ```dotenv
-# LLM_MODEL=llama-3.3-70b-versatile
+# LLM_MODEL=openai/gpt-oss-120b
+# LLM_REASONING_FORMAT=hidden
+# LLM_REASONING_EFFORT=low
 # APP_VERSION=0.1.0
 # LOG_LEVEL=INFO
 # LLM_MAX_TOKENS=512
@@ -278,7 +281,9 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | ---------------------- | ---------------------------------------- | ---------------------------------------- |
 | `APP_VERSION`          | `0.1.0`                                  | Version string returned by `/version`    |
 | `LOG_LEVEL`            | `INFO`                                   | Structured JSON application log level    |
-| `LLM_MODEL`            | `llama-3.3-70b-versatile`                | Groq chat model                          |
+| `LLM_MODEL`            | `openai/gpt-oss-120b`                    | Groq chat model                          |
+| `LLM_REASONING_FORMAT` | `hidden`                                 | Keep chain-of-thought out of answers     |
+| `LLM_REASONING_EFFORT` | `low`                                    | Reasoning budget (gpt-oss: low/med/high) |
 | `LLM_TIMEOUT_SECONDS`  | `30.0`                                   | Max wait for Groq chat responses         |
 | `LLM_MAX_RETRIES`      | `1`                                      | Groq chat retry count                    |
 | `EMBEDDING_MODEL`      | `paraphrase-multilingual-MiniLM-L12-v2`  | Sentence-transformer for retrieval       |

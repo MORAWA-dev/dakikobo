@@ -32,6 +32,68 @@ def test_get_llm_passes_timeout_and_retries(monkeypatch):
     assert calls["max_retries"] == 0
     assert calls["groq_api_key"] == "test-key"
     assert calls["default_headers"] == {"User-Agent": "DakiKoboTest/1.0"}
+    # "test-model" is not a reasoning model, so no reasoning params are sent.
+    assert calls["model_kwargs"] == {}
+
+
+@pytest.mark.parametrize(
+    "model",
+    ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"],
+)
+def test_reasoning_models_hide_chain_of_thought(monkeypatch, model):
+    """Farmer-facing answers must never contain reasoning tokens."""
+    monkeypatch.setattr(llm_chain, "LLM_REASONING_FORMAT", "hidden")
+    monkeypatch.setattr(llm_chain, "LLM_REASONING_EFFORT", "low")
+
+    assert llm_chain._reasoning_model_kwargs(model) == {
+        "reasoning_format": "hidden",
+        "reasoning_effort": "low",
+    }
+
+
+@pytest.mark.parametrize("model", ["llama-3.3-70b-versatile", "gemma2-9b-it"])
+def test_non_reasoning_models_get_no_reasoning_params(model):
+    """Groq returns HTTP 400 if these params go to a non-reasoning model."""
+    assert llm_chain._reasoning_model_kwargs(model) == {}
+
+
+def test_default_model_is_not_decommissioned():
+    """Guard against shipping a Groq model ID that Groq no longer serves."""
+    import config
+
+    retired = {
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "qwen/qwen3-32b",
+        "deepseek-r1-distill-llama-70b",
+        "mixtral-8x7b-32768",
+    }
+    assert config.LLM_MODEL not in retired
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("<think>je réfléchis</think>Semez en juin.", "Semez en juin."),
+        ("<reasoning>abc</reasoning>\n\nSemez en juin.", "Semez en juin."),
+        ("Semez en juin.<think>plus de pensées", "Semez en juin."),
+        ("final: Semez en juin.", "Semez en juin."),
+        ("Semez en juin.", "Semez en juin."),
+    ],
+)
+def test_strip_reasoning_removes_chain_of_thought(raw, expected):
+    assert llm_chain.strip_reasoning(raw) == expected
+
+
+def test_strip_reasoning_never_empties_a_real_answer():
+    """If the whole reply was a reasoning block, keep it rather than show nothing."""
+    only_reasoning = "<think>je réfléchis</think>"
+    assert llm_chain.strip_reasoning(only_reasoning) == only_reasoning
+
+
+def test_strip_reasoning_handles_empty_input():
+    assert llm_chain.strip_reasoning("") == ""
+    assert llm_chain.strip_reasoning(None) is None
 
 
 def test_get_llm_requires_api_key(monkeypatch):

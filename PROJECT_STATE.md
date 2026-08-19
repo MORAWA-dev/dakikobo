@@ -69,7 +69,8 @@ Implementation:
 - Entry point: `app.py`
 - RAG chain: `core/llm_chain.py`
 - Retrieval/ingestion: `core/rag_pipeline.py`
-- Model: Groq `llama-3.3-70b-versatile`
+- Model: Groq `openai/gpt-oss-120b` (reasoning hidden). Replaced
+  `llama-3.3-70b-versatile`, which Groq decommissioned on 2026-08-16.
 - Embeddings: `paraphrase-multilingual-MiniLM-L12-v2`
 - Vector store: ChromaDB in `chroma_db/` locally or rebuilt on HF
 

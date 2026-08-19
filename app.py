@@ -25,7 +25,7 @@ from core.rag_pipeline import (
     load_vector_store_if_usable,
     text_to_speech_to_static,
 )
-from core.llm_chain import setup_retrieval_qa
+from core.llm_chain import setup_retrieval_qa, strip_reasoning
 from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
@@ -1278,7 +1278,9 @@ def ask():
 
     try:
         response = get_rag_chain().invoke(retrieval_query)
-        answer = response["result"]
+        # Reasoning models can leak chain-of-thought into `content`; never show
+        # that to a farmer.
+        answer = strip_reasoning(response["result"])
 
         # Surface the documents the answer was grounded in, ranked and filtered
         # by retrieval relevance score so confidence reflects match quality, not

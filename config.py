@@ -11,11 +11,23 @@ APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_USER_AGENT = os.getenv("GROQ_USER_AGENT", "Mozilla/5.0 DakiKobo/1.0")
-LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 512))
+# Groq decommissioned `llama-3.3-70b-versatile` on 2026-08-16. Groq's stated
+# replacement for general/reasoning workloads is `openai/gpt-oss-120b`.
+# See https://console.groq.com/docs/deprecations
+LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
+# gpt-oss is a reasoning model: hidden reasoning tokens still count against the
+# completion budget, so keep more headroom than the old 512 or long French
+# answers get truncated mid-sentence. The prompt still caps answers at ~100 words.
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", 1024))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1))
 LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
+# Reasoning controls, only sent for reasoning-capable Groq models.
+# "hidden" keeps chain-of-thought out of the farmer-facing answer.
+LLM_REASONING_FORMAT = os.getenv("LLM_REASONING_FORMAT", "hidden")
+# "low" keeps latency and token burn down on the free Space; gpt-oss defaults to
+# "medium". Set to "none" for qwen3 models to disable reasoning entirely.
+LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "low")
 
 # --- Gemini Vision (leaf disease screening) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
