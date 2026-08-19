@@ -504,16 +504,16 @@ Tests:
 
 ## Verification Status
 
-Latest local full test run:
+Latest local full test run (2026-08-19, after the gpt-oss migration):
 
-- `109 passed`
+- `212 passed`
 - 1 PyPDF2 deprecation warning
+- 1 Pydantic v2 deprecation warning raised from `langchain_groq`
 
-Latest HF worktree test run:
-
-- `79 passed`
-- `1 skipped`
-- 1 PyPDF2 deprecation warning
+Note on `tests/test_rag.py::test_french_crop_question_returns_answer`: it makes a
+real Groq call, so it fails with HTTP 403 `Access denied. Please check your
+network settings.` on networks Groq blocks. That is an environment limitation,
+not a code failure. An invalid key would return 401 instead.
 
 Latest focused evaluator tests:
 
