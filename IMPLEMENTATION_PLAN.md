@@ -58,9 +58,12 @@ Status legend: `[ ]` todo · `[x]` done.
   - *Done when:* a retrieved chunk carries its originating PDF filename in `metadata["source"]`
     (verified by a quick print/check). **(M)**
 
-- [x] **9. Return + render source citations** — `app.py`, `static/js/index.js`, `static/css/style.css`
+- [x] **9. Return + render source citations** — `core/retrieval.py`, `app.py`, `static/js/index.js`, `static/css/style.css`
   - *Done when:* under each bot answer the UI shows the document name(s) the answer drew from;
     answers with no retrieved source show none. **(M)**
+  - Citation ranking and confidence are isolated from Flask in `core/retrieval.py`; `/ask`
+    performs one scored top-six search and passes the same accepted chunks to generation and
+    source grading.
 
 - [x] **10. Persistent Chroma vector store** — `config.py`, `core/rag_pipeline.py`, `app.py`
   - *Done when:* the second `python app.py` starts noticeably faster and logs "loading existing

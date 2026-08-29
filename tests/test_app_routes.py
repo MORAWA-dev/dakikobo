@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import app as app_module
 from core.case_log import list_feedback_events
+from core.retrieval import chunk_id, get_active_manifest_hash, manifest_hash
 
 
 def _query_starts_with(query: str, expected: str) -> None:
@@ -20,9 +21,18 @@ class _FakeRagChain:
         return {
             "result": "Semez le mil au début de la saison des pluies.",
             "source_documents": [
-                SimpleNamespace(metadata={"source": "guide_mil.pdf"}),
-                SimpleNamespace(metadata={"source": "guide_mil.pdf"}),
-                SimpleNamespace(metadata={"source": "calendrier.pdf"}),
+                SimpleNamespace(
+                    metadata={"source": "guide_mil.pdf"},
+                    page_content="Semez le mil au début de la saison des pluies.",
+                ),
+                SimpleNamespace(
+                    metadata={"source": "guide_mil.pdf"},
+                    page_content="Le semis du mil suit une pluie utile.",
+                ),
+                SimpleNamespace(
+                    metadata={"source": "calendrier.pdf"},
+                    page_content="Calendrier de semis du mil au Burkina Faso.",
+                ),
             ],
         }
 
@@ -122,6 +132,54 @@ class _UncertainRagChain:
                 ),
             ],
         }
+
+
+class _RagHarness:
+    """Adapt legacy test responses to the one-search RetrievalQA seam."""
+
+    def __init__(self, legacy_chain, scores=None):
+        self.legacy_chain = legacy_chain
+        self.scores = scores or {}
+        self.combine_documents_chain = self
+        self.search_calls = []
+        self.combined_docs = None
+        self._response = None
+
+    def similarity_search_with_relevance_scores(self, query, k):
+        self.search_calls.append((query, k))
+        self._response = self.legacy_chain.invoke(query)
+        return [
+            (
+                doc,
+                self.scores.get(
+                    (getattr(doc, "metadata", {}) or {}).get("source", "Inconnu"),
+                    0.4,
+                ),
+            )
+            for doc in self._response.get("source_documents", [])
+        ]
+
+    def run(self, *, input_documents, question):
+        assert self._response is not None
+        expected_docs = self._response.get("source_documents", [])
+        assert input_documents == [
+            doc
+            for doc in expected_docs
+            if self.scores.get(
+                (getattr(doc, "metadata", {}) or {}).get("source", "Inconnu"),
+                0.4,
+            )
+            >= app_module.SIMILARITY_THRESHOLD
+        ]
+        self.combined_docs = input_documents
+        return self._response["result"]
+
+
+def _install_rag(monkeypatch, legacy_chain, scores=None):
+    harness = _RagHarness(legacy_chain, scores=scores)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    return harness
 
 
 def test_app_import_does_not_initialize_rag():
@@ -306,6 +364,7 @@ def test_existing_valid_vector_store_is_reused(monkeypatch):
     )
 
     assert app_module._load_or_build_vector_store() is db
+    assert get_active_manifest_hash() == manifest_hash({"files": []})
 
 
 def test_invalid_existing_vector_store_is_rebuilt(monkeypatch):
@@ -333,6 +392,7 @@ def test_invalid_existing_vector_store_is_rebuilt(monkeypatch):
 
     assert calls == ["clear"]
     assert db == {"doc_count": 1, "manifest": {"files": []}}
+    assert get_active_manifest_hash() == manifest_hash({"files": []})
 
 
 def test_rebuild_clears_existing_vector_store(monkeypatch):
@@ -359,6 +419,7 @@ def test_rebuild_clears_existing_vector_store(monkeypatch):
 
     assert calls == ["clear"]
     assert db == {"doc_count": 1, "manifest": {"files": []}}
+    assert get_active_manifest_hash() == manifest_hash({"files": []})
 
 
 def test_demo_example_route_returns_text_case_card(monkeypatch):
@@ -782,7 +843,7 @@ def test_ask_enriches_case_with_weather_when_location_known(monkeypatch):
 
 def test_rag_route_returns_unique_sources(monkeypatch):
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _FakeRagChain())
+    _install_rag(monkeypatch, _FakeRagChain())
     monkeypatch.setattr(
         app_module,
         "text_to_speech_to_static",
@@ -796,14 +857,14 @@ def test_rag_route_returns_unique_sources(monkeypatch):
     assert "saison des pluies" in payload["answer"]
     assert payload["sources"] == [
         {
-            "title": "calendrier.pdf",
-            "type": "Base locale",
-            "snippet": "",
-        },
-        {
             "title": "guide_mil.pdf",
             "type": "Base locale",
-            "snippet": "",
+            "snippet": "Semez le mil au début de la saison des pluies.",
+        },
+        {
+            "title": "calendrier.pdf",
+            "type": "Base locale",
+            "snippet": "Calendrier de semis du mil au Burkina Faso.",
         },
     ]
     assert payload["confidence"] == "Fort"
@@ -828,7 +889,7 @@ def test_rag_route_attaches_field_context_to_case(monkeypatch):
                 ],
             }
 
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _CtxChain())
+    _install_rag(monkeypatch, _CtxChain())
     monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
 
     response = client.post(
@@ -852,7 +913,11 @@ def test_rag_route_attaches_field_context_to_case(monkeypatch):
 
 def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _SingleSourceRagChain())
+    _install_rag(
+        monkeypatch,
+        _SingleSourceRagChain(),
+        scores={"guide_mil.pdf": 0.3},
+    )
     monkeypatch.setattr(
         app_module,
         "text_to_speech_to_static",
@@ -868,7 +933,7 @@ def test_rag_route_marks_single_source_as_medium_confidence(monkeypatch):
 
 def test_rag_route_exposes_source_metadata(monkeypatch):
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _MetadataSourceRagChain())
+    _install_rag(monkeypatch, _MetadataSourceRagChain())
     monkeypatch.setattr(
         app_module,
         "text_to_speech_to_static",
@@ -899,56 +964,23 @@ def test_rag_route_exposes_source_metadata(monkeypatch):
     ]
 
 
-def test_review_status_label_includes_source_verified():
-    assert (
-        app_module._REVIEW_STATUS_LABELS["source_verified_pending_owner_signoff"]
-        == "Source vérifiée, signature propriétaire en attente"
-    )
-
-
-def test_source_rank_score_demotes_weak_handbook():
-    strong = app_module._source_rank_score("IITA 2018 - Production du niebe", 0.40)
-    weak = app_module._source_rank_score(
-        "Farmer's Handbook on Basic Agriculture", 0.40
-    )
-    assert strong > weak
-    assert app_module._is_weak_source_title("Agrobusiness au Burkina Faso")
-    assert app_module._is_weak_source_title(
-        "Burkina Faso - Profil des moyens d'existence (FEWS NET)"
-    )
-    assert not app_module._is_weak_source_title("ProSol 2020 - fertilite des sols")
-    light = app_module._source_rank_score("FEWS NET profile", 0.40, heavy=False)
-    heavy = app_module._source_rank_score("FEWS NET profile", 0.40, heavy=True)
-    assert heavy < light
-    assert app_module._is_field_practice_query({"rotation", "niebe"})
-
-
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
     client = app_module.app.test_client()
 
-    class FakeDb:
-        def similarity_search_with_relevance_scores(self, query, k):
-            _query_starts_with(query, "Comment stocker le niébé contre les bruches ?")
-            assert k == 10
-            return [
-                (
-                    SimpleNamespace(
-                        metadata={"source": "IITA 2018 - Production du niebe"}
-                    ),
-                    0.43,
-                ),
-                (
-                    SimpleNamespace(metadata={"source": "Source moyenne"}),
-                    0.35,
-                ),
-                (
-                    SimpleNamespace(metadata={"source": "Source faible"}),
-                    0.18,
-                ),
-            ]
+    scores = {
+        "IITA 2018 - Production du niebe": 0.43,
+        "Source moyenne": 0.35,
+        "Source faible": 0.18,
+    }
+    harness = _install_rag(monkeypatch, _NoisySourceRagChain(), scores=scores)
+    grounded_result = {}
+    real_grounded_answer = app_module.GroundedAnswer
 
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _NoisySourceRagChain())
-    monkeypatch.setattr(app_module, "_rag_db", FakeDb())
+    def capture_grounded_answer(**kwargs):
+        grounded_result.update(kwargs)
+        return real_grounded_answer(**kwargs)
+
+    monkeypatch.setattr(app_module, "GroundedAnswer", capture_grounded_answer)
     monkeypatch.setattr(
         app_module,
         "text_to_speech_to_static",
@@ -962,18 +994,32 @@ def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
     payload = response.get_json()
 
     assert response.status_code == 200
-    assert payload["confidence"] == "Fort"
-    assert [source["title"] for source in payload["sources"]] == [
+    assert len(harness.search_calls) == 1
+    retrieval_query, k = harness.search_calls[0]
+    _query_starts_with(
+        retrieval_query,
+        "Comment stocker le niébé contre les bruches ?",
+    )
+    assert k == 6
+    assert [doc.metadata["source"] for doc in harness.combined_docs] == [
         "IITA 2018 - Production du niebe",
+        "Source moyenne",
     ]
+    assert grounded_result["retrieved_chunk_ids"] == [
+        chunk_id(doc.metadata["source"], doc.page_content)
+        for doc in harness._response["source_documents"]
+    ]
+    assert len(grounded_result["retrieved_chunk_ids"]) == 3
+    assert payload["confidence"] == "Fort"
     titles = [source["title"] for source in payload["sources"]]
+    assert titles == ["IITA 2018 - Production du niebe"]
     assert "Source moyenne" not in titles
     assert "Source faible" not in titles
 
 
 def test_rag_route_refusal_has_no_sources_and_low_confidence(monkeypatch):
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _RefusalRagChain())
+    _install_rag(monkeypatch, _RefusalRagChain())
     monkeypatch.setattr(
         app_module, "text_to_speech_to_static", lambda text: ""
     )
@@ -1010,13 +1056,12 @@ def test_rag_route_question_crop_overrides_form_crop(monkeypatch):
                 ],
             }
 
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _SojaChain())
-    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
-    monkeypatch.setattr(
-        app_module,
-        "_source_scores",
-        lambda query: {"guide_legumineuses.pdf": 0.42},
+    _install_rag(
+        monkeypatch,
+        _SojaChain(),
+        scores={"guide_legumineuses.pdf": 0.42},
     )
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
 
     response = client.post(
         "/ask",
@@ -1056,11 +1101,12 @@ def test_rag_route_short_followup_keeps_prior_crop(monkeypatch):
                 ],
             }
 
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _FollowChain())
-    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
-    monkeypatch.setattr(
-        app_module, "_source_scores", lambda query: {"guide_soja.pdf": 0.4}
+    _install_rag(
+        monkeypatch,
+        _FollowChain(),
+        scores={"guide_soja.pdf": 0.4},
     )
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
 
     response = client.post(
         "/ask",
@@ -1084,9 +1130,12 @@ def test_rag_route_short_followup_keeps_prior_crop(monkeypatch):
 
 def test_rag_route_uncertain_is_first_class_not_failure(monkeypatch):
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _UncertainRagChain())
+    _install_rag(
+        monkeypatch,
+        _UncertainRagChain(),
+        scores={"guide_general.pdf": 0.4},
+    )
     monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
-    monkeypatch.setattr(app_module, "_source_scores", lambda query: {"guide_general.pdf": 0.4})
 
     response = client.post(
         "/ask",
@@ -1105,7 +1154,7 @@ def test_rag_route_uncertain_is_first_class_not_failure(monkeypatch):
 
 def test_rag_route_without_retrieved_docs_forces_refusal(monkeypatch):
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: _NoSourceRagChain())
+    _install_rag(monkeypatch, _NoSourceRagChain())
     monkeypatch.setattr(
         app_module, "text_to_speech_to_static", lambda text: ""
     )
@@ -1125,7 +1174,7 @@ def test_rag_route_handles_chain_errors(monkeypatch):
             raise RuntimeError("boom")
 
     client = app_module.app.test_client()
-    monkeypatch.setattr(app_module, "get_rag_chain", lambda: BrokenChain())
+    _install_rag(monkeypatch, BrokenChain())
 
     response = client.post("/ask", data={"messageText": "Quand semer le mil ?"})
     payload = response.get_json()

@@ -6,6 +6,9 @@ reviewed Burkinabè journals), so the assistant never invents fertilizer numbers
 Each crop entry cites the source(s) backing its figures, and every answer ends
 with a mandatory "confirmez avec votre agent" disclaimer.
 
+Crop detection now routes through the ``core.crops`` registry (A1), so a question
+about a recognized but unsupported crop (e.g. sésame) falls back to RAG.
+
 Sources:
   - Int. J. Biol. Chem. Sci. (IJBCS), essais microdose INERA sur sorgho, mil et
     niébé au Burkina Faso — dose vulgarisée céréales : 100 kg/ha NPK (14-23-14)
@@ -15,6 +18,8 @@ Sources:
     niébé) : faible apport d'azote (~14 kg N/ha) suffisant, fumure organique
     recommandée.
 """
+
+from core.crops import CROPS, resolve_crop
 
 SRC_IJBCS = {
     "title": "Recherche INERA - microdose Burkina",
@@ -38,7 +43,7 @@ DISCLAIMER = (
     "sol, de la pluie et de vos moyens."
 )
 
-# Canonical crop -> grounded recommendation text + sources.
+# Canonical crop id -> grounded recommendation text + sources.
 _RECOMMENDATIONS = {
     "sorgho": {
         "lines": [
@@ -58,7 +63,7 @@ _RECOMMENDATIONS = {
         ],
         "sources": [SRC_IJBCS],
     },
-    "maïs": {
+    "mais": {
         "lines": [
             "Dose vulgarisée : 150 kg/ha de NPK (14-23-14) au semis + 100 kg/ha "
             "d'urée (46 %) en couverture.",
@@ -67,7 +72,7 @@ _RECOMMENDATIONS = {
         ],
         "sources": [SRC_RSTB_MAIS],
     },
-    "niébé": {
+    "niebe": {
         "lines": [
             "Dose vulgarisée : 100 kg/ha de NPK (14-23-14), sans urée — le niébé "
             "est une légumineuse qui fixe l'azote de l'air.",
@@ -87,34 +92,13 @@ _RECOMMENDATIONS = {
     },
 }
 
-# Correct French article per crop (for "pour ... au Burkina Faso").
+# Correct French article per crop (for "pour ... au Burkina Faso"), keyed by id.
 _CROP_LABEL = {
     "sorgho": "le sorgho",
     "mil": "le mil",
-    "maïs": "le maïs",
-    "niébé": "le niébé",
+    "mais": "le maïs",
+    "niebe": "le niébé",
     "arachide": "l'arachide",
-}
-
-# Surface forms -> canonical crop key.
-_CROP_ALIASES = {
-    "sorgho": "sorgho",
-    "sorghum": "sorgho",
-    "mil": "mil",
-    "millet": "mil",
-    "petit mil": "mil",
-    "maïs": "maïs",
-    "mais": "maïs",
-    "maize": "maïs",
-    "niébé": "niébé",
-    "niebe": "niébé",
-    "cowpea": "niébé",
-    "haricot": "niébé",
-    "arachide": "arachide",
-    "arachides": "arachide",
-    "groundnut": "arachide",
-    "cacahuète": "arachide",
-    "cacahuete": "arachide",
 }
 
 # Words that signal the user is asking about fertilizer / fertilization.
@@ -140,12 +124,14 @@ def is_fertilizer_query(text: str) -> bool:
 
 
 def _match_crop(text: str) -> str | None:
-    """Return the canonical crop mentioned in the text, or None."""
-    t = (text or "").lower()
-    # Check multi-word aliases first (e.g. "petit mil") for a more specific match.
-    for alias in sorted(_CROP_ALIASES, key=len, reverse=True):
-        if alias in t:
-            return _CROP_ALIASES[alias]
+    """Return the fertilizer-supported crop id named in the text, or None.
+
+    A recognized crop that lacks fertilizer data (soja, coton, riz, sésame, fonio)
+    returns None so the caller can fall back to RAG.
+    """
+    crop = resolve_crop(text)
+    if crop and crop.fertilizer_supported:
+        return crop.id
     return None
 
 
@@ -184,14 +170,14 @@ def get_fertilizer_advice(
         "N'augmentez pas les doses sans conseil local.",
         "Évitez l'urée juste avant une forte pluie si possible.",
     ]
-    if matched in {"niébé", "arachide"}:
+    if matched in {"niebe", "arachide"}:
         do_not.append("Évitez les fortes doses d'urée sur les légumineuses.")
 
     case = build_advice_case(
         answer=answer,
         question=text,
         input_type="fertilizer",
-        crop=matched,
+        crop=CROPS[matched].label_fr,
         growth_stage=growth_stage,
         location=location,
         sources=sources,

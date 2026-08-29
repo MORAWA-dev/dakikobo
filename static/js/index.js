@@ -325,13 +325,17 @@ $(function() {
         }
         var t = text.replace(/\s+/g, ' ').trim();
         // Hide FEWS-style market dumps if they slipped through.
-        if (/route commerciale|march[eé]s villageois|vente de bois||→/i.test(t) && t.length > 40) {
+        if (/route commerciale|march[eé]s villageois|vente de bois|→/i.test(t) && t.length > 40) {
             return '';
         }
         if ((t.match(/,/g) || []).length >= 5) {
             return '';
         }
         return t;
+    }
+
+    function escapeHtml(text) {
+        return $('<div></div>').text(text == null ? '' : String(text)).html();
     }
 
     function asCleanList(value, maxItems) {
@@ -646,10 +650,13 @@ $(function() {
 
     function typeMessage(message, element, speed = 15, onComplete) {
         let i = 0;
-        element.html('');
+        let rendered = '';
+        const safeMessage = message == null ? '' : String(message);
+        element.text('');
         const typingInterval = setInterval(() => {
-            if (i < message.length) {
-                element.html(element.html() + message.charAt(i));
+            if (i < safeMessage.length) {
+                rendered += safeMessage.charAt(i);
+                element.text(rendered);
                 i++;
             } else {
                 clearInterval(typingInterval);
@@ -1165,33 +1172,79 @@ $(function() {
     }
 
 
-    var FIELD_LOCATION_TO_WEATHER = {
-        'Ouagadougou': 'ouagadougou',
-        'Bobo-Dioulasso': 'bobo',
-        'Kaya': 'kaya',
-        'Ouahigouya': 'ouahigouya',
-        "Fada N'Gourma": 'fada',
-        'Dori': 'dori'
-    };
+    function populateRegistrySelects(crops, places) {
+        if (crops.length && $('#fieldCrop').length) {
+            var $crop = $('#fieldCrop');
+            var $blank = $crop.find('option[value=""]').detach();
+            var $autre = $crop.find('option[value="autre"]').detach();
+            $crop.empty();
+            if ($blank.length) { $crop.append($blank); }
+            crops.forEach(function(crop) {
+                $crop.append($('<option>', { value: crop.id, text: crop.label_fr }));
+            });
+            if ($autre.length) { $crop.append($autre); }
+            // Re-apply cached labels in case /crop-labels resolved first.
+            if (_cropLabelCache && _cropLabelCache.length) {
+                applyCropLabels(_cropLabelCache);
+            }
+        }
+        if (places.length && $('#fieldLocationSelect').length) {
+            var $loc = $('#fieldLocationSelect');
+            var $blankLoc = $loc.find('option[value=""]').detach();
+            var $custom = $loc.find('option[value="__custom__"]').detach();
+            $loc.empty();
+            if ($blankLoc.length) { $loc.append($blankLoc); }
+            places.forEach(function(place) {
+                $loc.append($('<option>', { value: place.id, text: place.label_fr }));
+            });
+            if ($custom.length) { $loc.append($custom); }
+        }
 
-    var FIELD_LOCATION_TO_SOIL = FIELD_LOCATION_TO_WEATHER;
+        var weatherPlaces = places.filter(function(place) {
+            return place.has_weather;
+        });
+        ['#weatherLocation', '#soilLocation'].forEach(function(selector) {
+            var $select = $(selector);
+            if (!$select.length) {
+                return;
+            }
+            $select.empty();
+            weatherPlaces.forEach(function(place) {
+                $select.append($('<option>', {
+                    value: place.id,
+                    text: place.label_fr
+                }));
+            });
+        });
+
+        var $soilCrop = $('#soilCrop');
+        if ($soilCrop.length) {
+            $soilCrop.empty();
+            crops.filter(function(crop) {
+                return crop.fertilizer_supported;
+            }).forEach(function(crop) {
+                $soilCrop.append($('<option>', {
+                    value: crop.id,
+                    text: crop.label_fr
+                }));
+            });
+        }
+    }
 
     function syncToolsFromFieldLocation() {
         var selected = ($('#fieldLocationSelect').val() || '').trim();
         if (!selected || selected === '__custom__') {
             return;
         }
-        var weatherId = FIELD_LOCATION_TO_WEATHER[selected];
-        if (weatherId && $('#weatherLocation').length) {
-            $('#weatherLocation').val(weatherId);
+        // selected is now a place id (e.g. 'ouagadougou'); use directly.
+        if ($('#weatherLocation option[value="' + selected + '"]').length) {
+            $('#weatherLocation').val(selected);
         }
-        var soilId = FIELD_LOCATION_TO_SOIL[selected];
-        if (soilId && $('#soilLocation').length) {
-            $('#soilLocation').val(soilId);
+        if ($('#soilLocation option[value="' + selected + '"]').length) {
+            $('#soilLocation').val(selected);
         }
         var crop = ($('#fieldCrop').val() || '').trim();
         if (crop && crop !== 'autre' && $('#soilCrop').length) {
-            // soil crop options use maïs etc.
             if ($('#soilCrop option[value="' + crop + '"]').length) {
                 $('#soilCrop').val(crop);
             }
@@ -1518,7 +1571,14 @@ $(function() {
                     appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
                 } else {
                     if (response.case) {
-                        appendCaseMessage(response.case, response.answer, response.sources, response.confidence, response.audio_url);
+                        appendCaseMessage(
+                            response.case,
+                            response.answer,
+                            response.sources,
+                            response.confidence,
+                            response.audio_url,
+                            context.question || "Photo maladie"
+                        );
                     } else {
                         appendMessage(response.answer, false, response.sources, null, response.confidence, response.audio_url);
                     }
@@ -1584,11 +1644,13 @@ $(function() {
 
     // Welcome message (French — primary language for Burkina Faso farmers)
     // Keep chat first: context + examples collapsed by default (more space to talk).
-    loadFieldContextFromStorage();
-    setFieldContextOpen(false);
-    setExamplesOpen(false);
-    syncToolsFromFieldLocation();
-    updateFieldContextToggleLabel();
+    function initFieldContext() {
+        loadFieldContextFromStorage();
+        setFieldContextOpen(false);
+        setExamplesOpen(false);
+        syncToolsFromFieldLocation();
+        updateFieldContextToggleLabel();
+    }
 
     // Optional French labels from /crop-labels (local-language slots stay unused).
     function applyCropLabels(crops) {
@@ -1599,7 +1661,11 @@ $(function() {
         var byId = {};
         crops.forEach(function(c) {
             if (c && c.id) {
-                byId[c.id] = c;
+                var registryId = {
+                    'maïs': 'mais',
+                    'niébé': 'niebe'
+                }[c.id] || c.id;
+                byId[registryId] = c;
             }
         });
         var useSimple = isSimpleFrenchEnabled();
@@ -1619,12 +1685,22 @@ $(function() {
         });
     }
 
+    // Populate selects from the canonical registry first, then init the context.
+    // If it fails, chat and custom-location entry remain usable without stale ids.
+    $.getJSON('/registry')
+        .done(function(data) {
+            populateRegistrySelects(data.crops || [], data.places || []);
+        })
+        .always(function() {
+            initFieldContext();
+        });
+
     $.getJSON('/crop-labels')
         .done(function(data) {
             applyCropLabels(data.crops || []);
         })
         .fail(function() {
-            // Keep hardcoded French options in the template.
+            // Registry labels remain the default when this optional glossary fails.
         });
 
     var welcomeMessage = "🌾 Bienvenue. Écrivez votre question ci-dessous, ou utilisez 📷 pour une feuille. Ouvrez « Contexte parcelle » ou « Exemples » seulement si besoin. Conseils prudents, sourcés, à confirmer avec un agent agricole.";

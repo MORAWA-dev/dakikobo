@@ -1,8 +1,9 @@
 """In-process privacy-safe request metrics for demo observability.
 
 Keeps a fixed-size ring of recent HTTP events so operators can inspect latency,
-failures, and feature outcomes without a full log stack. Never stores question
-text, answers, transcripts, or upload bytes.
+failures, and feature outcomes without a full log stack. Privacy is enforced by
+the explicit field whitelist in ``OpsMetricsStore.record``; question text,
+answers, transcripts, and upload bytes are never copied into an event.
 """
 
 from __future__ import annotations
@@ -16,21 +17,6 @@ from typing import Any
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-# Fields that may contain user content — never retain them.
-_DROP_KEYS = {
-    "question",
-    "answer",
-    "message",
-    "messageText",
-    "transcript",
-    "text",
-    "prompt",
-    "image",
-    "audio",
-    "raw",
-}
 
 
 @dataclass

@@ -50,7 +50,7 @@ CONFIDENCE_MEDIUM_SCORE = float(os.getenv("CONFIDENCE_MEDIUM_SCORE", 0.2))
 # A secondary citation is dropped when it scores this far below the best source,
 # which suppresses unrelated cards next to the correct one.
 # Live HF eval 2026-07-10: margin 0.12 worked; keep default, allow env override.
-# Weak-title demotion is applied in ranking (see app._source_rank_score).
+# Weak-title demotion is applied in ranking (see core.retrieval._source_rank_score).
 CITATION_SCORE_MARGIN = float(os.getenv("CITATION_SCORE_MARGIN", 0.12))
 MAX_RAG_SOURCES = int(os.getenv("MAX_RAG_SOURCES", "2"))
 

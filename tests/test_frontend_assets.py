@@ -144,7 +144,6 @@ def test_text_field_context_panel_is_wired():
     assert 'id="fieldStage"' in html
     assert 'id="fieldLocationSelect"' in html
     assert 'id="fieldLocationCustom"' in html
-    assert "Ouagadougou" in html
     assert "Contexte parcelle" in html or "1. Contexte parcelle" in html
     assert ".field-context-panel" in css
     assert "function getFieldContext" in js
@@ -155,9 +154,48 @@ def test_text_field_context_panel_is_wired():
     assert "location: getFieldLocationValue()" in js
     assert "Météo" in js
     assert "weather_signals" in js
-    assert "/ops/metrics" in html
+    assert "<code>/ops</code>" in html
     # Field context appears before the chat panel in the field workflow layout.
     assert html.find('id="fieldContextPanel"') < html.find('id="chatPanel"')
+
+
+def test_phase_zero_frontend_regressions_are_fixed():
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert "/route commerciale|march[eé]s villageois|vente de bois|→/i" in js
+    assert "vente de bois||" not in js
+    assert "function escapeHtml" in js
+
+    type_body = js.split("function typeMessage", 1)[1].split(
+        "function showTypingIndicator", 1
+    )[0]
+    assert ".html(" not in type_body
+    assert "element.text(rendered)" in type_body
+
+    upload_body = js.split("function uploadImageForScreening", 1)[1].split(
+        "// Leaf-photo disease screening", 1
+    )[0]
+    assert 'context.question || "Photo maladie"' in upload_body
+
+
+def test_registry_populates_all_five_dynamic_selects():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert '<option value="ouagadougou">' not in html
+    assert '<option value="maïs">' not in html
+    for select_id in (
+        "fieldCrop",
+        "fieldLocationSelect",
+        "weatherLocation",
+        "soilLocation",
+        "soilCrop",
+    ):
+        assert f'#{select_id}' in js
+    assert "function populateRegistrySelects" in js
+    assert "place.has_weather" in js
+    assert "crop.fertilizer_supported" in js
+    assert "FIELD_LOCATION_TO_WEATHER" not in js
 
 
 def test_voice_input_uses_server_side_stt():

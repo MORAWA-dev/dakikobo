@@ -9,6 +9,8 @@ from datetime import date
 import requests
 
 from config import SOIL_TIMEOUT_SECONDS
+from core.crops import CROPS, resolve_crop
+from core.places import PLACES
 
 SOILGRIDS_QUERY_URL = "https://rest.isric.org/soilgrids/v2.0/properties/query"
 REQUEST_TIMEOUT_SECONDS = SOIL_TIMEOUT_SECONDS
@@ -26,23 +28,20 @@ class SoilLocation:
     longitude: float
 
 
-LOCATIONS = {
-    "ouagadougou": SoilLocation("ouagadougou", "Ouagadougou", 12.3714, -1.5197),
-    "bobo": SoilLocation("bobo", "Bobo-Dioulasso", 11.1771, -4.2979),
-    "kaya": SoilLocation("kaya", "Kaya", 13.0917, -1.0844),
-    "ouahigouya": SoilLocation("ouahigouya", "Ouahigouya", 13.5828, -2.4216),
-    "fada": SoilLocation("fada", "Fada N'Gourma", 12.0616, 0.3584),
-    "dori": SoilLocation("dori", "Dori", 14.0354, -0.0345),
+# Derived from the single place registry (core/places): only the weather-backed
+# rows carry coordinates, so this stays the same six cities as before.
+LOCATIONS: dict[str, SoilLocation] = {
+    place.id: SoilLocation(
+        place.id, place.label_fr, place.latitude, place.longitude
+    )
+    for place in PLACES.values()
+    if place.has_weather
 }
 
-SUPPORTED_CROPS = {
-    "sorgho": "sorgho",
-    "mil": "mil",
-    "maïs": "maïs",
-    "mais": "maïs",
-    "niébé": "niébé",
-    "niebe": "niébé",
-    "arachide": "arachide",
+# Soil guidance is available only for crops with a grounded dose table (see
+# core/fertilizer and the ``fertilizer_supported`` flag on the crop registry).
+_SOIL_CROP_IDS: set[str] = {
+    crop.id for crop in CROPS.values() if crop.fertilizer_supported
 }
 
 SOURCE_SOILGRIDS = {
@@ -68,11 +67,9 @@ def list_soil_locations() -> list[dict]:
 
 def list_soil_crops() -> list[dict]:
     return [
-        {"id": "sorgho", "name": "Sorgho"},
-        {"id": "mil", "name": "Mil"},
-        {"id": "maïs", "name": "Maïs"},
-        {"id": "niébé", "name": "Niébé"},
-        {"id": "arachide", "name": "Arachide"},
+        {"id": crop.id, "name": crop.label_fr.capitalize()}
+        for crop in CROPS.values()
+        if crop.fertilizer_supported
     ]
 
 
@@ -81,7 +78,15 @@ def clear_soil_cache() -> None:
 
 
 def normalize_crop(value: str) -> str | None:
-    return SUPPORTED_CROPS.get((value or "").strip().lower())
+    """Return the canonical accented crop label for a soil-supported crop.
+
+    Recognises via the crop registry (which handles plain and accented spellings)
+    and accepts only the crops that have a grounded fertilizer dose table.
+    """
+    crop = resolve_crop(value)
+    if crop is None or crop.id not in _SOIL_CROP_IDS:
+        return None
+    return crop.label_fr
 
 
 def _round_or_none(value, digits: int = 1):

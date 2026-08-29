@@ -29,6 +29,8 @@ def test_apply_simple_style_to_query_appends_once():
     assert q in out
     assert SIMPLE_STYLE_INSTRUCTION in out
     assert apply_simple_style_to_query(out) == out
+    assert "n'inventez pas" in SIMPLE_STYLE_INSTRUCTION
+    assert "ne inventez pas" not in SIMPLE_STYLE_INSTRUCTION
 
 
 def test_glossary_has_core_field_terms():
@@ -59,3 +61,9 @@ def test_light_replacements_and_simplify():
     assert "Demandez toujours confirmation" in light
     full = simplify_answer("Dose vulgarisée et NPK au semis.")
     assert "Mots simples" in full
+
+
+def test_simplify_keeps_glossary_note_for_replaced_stress_hydrique():
+    out = simplify_answer("Le mil subit un stress hydrique.")
+    assert "manque d'eau" in out
+    assert "stress hydrique :" in out

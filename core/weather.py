@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 import requests
 
 from config import WEATHER_TIMEOUT_SECONDS
+from core.places import PLACES, resolve_place
 
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 REQUEST_TIMEOUT_SECONDS = WEATHER_TIMEOUT_SECONDS
@@ -26,13 +27,14 @@ class WeatherLocation:
     longitude: float
 
 
-LOCATIONS = {
-    "ouagadougou": WeatherLocation("ouagadougou", "Ouagadougou", 12.3714, -1.5197),
-    "bobo": WeatherLocation("bobo", "Bobo-Dioulasso", 11.1771, -4.2979),
-    "kaya": WeatherLocation("kaya", "Kaya", 13.0917, -1.0844),
-    "ouahigouya": WeatherLocation("ouahigouya", "Ouahigouya", 13.5828, -2.4216),
-    "fada": WeatherLocation("fada", "Fada N'Gourma", 12.0616, 0.3584),
-    "dori": WeatherLocation("dori", "Dori", 14.0354, -0.0345),
+# Derived from the single place registry (core/places): only the weather-backed
+# rows carry coordinates, so this stays the same six cities as before.
+LOCATIONS: dict[str, WeatherLocation] = {
+    place.id: WeatherLocation(
+        place.id, place.label_fr, place.latitude, place.longitude
+    )
+    for place in PLACES.values()
+    if place.has_weather
 }
 
 SOURCE_OPEN_METEO = {
@@ -59,38 +61,14 @@ def list_weather_locations() -> list[dict]:
 def resolve_weather_location_id(text: str) -> str | None:
     """Map free-text commune/location to a supported weather location id.
 
-    Returns None when the text does not match a known Burkina demo city.
+    Delegates recognition to the place registry, then keeps only the places that
+    actually have coordinates. A place we recognise but cannot forecast for
+    (``has_weather=False``) returns None rather than a silent wrong city.
     """
-    raw = (text or "").strip().lower()
-    if not raw:
+    place = resolve_place(text)
+    if place is None or not place.has_weather:
         return None
-    # Exact id match first.
-    if raw in LOCATIONS:
-        return raw
-    # Common aliases / partial names.
-    aliases = {
-        "ouaga": "ouagadougou",
-        "ouagadougou": "ouagadougou",
-        "bobo": "bobo",
-        "bobo-dioulasso": "bobo",
-        "bobo dioulasso": "bobo",
-        "kaya": "kaya",
-        "ouahigouya": "ouahigouya",
-        "fada": "fada",
-        "fada n'gourma": "fada",
-        "fada ngourma": "fada",
-        "dori": "dori",
-    }
-    if raw in aliases:
-        return aliases[raw]
-    for alias, loc_id in aliases.items():
-        if alias in raw or raw in alias:
-            return loc_id
-    for loc in LOCATIONS.values():
-        name = loc.name.lower()
-        if raw == name or raw in name or name in raw:
-            return loc.id
-    return None
+    return place.id
 
 
 def clear_weather_cache() -> None:

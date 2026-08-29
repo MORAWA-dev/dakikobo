@@ -384,6 +384,123 @@ cd - && git worktree remove "$WT" --force
 
 ---
 
+### 2026-08-24 — Phase 1: the registry (core/places.py, core/crops.py)
+
+**Decided**
+
+- Executed Phase 1 of the locked spec in `plans/dakikobo_assessment_and_plan.md` — single source of truth for places (20) and crops (10).
+- `core/places.py`: `Place` dataclass + `PLACES` dict + `resolve_place` / `list_places`; 6 weather-backed places with coords (ouagadougou, bobo, kaya, ouahigouya, fada, dori), 14 with `has_weather=False`.
+- `core/crops.py`: `Crop` dataclass + `CROPS` dict + `resolve_crop` / `list_crops`; `fertilizer_supported=True` only for sorgho, mil, mais, niebe, arachide.
+- Rewired consumers onto the registries: `weather.py`, `soil.py`, `query_context.py`, `fertilizer.py` (`_match_crop` via `resolve_crop` + guard), `crop_labels.py`.
+- Frontend selects now populated from `GET /registry` with `place.id`/`crop.id` option values; deleted `FIELD_LOCATION_TO_WEATHER`/`FIELD_LOCATION_TO_SOIL`; `syncToolsFromFieldLocation` uses the selected id directly with `option[value=...]` existence guards.
+- Sentinel options (`""`, `autre`, `__custom__`) preserved via `.detach()`/re-append; init deferred behind async `/registry` fetch with `.always(initFieldContext)`.
+- Note: stored `location_select` values were display labels — after switching to ids they fail to restore and degrade safely to "field unset" via existing existence guard (no state corruption).
+
+**Files changed**
+
+- `core/places.py`, `core/crops.py` — new registries
+- `core/weather.py`, `core/soil.py`, `core/query_context.py`, `core/fertilizer.py`, `core/crop_labels.py` — rewired onto registries
+- `app.py` — `GET /registry` route
+- `static/js/index.js` — `populateRegistrySelects`, direct-id sync, init reordering
+- `tests/test_registry.py` — 15 new tests
+- `tests/test_app_routes.py`, `tests/test_frontend_assets.py` — (updated where needed)
+
+**Tests**
+
+- Full offline suite: **226 passed** (excludes live-network `tests/test_rag.py`). Only pre-existing PyPDF2 deprecation warning.
+
+**Still open**
+
+- Phase 2 (extract retrieval & citation into `core/retrieval.py`) is the next phase in the locked spec.
+
+**Next action for the following session**
+
+- Implement Phase 2 of the locked spec, or run the live RAG smoke test when network is available.
+
+---
+
+### 2026-08-26 — Phase 2: retrieval and citation extraction
+
+**Decided**
+
+- Executed Phase 2 of the locked spec in `plans/dakikobo_assessment_and_plan.md`.
+- Moved citation normalization, matching, metadata formatting, weak-source demotion, ranking, and confidence policy from Flask into the network-free `core/retrieval.py` seam.
+- Added immutable `SourceCard` / `GroundedAnswer`, stable runtime chunk IDs, query-less score injection, source-card JSON compatibility, and best-effort count-based fallback when score grading fails.
+- Rewired `/ask` to perform exactly one scored vector search (`k=6`), retain the configured similarity threshold, and pass the same accepted documents to the LLM combine chain and citation grading.
+- The active corpus manifest hash is now set only after a persisted vector store is accepted or a rebuild succeeds, and is cleared before each load/build attempt to prevent stale cache identity.
+- Preserved refusal, uncertainty, deterministic fertilizer, French response, and source metadata behavior. Docker/Gunicorn worker settings were intentionally unchanged for Hugging Face compatibility.
+
+**Files changed**
+
+- `core/retrieval.py` — extracted citation policy and Phase 2 public API.
+- `app.py` — removed duplicate citation policy, activated manifest hashing, and replaced double retrieval with one scored search.
+- `tests/test_retrieval.py` — offline policy coverage for chunk IDs, source metadata, noisy/weak source handling, FEWS demotion, count fallback, and manifest state.
+- `tests/test_app_routes.py` — one-search orchestration, exact document handoff, source JSON, and manifest load/rebuild assertions.
+- `config.py` — corrected citation-policy code reference.
+
+**Tests**
+
+- Retrieval policy: **10 passed**.
+- Route + retrieval target: **74 passed**.
+- Full offline suite: **234 passed** (excludes live-network `tests/test_rag.py`). Only the pre-existing PyPDF2 deprecation warning.
+- Python compilation and `git diff --check`: passed.
+- Public Space pre-deploy check: `/healthz` reports `ready`; `/version` reports `openai/gpt-oss-120b`, multilingual MiniLM embeddings, Markdown KB, startup warm-up enabled, and commit `5374ee13aa82e0cc4deb7ba117cc25756eb7c7a0`.
+
+**Git / deploy**
+
+- Phase 2 remains in the local working tree; no commit, push, or Hugging Face production deployment was performed automatically.
+- Existing one-worker Gunicorn deployment contract remains unchanged. Deploy through the documented HF worktree flow after review, then rerun the strict public evaluation.
+
+**Still open**
+
+- Phase 3 (SQLite cache and concurrency migration) is next in the locked spec.
+- Post-deploy verification must confirm the new Space commit, `rag_status=ready`, one-search behavior, and strict public RAG evaluation.
+
+**Next action for the following session**
+
+- Review and deploy Phase 2 to the Hugging Face Space, then run `scripts/evaluate_rag.py --strict --min-pass-rate 0.75` against the public URL.
+
+---
+
+### 2026-08-29 — Phase 0/1 audit repairs + Phase 2 deployment verification
+
+**Decided**
+
+- Audited the uncommitted Phase 0/1/2 work against the locked plan instead of trusting the earlier completion notes.
+- Phase 0 still contained the live XSS typing path, five-argument photo case call, simple-French elision/footnote loss, stale docs, dead metrics privacy constant, redundant exception tuple, and unlocked readiness reads; all are now repaired.
+- Phase 1 now converts registry ids to French labels before prompt/card construction, populates all five selects from `/registry`, preserves the existing accented `/crop-labels` contract, and returns the registry cache header required by §7.16.
+- Phase 2 remains one scored top-six vector search per `/ask`; the same threshold-accepted documents ground generation and citation grading, while stable ids retain provenance for all retrieved candidates.
+- Kept Docker/Gunicorn at one worker; the plan forbids raising concurrency before Phase 3 moves volatile state to SQLite.
+
+**Files changed**
+
+- `static/js/index.js`, `templates/index.html`, `core/simple_french.py`, `core/ops_metrics.py` — Phase 0 repairs and dynamic registry UI.
+- `core/crops.py`, `core/places.py`, `core/query_context.py`, `core/crop_labels.py`, `core/fertilizer.py`, `core/weather.py`, `core/soil.py`, `app.py` — Phase 1 registry and id/label wiring.
+- `core/retrieval.py`, `app.py`, `config.py` — Phase 2 extraction, manifest identity, and one-search orchestration.
+- `tests/test_frontend_assets.py`, `tests/test_simple_french.py`, `tests/test_registry.py`, `tests/test_query_context.py`, `tests/test_retrieval.py`, `tests/test_app_routes.py` — regression and orchestration coverage.
+- `README.md`, `IMPLEMENTATION_PLAN.md` — current modules, citation flow, and token default.
+
+**Verification**
+
+- Full offline suite excluding live RAG: **243 passed**, one existing PyPDF2 deprecation warning.
+- Targeted Phase 0/1/2 suite: **139 passed**.
+- Python compilation and Flask import: passed.
+- Production Gunicorn smoke: booted with the Docker-compatible one-worker command; `/healthz` returned 200 and `/registry` returned 200 with 10 crops, 20 places, and `Cache-Control: public, max-age=3600`.
+- Local live `tests/test_rag.py`: no test result; stopped after 142 s while `huggingface_hub` was waiting for model assets.
+- Current public Space (before this work is pushed): `/healthz` is `ready`; `/version` is commit `5374ee13aa82e0cc4deb7ba117cc25756eb7c7a0`; `/registry` is 404, confirming Phase 1/2 are not deployed yet.
+
+**Git / deploy**
+
+- No commit or push performed. New imported modules are untracked, so deployment must include `core/crops.py`, `core/places.py`, and `core/retrieval.py`; do not use `git commit -am` alone.
+- After pushing GitHub and the HF worktree, verify `/registry`, `/version`, `/healthz`, then run `scripts/evaluate_rag.py --strict --min-pass-rate 0.75`.
+
+**Still open**
+
+- The plan demands 20 places but the pre-registry alias table had only 17 unique labels; the existing Phase 1 draft fills the locked count with Réo, Boromo, and Yako. Obtain product-owner confirmation before changing that vocabulary.
+- Phase 3 is next; do not change worker count before its SQLite cache/state migration.
+
+---
+
 ### Template for the next session entry
 
 ```markdown

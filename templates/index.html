@@ -123,7 +123,7 @@
               plutôt qu'une précision inventée.
             </div>
             <div class="credibility-note">
-              Métriques ops anonymes (latence/erreurs) : <code>/ops/metrics</code>.
+              Métriques ops anonymes (latence/erreurs) : <code>/ops</code>.
             </div>
           </div>
         </div>
@@ -156,11 +156,6 @@
             <label class="field-context-label" for="fieldCrop">Culture</label>
             <select id="fieldCrop" name="crop" aria-label="Culture">
               <option value="">Je ne sais pas</option>
-              <option value="mil">Mil</option>
-              <option value="sorgho">Sorgho</option>
-              <option value="maïs">Maïs</option>
-              <option value="niébé">Niébé</option>
-              <option value="arachide">Arachide</option>
               <option value="autre">Autre</option>
             </select>
             <label class="field-context-label" for="fieldStage">Stade</label>
@@ -175,12 +170,6 @@
             <label class="field-context-label" for="fieldLocationSelect">Lieu</label>
             <select id="fieldLocationSelect" name="location_select" aria-label="Localité connue">
               <option value="">Je ne sais pas</option>
-              <option value="Ouagadougou">Ouagadougou</option>
-              <option value="Bobo-Dioulasso">Bobo-Dioulasso</option>
-              <option value="Kaya">Kaya</option>
-              <option value="Ouahigouya">Ouahigouya</option>
-              <option value="Fada N'Gourma">Fada N'Gourma</option>
-              <option value="Dori">Dori</option>
               <option value="__custom__">Autre commune / village…</option>
             </select>
             <input
@@ -310,35 +299,15 @@
         <div class="weather-panel" aria-label="Météo agricole">
           <label class="weather-label" for="weatherLocation">Météo agricole</label>
           <div class="weather-controls">
-            <select id="weatherLocation" name="weatherLocation">
-              <option value="ouagadougou">Ouagadougou</option>
-              <option value="bobo">Bobo-Dioulasso</option>
-              <option value="kaya">Kaya</option>
-              <option value="ouahigouya">Ouahigouya</option>
-              <option value="fada">Fada N'Gourma</option>
-              <option value="dori">Dori</option>
-            </select>
+            <select id="weatherLocation" name="weatherLocation"></select>
             <button id="weatherBtn" type="button">Voir</button>
           </div>
         </div>
         <div class="soil-panel" aria-label="Sol et engrais">
           <label class="soil-label" for="soilCrop">Sol + engrais</label>
           <div class="soil-controls">
-            <select id="soilCrop" name="soilCrop">
-              <option value="sorgho">Sorgho</option>
-              <option value="mil">Mil</option>
-              <option value="maïs">Maïs</option>
-              <option value="niébé">Niébé</option>
-              <option value="arachide">Arachide</option>
-            </select>
-            <select id="soilLocation" name="soilLocation">
-              <option value="ouagadougou">Ouagadougou</option>
-              <option value="bobo">Bobo-Dioulasso</option>
-              <option value="kaya">Kaya</option>
-              <option value="ouahigouya">Ouahigouya</option>
-              <option value="fada">Fada N'Gourma</option>
-              <option value="dori">Dori</option>
-            </select>
+            <select id="soilCrop" name="soilCrop"></select>
+            <select id="soilLocation" name="soilLocation"></select>
             <button id="soilBtn" type="button">Voir</button>
           </div>
         </div>
@@ -349,7 +318,6 @@
             type="text"
             id="messageText"
             name="messageText"
-            placeholder="2. Votre question de terrain..."
           />
           <button
             id="toolsToggle"

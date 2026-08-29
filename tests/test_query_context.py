@@ -69,3 +69,18 @@ def test_followup_ok_ouaga_keeps_soja_from_prior():
     assert resolved.location == "Ouagadougou"
     assert "soja" in resolved.retrieval_query.lower()
     assert "culture: soja" in resolved.retrieval_query
+
+
+def test_registry_ids_are_converted_to_french_prompt_labels():
+    resolved = resolve_query_context(
+        "Quand semer ?",
+        {"crop": "mais", "location": "bobo"},
+    )
+    assert resolved.crop_id == "mais"
+    assert resolved.crop_label_fr == "maïs"
+    assert resolved.place_id == "bobo"
+    assert resolved.place_label_fr == "Bobo-Dioulasso"
+    assert "culture: maïs" in resolved.retrieval_query
+    assert "lieu: Bobo-Dioulasso" in resolved.retrieval_query
+    assert resolved.as_case_fields()["crop"] == "maïs"
+    assert resolved.as_case_fields()["location"] == "Bobo-Dioulasso"

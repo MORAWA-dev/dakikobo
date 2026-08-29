@@ -18,7 +18,7 @@ from typing import Iterable
 SIMPLE_STYLE_INSTRUCTION = (
     "Répondez en français très simple : phrases courtes, mots du quotidien, "
     "pas de jargon inutile. Expliquez un terme technique seulement s'il est "
-    "indispensable. Restez prudent et ne inventez pas de doses ou de dates."
+    "indispensable. Restez prudent et n'inventez pas de doses ou de dates."
 )
 
 # Technical term -> plain French explanation (Burkina field vocabulary).
@@ -163,8 +163,12 @@ def light_replacements(text: str) -> str:
 
 
 def simplify_answer(answer: str, *, max_terms: int = 5) -> str:
-    """Apply light replacements then glossary footnotes."""
-    return enrich_answer_with_glossary(
-        light_replacements(answer),
-        max_terms=max_terms,
-    )
+    """Apply light replacements while preserving notes for replaced terms."""
+    original = answer or ""
+    simplified = light_replacements(original)
+    notes = glossary_notes(original, max_terms=max_terms)
+    if not simplified or not notes:
+        return simplified
+    if "Mots simples :" in simplified or "Mots simples:" in simplified:
+        return simplified
+    return simplified.rstrip() + "\n\nMots simples :\n- " + "\n- ".join(notes)

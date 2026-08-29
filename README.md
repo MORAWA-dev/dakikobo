@@ -43,7 +43,8 @@ remplacement de l'agent agricole.
 
 - **Grounded French answers** — RAG over a local document corpus; off-topic questions
   fall back to an honest "je ne sais pas" instead of hallucinating.
-- **Source citations** — each answer shows which document(s) it was drawn from.
+- **Source citations** — one scored retrieval grounds both the generated answer and
+  its ranked source cards, with stable chunk ids for future evidence tracking.
 - **Fast inference** — Groq-hosted `openai/gpt-oss-120b`, with reasoning tokens
   hidden so answers stay short and farmer-readable.
 - **Multilingual retrieval** — `paraphrase-multilingual-MiniLM-L12-v2` embeddings for
@@ -153,7 +154,7 @@ Optional overrides (defaults in `config.py` are fine for development):
 # LLM_REASONING_EFFORT=low
 # APP_VERSION=0.1.0
 # LOG_LEVEL=INFO
-# LLM_MAX_TOKENS=512
+# LLM_MAX_TOKENS=1024
 # LLM_TEMPERATURE=0.1
 # LLM_TIMEOUT_SECONDS=30.0
 # LLM_MAX_RETRIES=1
@@ -327,6 +328,9 @@ dakikobo/
 ├── app.py               # Flask entry point + routes (/ , /ask , /feedback)
 ├── config.py            # Central configuration
 ├── core/
+│   ├── crops.py         # Canonical crop ids, French labels and capabilities
+│   ├── places.py        # Canonical place ids, labels and weather coverage
+│   ├── retrieval.py     # Citation ranking, confidence and stable chunk ids
 │   ├── llm_chain.py     # LLM + RetrievalQA setup and French prompt
 │   └── rag_pipeline.py  # Markdown/PDF ingestion, embeddings, Chroma, TTS
 ├── templates/index.html # Chat UI

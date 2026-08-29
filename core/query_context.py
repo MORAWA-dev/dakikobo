@@ -3,6 +3,10 @@
 Stale form context (e.g. culture=sorgho · lieu=Ouagadougou) must not hijack a
 question about another crop or place. Short follow-ups like "ok à Ouagadougou"
 must keep the previous topic.
+
+Crop and place vocabularies are no longer duplicated here: detection delegates
+to the ``core.crops`` / ``core.places`` registries (A1), so this module and the
+weather/soil/fertilizer paths always agree on what a crop or place is called.
 """
 
 from __future__ import annotations
@@ -11,63 +15,8 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-# Question-side crop aliases (broader than fertilizer tool set).
-_CROP_ALIASES: dict[str, str] = {
-    "sorgho": "sorgho",
-    "sorghum": "sorgho",
-    "mil": "mil",
-    "millet": "mil",
-    "petit mil": "mil",
-    "maïs": "maïs",
-    "mais": "maïs",
-    "maize": "maïs",
-    "niébé": "niébé",
-    "niebe": "niébé",
-    "cowpea": "niébé",
-    "haricot": "niébé",
-    "arachide": "arachide",
-    "arachides": "arachide",
-    "groundnut": "arachide",
-    "cacahuète": "arachide",
-    "cacahuete": "arachide",
-    "soja": "soja",
-    "soya": "soja",
-    "soybean": "soja",
-    "coton": "coton",
-    "riz": "riz",
-    "sésame": "sésame",
-    "sesame": "sésame",
-    "fonio": "fonio",
-}
-
-# Common Burkina place names (normalized key -> display label).
-_LOCATION_ALIASES: dict[str, str] = {
-    "ouagadougou": "Ouagadougou",
-    "ouaga": "Ouagadougou",
-    "bobo": "Bobo-Dioulasso",
-    "bobo-dioulasso": "Bobo-Dioulasso",
-    "bobodioulasso": "Bobo-Dioulasso",
-    "kaya": "Kaya",
-    "dori": "Dori",
-    "koudougou": "Koudougou",
-    "ouahigouya": "Ouahigouya",
-    "banfora": "Banfora",
-    "fada": "Fada N'Gourma",
-    "fada n'gourma": "Fada N'Gourma",
-    "tenkodogo": "Tenkodogo",
-    "dedougou": "Dédougou",
-    "dédougou": "Dédougou",
-    "mogtedo": "Mogtédo",
-    "mogtédo": "Mogtédo",
-    "pouytenga": "Pouytenga",
-    "koupela": "Koupéla",
-    "koupéla": "Koupéla",
-    "ziniare": "Ziniaré",
-    "ziniaré": "Ziniaré",
-    "manga": "Manga",
-    "gaoua": "Gaoua",
-    "kongoussi": "Kongoussi",
-}
+from core.crops import resolve_crop
+from core.places import resolve_place
 
 
 def _normalize(text: str) -> str:
@@ -77,25 +26,27 @@ def _normalize(text: str) -> str:
 
 
 def detect_crop_in_text(text: str) -> str:
-    """Return canonical crop named in free text, or empty string."""
-    t = _normalize(text)
-    if not t:
-        return ""
-    for alias in sorted(_CROP_ALIASES, key=len, reverse=True):
-        if re.search(rf"(?<!\w){re.escape(_normalize(alias))}(?!\w)", t):
-            return _CROP_ALIASES[alias]
-    return ""
+    """Return canonical French crop label named in free text, or empty string."""
+    crop = resolve_crop(text)
+    return crop.label_fr if crop else ""
+
+
+def detect_crop_id_in_text(text: str) -> str:
+    """Return the ascii crop id named in free text, or empty string."""
+    crop = resolve_crop(text)
+    return crop.id if crop else ""
 
 
 def detect_location_in_text(text: str) -> str:
     """Return a display location if a known place is named, else empty."""
-    t = _normalize(text)
-    if not t:
-        return ""
-    for alias in sorted(_LOCATION_ALIASES, key=len, reverse=True):
-        if re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", t):
-            return _LOCATION_ALIASES[alias]
-    return ""
+    place = resolve_place(text)
+    return place.label_fr if place else ""
+
+
+def detect_location_id_in_text(text: str) -> str:
+    """Return the slug place id named in free text, or empty string."""
+    place = resolve_place(text)
+    return place.id if place else ""
 
 
 def is_short_followup(text: str) -> bool:
@@ -135,7 +86,14 @@ def expand_with_prior(query: str, prior_question: str) -> str:
 
 @dataclass(frozen=True)
 class ResolvedQueryContext:
-    """Effective fields after merging question text with the parcelle form."""
+    """Effective fields after merging question text with the parcelle form.
+
+    Carries the id/label pair for both crop and place (§7.2): ``*_id`` is the
+    registry slug used for cache keys and weather/soil/fertilizer lookups,
+    ``*_label_fr`` is the French display/prompt text. ``crop``/``location``
+    remain the label-valued fields the prompt and the card already use, so
+    retrieval and card output stay byte-identical.
+    """
 
     retrieval_query: str
     crop: str
@@ -147,12 +105,17 @@ class ResolvedQueryContext:
     question_location: str
     crop_conflict: bool
     expanded_from_prior: bool
+    crop_id: str = ""
+    crop_label_fr: str = ""
+    place_id: str = ""
+    place_label_fr: str = ""
+    simple_french: bool = False
 
     def as_case_fields(self) -> dict[str, str]:
         return {
-            "crop": self.crop,
+            "crop": self.crop_label_fr or self.crop,
             "growth_stage": self.growth_stage,
-            "location": self.location,
+            "location": self.place_label_fr or self.location,
         }
 
 
@@ -161,6 +124,7 @@ def resolve_query_context(
     form_context: dict[str, str] | None = None,
     *,
     prior_question: str = "",
+    simple_french: bool = False,
 ) -> ResolvedQueryContext:
     """Merge free-text question with optional form context for RAG and cards.
 
@@ -171,9 +135,19 @@ def resolve_query_context(
        (or form crop is empty).
     """
     form = form_context or {}
-    form_crop = (form.get("crop") or "").strip()
+    form_crop_raw = (form.get("crop") or "").strip()
     form_stage = (form.get("growth_stage") or "").strip()
-    form_location = (form.get("location") or "").strip()
+    form_location_raw = (form.get("location") or "").strip()
+
+    # Browser selects submit stable registry ids. Convert those ids (and any
+    # accepted aliases from older clients) to French labels before they reach
+    # the prompt or the farmer-facing card.
+    form_crop_entry = resolve_crop(form_crop_raw) if form_crop_raw else None
+    form_place_entry = resolve_place(form_location_raw) if form_location_raw else None
+    form_crop = form_crop_entry.label_fr if form_crop_entry else form_crop_raw
+    form_location = (
+        form_place_entry.label_fr if form_place_entry else form_location_raw
+    )
 
     raw_query = (query or "").strip()
     prior = (prior_question or "").strip()
@@ -215,6 +189,12 @@ def resolve_query_context(
         crop_conflict=crop_conflict,
     )
 
+    # Registry ids for cache keys and weather/soil/fertilizer lookups. Resolving
+    # the effective label back through the registry keeps form-supplied values
+    # (which may be aliases or unaccented) on the same vocabulary as the question.
+    resolved_crop = resolve_crop(crop) if crop else None
+    resolved_place = resolve_place(location) if location else None
+
     return ResolvedQueryContext(
         retrieval_query=retrieval_query,
         crop=crop,
@@ -226,6 +206,11 @@ def resolve_query_context(
         question_location=question_location,
         crop_conflict=crop_conflict,
         expanded_from_prior=expanded_from_prior,
+        crop_id=resolved_crop.id if resolved_crop else "",
+        crop_label_fr=resolved_crop.label_fr if resolved_crop else crop,
+        place_id=resolved_place.id if resolved_place else "",
+        place_label_fr=resolved_place.label_fr if resolved_place else location,
+        simple_french=simple_french,
     )
 
 

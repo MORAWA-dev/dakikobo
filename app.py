@@ -3,8 +3,6 @@
 import os
 import json
 import logging
-import re
-import unicodedata
 from math import ceil
 from time import perf_counter, time
 from threading import Lock, Thread
@@ -26,6 +24,13 @@ from core.rag_pipeline import (
     text_to_speech_to_static,
 )
 from core.llm_chain import sanitize_answer, setup_retrieval_qa
+from core.retrieval import (
+    GroundedAnswer,
+    chunk_id,
+    ground_answer,
+    manifest_hash,
+    set_active_manifest_hash,
+)
 from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
@@ -52,6 +57,8 @@ from core.weather import (
     list_weather_locations,
     resolve_weather_location_id,
 )
+from core.crops import list_crops
+from core.places import list_places
 from core.soil import (
     SoilError,
     build_soil_context,
@@ -74,10 +81,7 @@ from config import (
     SECRET_KEY,
     BOT_NAME,
     BOT_CREATOR,
-    CONFIDENCE_STRONG_SCORE,
-    CONFIDENCE_MEDIUM_SCORE,
-    CITATION_SCORE_MARGIN,
-    MAX_RAG_SOURCES,
+    SIMILARITY_THRESHOLD,
     REBUILD_VECTORSTORE,
     RAG_WARMUP_ON_START,
     REQUEST_COOLDOWN_SECONDS,
@@ -200,245 +204,6 @@ def _request_log_finish(response):
     return response
 
 
-def _short_snippet(text: str, max_chars: int = 150) -> str:
-    text = " ".join((text or "").split())
-    if len(text) <= max_chars:
-        return text
-    cut = text[:max_chars].rsplit(" ", 1)[0]
-    return f"{cut}..."
-
-
-_DOC_TYPE_LABELS = {
-    "fao_report": "Rapport FAO",
-    "csa_plan": "Plan CSA",
-    "training_manual": "Manuel de formation",
-    "research_article": "Article de recherche",
-    "country_profile": "Profil pays",
-    "program_doc": "Document de programme",
-    "survey_report": "Enquête agricole",
-    "scraped_web": "Source web revue",
-}
-
-_REVIEW_STATUS_LABELS = {
-    "reviewed_by_codex_pending_human_review": "Revu, validation humaine à finaliser",
-    "source_verified_pending_owner_signoff": "Source vérifiée, signature propriétaire en attente",
-    "reviewed_by_codex": "Revu par Codex",
-    "reviewed_by_owner": "Validé par le propriétaire",
-    "pending_human_review": "À vérifier humainement",
-    "pending_verification": "Vérification requise",
-}
-
-_CITATION_STOPWORDS = {
-    "avec", "dans", "pour", "contre", "comment", "quelle", "quand", "quoi",
-    "vous", "votre", "cette", "cela", "faire", "avoir", "etre", "sont",
-    "plus", "bien", "agricole", "agriculture", "burkina", "faso", "les",
-    "des", "sur", "aux", "une", "est", "son", "ses", "mes", "vos", "nos",
-    "par", "pas", "que", "qui", "quel", "elle", "ils", "elles", "leur",
-}
-
-_CROP_TOKENS = {
-    "arachide", "coton", "fonio", "mais", "mil", "niebe", "riz",
-    "sesame", "soja", "sorgho",
-}
-
-# Generic or off-scope titles that often pollute crop-specific answers.
-# Ranking demotes these when stronger crop-matched sources are available.
-_WEAK_SOURCE_MARKERS = (
-    "farmer's handbook",
-    "farmer_training",
-    "basic agriculture",
-    "caracteristiques des menages",
-    "cartographie des zones socio",
-    "zones socio-rurales",
-    "agrobusiness",
-    "modernisation agricole",
-    "comprehensive report",
-    "foncier",
-    "profil des moyens d'existence",  # seasonal calendar ok for semis; weak for agronomy
-    "fews net",
-    "fews",
-    "moyens d'existence",
-    "livelihood",
-    "household survey",
-    "orpaillage",
-)
-
-# Field-practice questions should not lead with livelihood/FEWS-style profiles
-# when stronger extension sources exist.
-_FIELD_PRACTICE_TOKENS = {
-    "rotation",
-    "humidite",
-    "paillage",
-    "mulching",
-    "mulch",
-    "fumure",
-    "engrais",
-    "semis",
-    "semer",
-    "stockage",
-    "stocker",
-    "bruche",
-    "maladie",
-    "tache",
-    "compost",
-    "azote",
-    "infiltration",
-    "ruissellement",
-}
-
-_CITATION_ALIASES = {
-    "arachide": {"groundnut", "cacahuete"},
-    "bruche": {"bruches", "insecte", "insectes", "ravageur", "ravageurs"},
-    "bruches": {"bruche", "insecte", "insectes", "ravageur", "ravageurs"},
-    "carence": {"carences", "chlorose", "jaunissement"},
-    "chlorose": {"carence", "carences", "jaunissement"},
-    "conservation": {"conserver", "stockage", "stocker", "eau", "humidite"},
-    "conserver": {"conservation", "stockage", "stocker"},
-    "engrais": {"fertilisation", "fertiliser", "fumure"},
-    "fertilisation": {"engrais", "fertiliser", "fumure"},
-    "fertiliser": {"engrais", "fertilisation", "fumure"},
-    "feuille": {"feuilles", "foliaire", "tache", "taches"},
-    "feuilles": {"feuille", "foliaire", "tache", "taches"},
-    "fumure": {"engrais", "fertilisation", "fertiliser"},
-    "humidite": {"paillage", "mulching", "eau", "infiltration", "evaporation"},
-    "maladie": {"maladies", "symptome", "symptomes", "feuille", "tache"},
-    "maladies": {"maladie", "symptome", "symptomes", "feuille", "tache"},
-    "paillage": {"mulching", "mulch", "residus", "humidite"},
-    "rotation": {"azote", "legumineuse", "cereales", "fertilite"},
-    "semer": {"semis"},
-    "semis": {"semer"},
-    "stockage": {"conservation", "conserver", "stocker"},
-    "stocker": {"conservation", "conserver", "stockage"},
-    "symptome": {"maladie", "maladies", "symptomes", "tache", "feuille"},
-    "symptomes": {"maladie", "maladies", "symptome", "tache", "feuille"},
-    "tache": {"taches", "feuille", "feuilles", "maladie"},
-    "taches": {"tache", "feuille", "feuilles", "maladie"},
-}
-
-
-def _normalize_for_match(text: str) -> str:
-    text = unicodedata.normalize("NFKD", text or "")
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    return text.lower()
-
-
-def _citation_tokens(text: str) -> set[str]:
-    normalized = _normalize_for_match(text)
-    tokens = set(re.findall(r"[a-z0-9]{3,}", normalized))
-    filtered = {token for token in tokens if token not in _CITATION_STOPWORDS}
-    expanded = set()
-    for token in filtered:
-        expanded.add(token)
-        expanded.update(_CITATION_ALIASES.get(token, set()))
-    return expanded
-
-
-def _source_match_texts(source_docs) -> dict[str, str]:
-    by_title = {}
-    for doc in source_docs:
-        title = doc.metadata.get("source", "Inconnu")
-        by_title.setdefault(title, []).append(getattr(doc, "page_content", ""))
-    return {title: " ".join(texts) for title, texts in by_title.items()}
-
-
-def _source_tokens(source: dict, match_text: str) -> set[str]:
-    source_text = f"{source.get('title', '')} {source.get('snippet', '')} {match_text}"
-    return _citation_tokens(source_text)
-
-
-def _source_overlap(source: dict, query_tokens: set[str], match_text: str = "") -> int:
-    if not query_tokens:
-        return 0
-    return len(query_tokens.intersection(_source_tokens(source, match_text)))
-
-
-def _is_weak_source_title(title: str) -> bool:
-    normalized = _normalize_for_match(title)
-    return any(marker in normalized for marker in _WEAK_SOURCE_MARKERS)
-
-
-def _source_rank_score(title: str, base_score: float, *, heavy: bool = False) -> float:
-    """Adjust retrieval score for ranking: demote known weak/generic titles."""
-    if not _is_weak_source_title(title):
-        return float(base_score)
-    # Heavier demotion for field-practice questions (rotation, humidite, etc.).
-    penalty = 0.28 if heavy else 0.12
-    return float(base_score) - penalty
-
-
-def _is_field_practice_query(query_tokens: set[str]) -> bool:
-    return bool(query_tokens.intersection(_FIELD_PRACTICE_TOKENS))
-
-
-def _title_crop_hits(title: str, crop_tokens: set[str]) -> int:
-    if not crop_tokens:
-        return 0
-    return len(_citation_tokens(title).intersection(crop_tokens))
-
-
-def _safe_source_url(metadata: dict) -> str:
-    url = (metadata.get("source_url") or "").strip()
-    if not url:
-        source_file = (metadata.get("source_file") or "").strip()
-        if source_file.startswith(("http://", "https://")):
-            url = source_file
-    if url.startswith(("http://", "https://")):
-        return url
-    return ""
-
-
-def _source_card_from_doc(doc) -> dict:
-    metadata = getattr(doc, "metadata", {}) or {}
-    title = metadata.get("source", "Inconnu")
-    doc_type = metadata.get("doc_type", "")
-    card = {
-        "title": title,
-        "type": _DOC_TYPE_LABELS.get(doc_type, "Base locale"),
-        "snippet": _short_snippet(getattr(doc, "page_content", "")),
-    }
-    for key in ("publisher", "year", "country"):
-        value = (metadata.get(key) or "").strip()
-        if value:
-            card[key] = value
-
-    review_status = (metadata.get("review_status") or "").strip()
-    review_label = _REVIEW_STATUS_LABELS.get(review_status)
-    if review_label:
-        card["review_status"] = review_label
-
-    url = _safe_source_url(metadata)
-    if url:
-        card["url"] = url
-
-    return card
-
-
-def _format_rag_sources(source_docs) -> list[dict]:
-    """Return unique, UI-friendly source cards from retrieved documents.
-
-    The card type reflects the document's `doc_type` metadata when available
-    (e.g. "Rapport FAO"), and cards expose reviewed document metadata when
-    available: publisher, year, country, review status, and source URL.
-    """
-    by_title = {}
-    for doc in source_docs:
-        metadata = getattr(doc, "metadata", {}) or {}
-        title = metadata.get("source", "Inconnu")
-        if title in by_title:
-            continue
-        by_title[title] = _source_card_from_doc(doc)
-    return sorted(by_title.values(), key=lambda item: item["title"])
-
-
-def _confidence_from_sources(sources: list[dict]) -> str:
-    """Count-based fallback, used only when relevance scores are unavailable."""
-    if len(sources) >= 2:
-        return "Fort"
-    if len(sources) == 1:
-        return "Moyen"
-    return "Faible"
-
-
 def _is_refusal(answer: str) -> bool:
     """True when the model returned the grounded 'I don't know' fallback.
 
@@ -557,7 +322,9 @@ def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict |
         return [], None
     try:
         weather = build_weather_context(loc_id)
-    except (WeatherError, ValueError, Exception) as exc:
+    # Weather enrichment is optional; any provider/parser failure must not
+    # prevent the main agricultural answer from being returned.
+    except Exception as exc:
         print(f"Weather enrichment skipped for {loc_id}: {exc}")
         return [], None
     # Prefer one actionable signal (risk > watch > good) for compact cards.
@@ -574,144 +341,6 @@ def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict |
     ranked.sort(key=lambda item: item[0])
     signals = [line for _, line in ranked[:1]]
     return signals, weather
-
-
-def _confidence_from_score(top_score: float) -> str:
-    """Map the best retrieval relevance score to a confidence label."""
-    if top_score >= CONFIDENCE_STRONG_SCORE:
-        return "Fort"
-    if top_score >= CONFIDENCE_MEDIUM_SCORE:
-        return "Moyen"
-    return "Faible"
-
-
-def _source_scores(query: str) -> dict:
-    """Best relevance score per source title for this query.
-
-    Returns an empty dict when the vector store is unavailable (e.g. unit tests
-    that mock the chain), which makes callers fall back to count-based logic.
-    """
-    if _rag_db is None:
-        return {}
-    try:
-        scored = _rag_db.similarity_search_with_relevance_scores(query, k=10)
-    except Exception as e:  # never let scoring break an answer
-        print(f"Score lookup failed; using count-based confidence: {e}")
-        return {}
-
-    best = {}
-    for doc, score in scored:
-        title = doc.metadata.get("source", "Inconnu")
-        if title not in best or score > best[title]:
-            best[title] = score
-    return best
-
-
-def _grounded_sources_and_confidence(query: str, source_docs) -> tuple[list[dict], str]:
-    """Build the source cards and confidence from retrieval relevance scores.
-
-    Drops secondary citations that either miss the query's crop/topic concepts
-    or score far below the best match. Demotes known weak/generic titles when
-    ranking. Falls back to the count-based heuristic when no scores exist.
-    """
-    sources = _format_rag_sources(source_docs)
-    scores = _source_scores(query)
-
-    if not sources or not scores:
-        return sources, _confidence_from_sources(sources)
-
-    query_tokens = _citation_tokens(query)
-    match_texts = _source_match_texts(source_docs)
-    source_tokens = {
-        s["title"]: _source_tokens(s, match_texts.get(s["title"], ""))
-        for s in sources
-    }
-    query_crop_tokens = query_tokens.intersection(_CROP_TOKENS)
-    query_topic_tokens = query_tokens - query_crop_tokens
-
-    crop_overlaps = {
-        title: len(tokens.intersection(query_crop_tokens))
-        for title, tokens in source_tokens.items()
-    }
-    had_crop_filter = False
-    if query_crop_tokens and any(crop_overlaps.values()):
-        sources = [s for s in sources if crop_overlaps.get(s["title"], 0) > 0]
-        had_crop_filter = True
-
-    topic_overlaps = {
-        title: len(tokens.intersection(query_topic_tokens))
-        for title, tokens in source_tokens.items()
-    }
-    if query_topic_tokens and any(topic_overlaps.get(s["title"], 0) > 0 for s in sources):
-        sources = [s for s in sources if topic_overlaps.get(s["title"], 0) > 0]
-
-    overlaps = {
-        s["title"]: _source_overlap(s, query_tokens, match_texts.get(s["title"], ""))
-        for s in sources
-    }
-    if any(overlaps.values()):
-        max_overlap = max(overlaps.values())
-        min_overlap = max(1, max_overlap - 1) if max_overlap >= 3 else 1
-        sources = [s for s in sources if overlaps.get(s["title"], 0) >= min_overlap]
-
-    scored_known = [scores[s["title"]] for s in sources if s["title"] in scores]
-    if not scored_known:
-        return sources, _confidence_from_sources(sources)
-
-    top = max(scored_known)
-    floor = top - CITATION_SCORE_MARGIN
-    kept = [
-        s for s in sources
-        if s["title"] in scores and scores[s["title"]] >= floor
-    ]
-    if not kept:
-        kept = [s for s in sources if s["title"] in scores and scores[s["title"]] == top]
-
-    practice_query = _is_field_practice_query(query_tokens)
-
-    # Drop weak generic titles when at least one stronger source remains.
-    # If only weak titles remain, keep them but force low confidence below
-    # (still better than answering with zero citations after the LLM saw chunks).
-    strong = [s for s in kept if not _is_weak_source_title(s["title"])]
-    if strong:
-        kept = strong
-
-    if not kept:
-        return [], "Faible"
-
-    # Prefer title crop match, then content crop overlap, then adjusted score.
-    ranked = sorted(
-        kept,
-        key=lambda source: (
-            _title_crop_hits(source["title"], query_crop_tokens),
-            crop_overlaps.get(source["title"], 0),
-            _source_rank_score(
-                source["title"],
-                scores.get(source["title"], -1.0),
-                heavy=practice_query,
-            ),
-        ),
-        reverse=True,
-    )
-
-    max_sources = MAX_RAG_SOURCES
-    confidence = _confidence_from_score(top)
-    # Crop-focused questions without any crop-matching source: keep one card
-    # and avoid overstating confidence.
-    if query_crop_tokens and not had_crop_filter:
-        max_sources = 1
-        if confidence == "Fort":
-            confidence = "Moyen"
-    # If the best remaining citation is still a weak generic source, stay Moyen
-    # (or Faible for field-practice questions).
-    if ranked and _is_weak_source_title(ranked[0]["title"]):
-        max_sources = min(max_sources, 1)
-        if practice_query:
-            confidence = "Faible"
-        elif confidence == "Fort":
-            confidence = "Moyen"
-
-    return ranked[:max_sources], confidence
 
 
 def _confidence_for_screen(case: dict | None, has_context: bool) -> str:
@@ -854,10 +483,15 @@ def _expected_vector_store_manifest() -> dict:
 def _load_or_build_vector_store():
     store_exists = vector_store_exists()
     expected_manifest = _expected_vector_store_manifest()
+    active_hash = manifest_hash(expected_manifest)
+    # Never expose a stale corpus identity if loading/rebuilding fails.
+    set_active_manifest_hash(None)
+
     if store_exists and not REBUILD_VECTORSTORE:
         print("1. Loading existing vector store (set REBUILD_VECTORSTORE=true to rebuild)...")
         db = load_vector_store_if_usable(expected_manifest)
         if db is not None:
+            set_active_manifest_hash(active_hash)
             return db
         print("1. Clearing unusable vector store for a clean rebuild...")
         clear_vector_store()
@@ -881,7 +515,10 @@ def _load_or_build_vector_store():
         f"({len(local_docs)} {local_source} docs + {len(website_docs)} web sources)..."
     )
     all_docs = website_docs + local_docs
-    return initialize_vector_store(all_docs, expected_manifest)
+    db = initialize_vector_store(all_docs, expected_manifest)
+    if db is not None:
+        set_active_manifest_hash(active_hash)
+    return db
 
 
 def get_rag_chain():
@@ -892,8 +529,12 @@ def get_rag_chain():
             if _rag_chain is None:
                 db = _load_or_build_vector_store()
                 print("4. Setting up RetrievalQA chain...")
-                _rag_chain = setup_retrieval_qa(db)
-                _rag_db = db  # kept so /ask can read relevance scores
+                chain = setup_retrieval_qa(db)
+                # `_rag_chain` is the readiness sentinel. Publish the database
+                # first so requests racing background warm-up never see a ready
+                # chain without the vector store required by `/ask`.
+                _rag_db = db
+                _rag_chain = chain
                 print(f"✅ {BOT_NAME} is ready!")
     return _rag_chain
 
@@ -941,7 +582,11 @@ def _rag_runtime_status() -> dict:
         finished_at = _rag_warmup_finished_at
         error = _rag_warmup_error
 
-    if _rag_chain is not None:
+    # Keep readiness reads under the same lock used to publish the chain.
+    with _rag_lock:
+        rag_ready = _rag_chain is not None
+
+    if rag_ready:
         status = "ready"
     elif error:
         status = "error"
@@ -979,7 +624,8 @@ def crop_labels_route():
         crop_id = (crop.get("id") or "").strip()
         if not crop_id:
             continue
-        # Align with form values that use accents for maïs / niébé.
+        # Preserve this existing route's accented form-value contract. The
+        # registry endpoint separately exposes stable ASCII ids.
         form_id = {
             "mais": "maïs",
             "niebe": "niébé",
@@ -1000,13 +646,31 @@ def crop_labels_route():
     )
 
 
+@app.route("/registry")
+def registry():
+    """Canonical crop and place registry for populating UI selects (Phase 1)."""
+    try:
+        crops = list_crops()
+        places = list_places()
+    except Exception as exc:
+        logger.exception("Registry loading failed: %s", exc)
+        return jsonify({
+            "error": "Le registre des cultures et des lieux est indisponible.",
+            "crops": [],
+            "places": [],
+        }), 500
+    response = jsonify({"crops": crops, "places": places})
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
 @app.route("/healthz")
 def healthz():
     rag_runtime = _rag_runtime_status()
     return jsonify({
         "ok": True,
         "bot": BOT_NAME,
-        "rag_ready": _rag_chain is not None,
+        "rag_ready": rag_runtime["status"] == "ready",
         "rag_status": rag_runtime["status"],
         "rag_warmup": rag_runtime,
     })
@@ -1277,15 +941,57 @@ def ask():
             return jsonify(payload)
 
     try:
-        response = get_rag_chain().invoke(retrieval_query)
+        chain = get_rag_chain()
+        if _rag_db is None:
+            raise RuntimeError("Le magasin vectoriel RAG n'est pas initialisé.")
+
+        # One scored retrieval is the sole evidence set for both generation and
+        # citation grading. This avoids RetrievalQA invoking the retriever a
+        # second time and keeps the answer aligned with the displayed sources.
+        scored = _rag_db.similarity_search_with_relevance_scores(
+            retrieval_query,
+            k=6,
+        )
+        retrieved_chunk_ids = [
+            chunk_id(
+                (getattr(doc, "metadata", {}) or {}).get("source", "Inconnu"),
+                getattr(doc, "page_content", ""),
+            )
+            for doc, _ in scored
+        ]
+        accepted_scored = [
+            (doc, score)
+            for doc, score in scored
+            if score >= SIMILARITY_THRESHOLD
+        ]
+        source_docs = [doc for doc, _ in accepted_scored]
+        source_scores = {}
+        for doc, score in accepted_scored:
+            metadata = getattr(doc, "metadata", {}) or {}
+            title = metadata.get("source", "Inconnu")
+            if title not in source_scores or score > source_scores[title]:
+                source_scores[title] = score
+
+        raw_answer = chain.combine_documents_chain.run(
+            input_documents=source_docs,
+            question=retrieval_query,
+        )
         # Reasoning models can leak chain-of-thought into `content`; never show
         # that to a farmer.
-        answer = sanitize_answer(response["result"])
+        answer = sanitize_answer(raw_answer)
+        grounded_policy = ground_answer(
+            retrieval_query,
+            source_docs,
+            score_lookup=lambda: source_scores,
+        )
+        grounded = GroundedAnswer(
+            sources=grounded_policy.sources,
+            confidence=grounded_policy.confidence,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+        )
 
-        # Surface the documents the answer was grounded in, ranked and filtered
-        # by retrieval relevance score so confidence reflects match quality, not
-        # how many chunks came back.
-        source_docs = response.get("source_documents", [])
+        # Threshold-accepted documents ground generation and citations, while
+        # provenance retains every raw top-six candidate for cache/ledger use.
         case = None
         answer_kind = "advice"
         case_kwargs = {
@@ -1309,7 +1015,7 @@ def ask():
         elif _is_uncertain(answer):
             # First-class uncertainty: keep weak sources for transparency, force
             # Faible confidence, and surface a non-confirmed field case.
-            sources, _ = _grounded_sources_and_confidence(retrieval_query, source_docs)
+            sources = [card.as_dict() for card in grounded.sources]
             confidence = "Faible"
             refusal = False
             answer_kind = "uncertain"
@@ -1326,12 +1032,12 @@ def ask():
                 **case_kwargs,
             )
         else:
-            sources, confidence = _grounded_sources_and_confidence(
-                retrieval_query, source_docs
-            )
+            sources = [card.as_dict() for card in grounded.sources]
+            confidence = grounded.confidence
             refusal = False
             answer_kind = "advice"
             answer = _maybe_simplify(answer, simple_french)
+
             case = build_advice_case(
                 answer=answer,
                 sources=sources,
@@ -1355,6 +1061,7 @@ def ask():
             audio_generated=bool(audio_url),
             case_structured=case is not None,
         )
+
         payload = {
             "answer": answer,
             "sources": sources,
