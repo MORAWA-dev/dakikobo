@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as datetime_time, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 
 from config import WEATHER_TIMEOUT_SECONDS
+from core.cache import TTLCache
 from core.places import PLACES, resolve_place
 
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -43,7 +44,8 @@ SOURCE_OPEN_METEO = {
     "snippet": "Prévision gratuite: pluie, température, évapotranspiration ET0 et humidité du sol.",
 }
 
-_CACHE: dict[tuple[str, str], dict] = {}
+_WEATHER_CACHE = TTLCache("weather", ttl_seconds=1)
+_BURKINA_TZ = ZoneInfo("Africa/Abidjan")
 
 
 def list_weather_locations() -> list[dict]:
@@ -72,7 +74,17 @@ def resolve_weather_location_id(text: str) -> str | None:
 
 
 def clear_weather_cache() -> None:
-    _CACHE.clear()
+    _WEATHER_CACHE.clear()
+
+
+def _seconds_until_local_midnight() -> int:
+    now = datetime.now(_BURKINA_TZ)
+    midnight = datetime.combine(
+        now.date() + timedelta(days=1),
+        datetime_time.min,
+        tzinfo=_BURKINA_TZ,
+    )
+    return max(1, int((midnight - now).total_seconds()))
 
 
 def _round_or_none(value, digits: int = 1):
@@ -265,10 +277,11 @@ def build_weather_context(location_id: str, payload: dict | None = None) -> dict
     if location is None:
         raise ValueError("Localité météo non prise en charge.")
 
-    today = date.today()
-    cache_key = (location.id, today.isoformat())
-    if payload is None and cache_key in _CACHE:
-        cached = deepcopy(_CACHE[cache_key])
+    today = datetime.now(_BURKINA_TZ).date()
+    cache_key = f"{location.id}|{today.isoformat()}"
+    cached_value = _WEATHER_CACHE.get(cache_key) if payload is None else None
+    if cached_value is not None:
+        cached = cached_value
         cached["cached"] = True
         return cached
 
@@ -326,5 +339,7 @@ def build_weather_context(location_id: str, payload: dict | None = None) -> dict
     }
 
     if payload is None:
-        _CACHE[cache_key] = deepcopy(result)
+        # Expire at the next Burkina Faso midnight, not a rolling 24 hours.
+        _WEATHER_CACHE.ttl_seconds = _seconds_until_local_midnight()
+        _WEATHER_CACHE.set(cache_key, result)
     return result

@@ -51,6 +51,8 @@ remplacement de l'agent agricole.
   good French matching, stored in a **persistent ChromaDB** (built once, fast on restart).
 - **Hosted warm-up** — the Docker Space can prepare RAG in the background after startup so the
   first public question is less likely to pay the full indexing cost.
+- **Shared answer and context cache** — SQLite WAL serves repeat grounded answers immediately and
+  shares weather, soil, and privacy-safe ops state across two threaded workers.
 - **Voice output (TTS)** — answers can auto-play in French via gTTS and be replayed
   from their answer bubble.
 - **Voice input (STT)** — records a short browser audio clip and transcribes it with
@@ -89,6 +91,7 @@ remplacement de l'agent agricole.
 | Text-to-speech   | gTTS (French)                                         |
 | Weather data     | Open-Meteo Forecast API                               |
 | Soil indicators  | SoilGrids REST API                                    |
+| Runtime state    | SQLite WAL (answer/weather/soil caches + ops metrics) |
 
 ---
 
@@ -298,6 +301,9 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `MARKDOWN_FOLDER`      | `Data/markdown`                          | Reviewed Markdown corpus for RAG         |
 | `PREFER_MARKDOWN_KB`   | `true`                                   | Use Markdown first; fallback to PDFs if needed |
 | `CASE_LOG_DB_PATH`     | `data/case_log.sqlite3`                  | Runtime SQLite feedback/case log         |
+| `STATE_DB_PATH`        | `data/runtime_state.sqlite3`             | Shared SQLite cache and ops state         |
+| `ANSWER_CACHE_ENABLED` | `true`                                   | Enable corpus-aware repeat-answer cache   |
+| `ANSWER_CACHE_TTL_SECONDS` | `86400`                              | Answer cache lifetime (24 hours)          |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
 | `STT_MODEL`            | `whisper-large-v3-turbo`                 | Groq model for voice input transcription |
@@ -307,7 +313,7 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `GEMINI_MODEL`         | `gemini-2.5-flash`                       | Gemini Vision model for leaf screening   |
 | `GEMINI_TIMEOUT_SECONDS` | `45.0`                                 | Max wait for Gemini image screening      |
 | `WEATHER_TIMEOUT_SECONDS` | `10.0`                                | Max wait for Open-Meteo requests         |
-| `SOIL_TIMEOUT_SECONDS` | `12.0`                                   | Max wait for SoilGrids requests          |
+| `SOIL_TIMEOUT_SECONDS` | `18.0`                                   | Max wait for SoilGrids requests          |
 | `WEB_FETCH_TIMEOUT_SECONDS` | `15.0`                              | Max wait for web knowledge fetches       |
 | `FIRECRAWL_API_KEY`    | empty                                    | Firecrawl key for offline source scraping |
 | `FIRECRAWL_HTTP_TIMEOUT_SECONDS` | `45.0`                         | Max wait for Firecrawl API requests      |

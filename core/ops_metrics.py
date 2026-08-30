@@ -1,18 +1,20 @@
-"""In-process privacy-safe request metrics for demo observability.
+"""SQLite-backed privacy-safe request metrics for demo observability.
 
-Keeps a fixed-size ring of recent HTTP events so operators can inspect latency,
-failures, and feature outcomes without a full log stack. Privacy is enforced by
-the explicit field whitelist in ``OpsMetricsStore.record``; question text,
-answers, transcripts, and upload bytes are never copied into an event.
+Only an explicit field whitelist is persisted. Question text, answers,
+transcripts, and upload bytes never enter the metric table. SQLite WAL keeps
+the recent-event view coherent across Gunicorn workers.
 """
 
 from __future__ import annotations
 
-from collections import Counter, deque
-from dataclasses import asdict, dataclass, field
+from collections import Counter
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
+
+from config import OPS_METRICS_MAX_EVENTS, STATE_DB_PATH
+from core.cache import sqlite_connection
 
 
 def _utc_now_iso() -> str:
@@ -35,31 +37,102 @@ class MetricEvent:
     source_count: int | None = None
     answer_kind: str = ""
     refusal: bool | None = None
+    cache_hit: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-class OpsMetricsStore:
-    """Thread-safe ring buffer of recent request metrics."""
+_EVENT_COLUMNS = (
+    "timestamp",
+    "method",
+    "route",
+    "endpoint",
+    "status_code",
+    "latency_ms",
+    "feature",
+    "intent",
+    "outcome",
+    "failure_type",
+    "confidence",
+    "source_count",
+    "answer_kind",
+    "refusal",
+    "cache_hit",
+)
 
-    def __init__(self, max_events: int = 200):
+
+class OpsMetricsStore:
+    """Privacy-filtered SQLite event store with a bounded snapshot window."""
+
+    def __init__(
+        self,
+        max_events: int = OPS_METRICS_MAX_EVENTS,
+        *,
+        db_path: str = STATE_DB_PATH,
+    ):
         self._max_events = max(10, int(max_events))
-        self._events: deque[MetricEvent] = deque(maxlen=self._max_events)
-        self._lock = Lock()
-        self._total = 0
-        self._errors = 0
+        self.db_path = str(db_path)
+        self._ensure_schema()
+
+    def _ensure_schema(self) -> None:
+        with sqlite_connection(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS metric_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    route TEXT NOT NULL,
+                    endpoint TEXT NOT NULL,
+                    status_code INTEGER NOT NULL,
+                    latency_ms REAL,
+                    feature TEXT NOT NULL DEFAULT '',
+                    intent TEXT NOT NULL DEFAULT '',
+                    outcome TEXT NOT NULL DEFAULT '',
+                    failure_type TEXT NOT NULL DEFAULT '',
+                    confidence TEXT NOT NULL DEFAULT '',
+                    source_count INTEGER,
+                    answer_kind TEXT NOT NULL DEFAULT '',
+                    refusal INTEGER,
+                    cache_hit INTEGER
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS metric_totals (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    recorded_events INTEGER NOT NULL,
+                    http_errors INTEGER NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO metric_totals (id, recorded_events, http_errors)
+                SELECT 1,
+                       COUNT(*),
+                       COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0)
+                FROM metric_events
+                WHERE NOT EXISTS (SELECT 1 FROM metric_totals WHERE id = 1)
+                """
+            )
 
     def reset(self) -> None:
-        with self._lock:
-            self._events.clear()
-            self._total = 0
-            self._errors = 0
+        with sqlite_connection(self.db_path) as conn:
+            conn.execute("DELETE FROM metric_events")
+            conn.execute(
+                """
+                UPDATE metric_totals
+                SET recorded_events = 0, http_errors = 0
+                WHERE id = 1
+                """
+            )
 
     def record(self, **fields: Any) -> MetricEvent | None:
-        """Record a privacy-filtered metric event. Returns None if route is skipped."""
+        """Record a privacy-filtered event; skip the metrics endpoint itself."""
         route = str(fields.get("route") or "")
-        # Avoid recording metrics scraping itself (noise loop).
         if route.startswith("/ops"):
             return None
 
@@ -76,6 +149,11 @@ class OpsMetricsStore:
         except (TypeError, ValueError):
             source_count_i = None
 
+        refusal = fields.get("refusal")
+        refusal = refusal if isinstance(refusal, bool) else None
+        cache_hit = fields.get("cache_hit")
+        cache_hit = cache_hit if isinstance(cache_hit, bool) else None
+
         event = MetricEvent(
             timestamp=str(fields.get("timestamp") or _utc_now_iso()),
             method=str(fields.get("method") or "")[:12],
@@ -90,32 +168,85 @@ class OpsMetricsStore:
             confidence=str(fields.get("confidence") or "")[:20],
             source_count=source_count_i,
             answer_kind=str(fields.get("answer_kind") or "")[:30],
-            refusal=fields.get("refusal") if isinstance(fields.get("refusal"), bool) else None,
+            refusal=refusal,
+            cache_hit=cache_hit,
         )
 
-        with self._lock:
-            self._events.append(event)
-            self._total += 1
-            if status >= 400:
-                self._errors += 1
+        values = event.to_dict()
+        values["refusal"] = None if refusal is None else int(refusal)
+        values["cache_hit"] = None if cache_hit is None else int(cache_hit)
+        placeholders = ", ".join("?" for _ in _EVENT_COLUMNS)
+        with sqlite_connection(self.db_path) as conn:
+            conn.execute(
+                f"INSERT INTO metric_events ({', '.join(_EVENT_COLUMNS)}) "
+                f"VALUES ({placeholders})",
+                tuple(values[column] for column in _EVENT_COLUMNS),
+            )
+            conn.execute(
+                """
+                UPDATE metric_totals
+                SET recorded_events = recorded_events + 1,
+                    http_errors = http_errors + ?
+                WHERE id = 1
+                """,
+                (1 if status >= 400 else 0,),
+            )
+            conn.execute(
+                """
+                DELETE FROM metric_events
+                WHERE id NOT IN (
+                    SELECT id FROM metric_events ORDER BY id DESC LIMIT ?
+                )
+                """,
+                (self._max_events,),
+            )
         return event
+
+    @staticmethod
+    def _event_from_row(row) -> MetricEvent:
+        values = {column: row[column] for column in _EVENT_COLUMNS}
+        values["refusal"] = (
+            None if values["refusal"] is None else bool(values["refusal"])
+        )
+        values["cache_hit"] = (
+            None if values["cache_hit"] is None else bool(values["cache_hit"])
+        )
+        return MetricEvent(**values)
 
     def snapshot(self, limit: int = 50) -> dict[str, Any]:
         limit = max(1, min(int(limit), self._max_events))
-        with self._lock:
-            events = list(self._events)
-            total = self._total
-            errors = self._errors
+        with sqlite_connection(self.db_path) as conn:
+            totals = conn.execute(
+                "SELECT recorded_events, http_errors FROM metric_totals WHERE id = 1"
+            ).fetchone()
+            rows = conn.execute(
+                f"""
+                SELECT {', '.join(_EVENT_COLUMNS)}
+                FROM metric_events
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (self._max_events,),
+            ).fetchall()
 
+        events = [self._event_from_row(row) for row in reversed(rows)]
+        total = int(totals["recorded_events"] or 0)
+        errors = int(totals["http_errors"] or 0)
         recent = events[-limit:]
         latencies = sorted(
-            e.latency_ms for e in events if isinstance(e.latency_ms, (int, float))
+            event.latency_ms
+            for event in events
+            if isinstance(event.latency_ms, (int, float))
         )
-        by_route = Counter(e.route for e in events)
-        by_status = Counter(str(e.status_code) for e in events)
-        by_outcome = Counter(e.outcome for e in events if e.outcome)
-        by_failure = Counter(e.failure_type for e in events if e.failure_type)
-        by_feature = Counter(e.feature or e.endpoint or e.route for e in events)
+        by_route = Counter(event.route for event in events)
+        by_status = Counter(str(event.status_code) for event in events)
+        by_outcome = Counter(event.outcome for event in events if event.outcome)
+        by_failure = Counter(
+            event.failure_type for event in events if event.failure_type
+        )
+        by_feature = Counter(
+            event.feature or event.endpoint or event.route for event in events
+        )
 
         def percentile(sorted_vals: list[float], p: float) -> float | None:
             if not sorted_vals:
@@ -127,8 +258,8 @@ class OpsMetricsStore:
             return round(sorted_vals[idx], 2)
 
         slow = sorted(
-            (e for e in events if e.latency_ms is not None),
-            key=lambda e: e.latency_ms or 0,
+            (event for event in events if event.latency_ms is not None),
+            key=lambda event: event.latency_ms or 0,
             reverse=True,
         )[:10]
 
@@ -155,22 +286,32 @@ class OpsMetricsStore:
             "by_outcome": dict(by_outcome.most_common(20)),
             "by_failure_type": dict(by_failure.most_common(20)),
             "by_feature": dict(by_feature.most_common(20)),
-            "slowest": [e.to_dict() for e in slow],
-            "recent": [e.to_dict() for e in reversed(recent)],
+            "slowest": [event.to_dict() for event in slow],
+            "recent": [event.to_dict() for event in reversed(recent)],
         }
 
 
-# Process-wide store used by Flask.
-metrics_store = OpsMetricsStore(max_events=200)
+_metrics_store: OpsMetricsStore | None = None
+_metrics_store_lock = Lock()
 
 
-def configure_metrics_store(max_events: int) -> OpsMetricsStore:
-    """Reconfigure capacity (mainly for tests / env overrides).
+def get_metrics_store() -> OpsMetricsStore:
+    """Return the configured process facade over the shared SQLite database."""
+    global _metrics_store
+    if _metrics_store is None:
+        with _metrics_store_lock:
+            if _metrics_store is None:
+                _metrics_store = OpsMetricsStore()
+    return _metrics_store
 
-    Replaces the store in-place on the module attribute so importers that hold
-    a direct reference should re-import; prefer using this module's
-    ``metrics_store`` attribute after configure.
-    """
-    global metrics_store
-    metrics_store = OpsMetricsStore(max_events=max_events)
-    return metrics_store
+
+def configure_metrics_store(
+    max_events: int,
+    *,
+    db_path: str = STATE_DB_PATH,
+) -> OpsMetricsStore:
+    """Replace the local facade while retaining SQLite cross-worker sharing."""
+    global _metrics_store
+    with _metrics_store_lock:
+        _metrics_store = OpsMetricsStore(max_events=max_events, db_path=db_path)
+    return _metrics_store

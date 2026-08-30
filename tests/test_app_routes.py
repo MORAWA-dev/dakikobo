@@ -177,6 +177,9 @@ class _RagHarness:
 
 def _install_rag(monkeypatch, legacy_chain, scores=None):
     harness = _RagHarness(legacy_chain, scores=scores)
+    # Route-policy tests exercise live generation; answer-cache behavior has a
+    # dedicated Phase 3 integration test.
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
     monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
     monkeypatch.setattr(app_module, "_rag_db", harness)
     return harness

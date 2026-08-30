@@ -296,6 +296,20 @@ Status legend: `[ ]` todo · `[x]` done.
   - `/healthz` now reports `rag_status` and warm-up timestamps/errors while keeping `rag_ready`.
   - Tests cover the one-shot background warm-up trigger without loading models.
 
+- [x] **29. Phase 3 cache and concurrency** — `core/cache.py`, `core/answer_cache.py`, `core/ops_metrics.py`, `app.py`, `Dockerfile`
+  - Added a WAL-enabled SQLite TTL cache with 30-second connection timeouts and namespace isolation.
+  - Moved weather (until local midnight), soil (30 days), and privacy-safe ops events out of
+    process-local dictionaries so workers share one coherent state boundary.
+  - Added a 24-hour answer cache keyed by normalized question, canonical crop/place ids, growth
+    stage, Français simple mode, model, and active corpus-manifest hash. Cache hits bypass routing,
+    Groq, retrieval, weather, and TTS while retaining grounded sources and chunk provenance.
+  - Added the salted question-hash helper for the Phase 4 evidence ledger and guarded case-log
+    schema initialization once per process/database path.
+  - Pruned unused direct dependencies, pinned NumPy/Torch/Transformers, and raised production
+    serving to two workers × four threads with a 90-second request timeout.
+  - Tests cover TTL expiry/purge, WAL concurrency, cache-key invalidation, router bypass, privacy,
+    and cross-worker ops percentiles.
+
 ---
 
 ## Later / parked (do **not** attempt now)

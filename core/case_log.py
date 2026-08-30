@@ -5,9 +5,13 @@ from __future__ import annotations
 import os
 import sqlite3
 from datetime import datetime, timezone
+from threading import Lock
 
 
 SCHEMA_VERSION = 3
+_CASE_LOG_INITIALIZED = False
+_CASE_LOG_INITIALIZED_PATH = ""
+_CASE_LOG_INIT_LOCK = Lock()
 
 VALID_OUTCOMES = frozenset({
     "applied_improved",
@@ -66,26 +70,46 @@ def _migrate_to_v3(conn: sqlite3.Connection) -> None:
 
 
 def init_case_log(db_path: str) -> None:
-    """Create the case-log database schema if needed and apply migrations."""
-    with _connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS feedback_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_at TEXT NOT NULL,
-                rating TEXT NOT NULL CHECK (rating IN ('up', 'down')),
-                question TEXT NOT NULL,
-                answer TEXT NOT NULL,
-                outcome TEXT,
-                outcome_at TEXT,
-                before_image_ref TEXT,
-                after_image_ref TEXT
+    """Create/apply the schema once per process for the active database path."""
+    global _CASE_LOG_INITIALIZED, _CASE_LOG_INITIALIZED_PATH
+    normalized_path = os.path.abspath(db_path)
+    if (
+        _CASE_LOG_INITIALIZED
+        and _CASE_LOG_INITIALIZED_PATH == normalized_path
+        and os.path.isfile(normalized_path)
+    ):
+        return
+
+    with _CASE_LOG_INIT_LOCK:
+        if (
+            _CASE_LOG_INITIALIZED
+            and _CASE_LOG_INITIALIZED_PATH == normalized_path
+            and os.path.isfile(normalized_path)
+        ):
+            return
+        with _connect(normalized_path) as conn:
+            # Serialize the one-time migration if multiple workers boot together.
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS feedback_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    rating TEXT NOT NULL CHECK (rating IN ('up', 'down')),
+                    question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    outcome TEXT,
+                    outcome_at TEXT,
+                    before_image_ref TEXT,
+                    after_image_ref TEXT
+                )
+                """
             )
-            """
-        )
-        _migrate_to_v2(conn)
-        _migrate_to_v3(conn)
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            _migrate_to_v2(conn)
+            _migrate_to_v3(conn)
+            conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        _CASE_LOG_INITIALIZED = True
+        _CASE_LOG_INITIALIZED_PATH = normalized_path
 
 
 def record_feedback(

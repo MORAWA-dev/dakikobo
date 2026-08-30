@@ -93,3 +93,8 @@ def test_resolve_weather_location_id_matches_common_names():
     assert resolve_weather_location_id("  Dori  ") == "dori"
     assert resolve_weather_location_id("village inconnu") is None
     assert resolve_weather_location_id("") is None
+
+
+def test_weather_sqlite_ttl_targets_local_midnight():
+    assert weather._WEATHER_CACHE.backend == "sqlite"
+    assert 1 <= weather._seconds_until_local_midnight() <= 24 * 60 * 60

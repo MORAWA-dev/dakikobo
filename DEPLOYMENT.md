@@ -44,6 +44,9 @@ STT_MODEL=whisper-large-v3-turbo
 VECTORSTORE_DIR=chroma_db
 CITATION_SCORE_MARGIN=0.12
 MAX_RAG_SOURCES=2
+STATE_DB_PATH=data/runtime_state.sqlite3
+ANSWER_CACHE_ENABLED=true
+ANSWER_CACHE_TTL_SECONDS=86400
 ```
 
 ## Hugging Face Spaces
@@ -103,7 +106,7 @@ pip install -r requirements.txt
 Start command:
 
 ```bash
-gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180
+gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 90
 ```
 
 Health check path:
@@ -117,6 +120,8 @@ Health check path:
 - The Docker image sets `RAG_WARMUP_ON_START=true`, so Hugging Face starts preparing RAG in the
   background after the app boots. `/healthz` reports `rag_status` as `cold`, `warming`, `ready`,
   or `error`.
+- Answer, weather, soil, and ops state share one WAL-enabled SQLite file, so both Gunicorn workers
+  see the same cache entries and metrics. The free Space disk is still ephemeral across rebuilds.
 - A real RAG question can still be slow if it arrives before warm-up finishes; open `/healthz`
   or ask one warm-up question before a live demo.
 - Keep `Data/` available on the deployed service if the vector store must be rebuilt.

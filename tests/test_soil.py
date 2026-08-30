@@ -164,3 +164,8 @@ def test_fetch_soilgrids_retries_on_502(monkeypatch):
     except Exception:
         pass
     assert calls["n"] == 2
+
+
+def test_soil_sqlite_cache_uses_thirty_day_ttl():
+    assert soil._SOIL_CACHE.backend == "sqlite"
+    assert soil._SOIL_CACHE.ttl_seconds == 30 * 24 * 60 * 60

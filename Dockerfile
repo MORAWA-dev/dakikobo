@@ -21,4 +21,4 @@ COPY --chown=user:user . .
 
 EXPOSE 7860
 
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-7860} --workers 1 --timeout 180"]
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-7860} --workers 2 --threads 4 --timeout 90"]

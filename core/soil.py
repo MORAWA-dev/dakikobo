@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date
 
 import requests
 
 from config import SOIL_TIMEOUT_SECONDS
+from core.cache import TTLCache
 from core.crops import CROPS, resolve_crop
 from core.places import PLACES
 
@@ -50,7 +49,7 @@ SOURCE_SOILGRIDS = {
     "snippet": "Indicateurs pédologiques mondiaux: argile, sable, carbone organique, pH et CEC.",
 }
 
-_CACHE: dict[tuple[str, str], dict] = {}
+_SOIL_CACHE = TTLCache("soil", ttl_seconds=30 * 24 * 60 * 60)
 
 
 def list_soil_locations() -> list[dict]:
@@ -74,7 +73,7 @@ def list_soil_crops() -> list[dict]:
 
 
 def clear_soil_cache() -> None:
-    _CACHE.clear()
+    _SOIL_CACHE.clear()
 
 
 def normalize_crop(value: str) -> str | None:
@@ -292,9 +291,12 @@ def build_soil_context(location_id: str, crop: str, payload: dict | None = None)
     if crop_key is None:
         raise ValueError("Culture non prise en charge.")
 
-    cache_key = (location.id, date.today().isoformat())
-    if payload is None and cache_key in _CACHE:
-        cached = deepcopy(_CACHE[cache_key])
+    # SoilGrids values are location-level and change slowly. Crop-specific text
+    # is applied after reading the shared 30-day location cache.
+    cache_key = location.id
+    cached_value = _SOIL_CACHE.get(cache_key) if payload is None else None
+    if cached_value is not None:
+        cached = cached_value
         cached["cached"] = True
         cached["crop"] = crop_key
         return cached
@@ -351,5 +353,5 @@ def build_soil_context(location_id: str, crop: str, payload: dict | None = None)
     }
 
     if payload is None:
-        _CACHE[cache_key] = deepcopy(context)
+        _SOIL_CACHE.set(cache_key, context)
     return context

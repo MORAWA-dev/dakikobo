@@ -6,5 +6,8 @@ __pycache__
 .env
 chroma_db
 data/feedback.csv
+data/case_log.sqlite3*
+data/runtime_state.sqlite3*
+data/feedback_images
 reports/rag_eval_results.md
 static/audio/*.mp3

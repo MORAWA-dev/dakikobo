@@ -22,15 +22,11 @@ groq
 # Vector store & embeddings
 chromadb==0.5.0
 sentence-transformers==2.7.0
-transformers
-safetensors
-tokenizers
-onnxruntime
+transformers==4.57.6
 
-# Scientific computing (no strict pins — let pip resolve for your platform)
-numpy
-scipy
-torch
+# Scientific stack pinned to the versions verified by the offline suite.
+numpy==1.26.4
+torch==2.2.2
 
 # PDF extraction
 PyPDF2==3.0.1
@@ -40,15 +36,6 @@ requests==2.31.0
 
 # Text-to-speech
 gTTS
-
-# Utilities
-pydantic
-tenacity
-httpx
-tiktoken
-openai
-rich
-Pygments
 
 # Testing
 pytest

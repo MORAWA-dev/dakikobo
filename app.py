@@ -27,10 +27,12 @@ from core.llm_chain import sanitize_answer, setup_retrieval_qa
 from core.retrieval import (
     GroundedAnswer,
     chunk_id,
+    get_active_manifest_hash,
     ground_answer,
     manifest_hash,
     set_active_manifest_hash,
 )
+from core.answer_cache import AnswerCache, build_answer_cache_key
 from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
@@ -94,6 +96,9 @@ from config import (
     MAX_QUESTION_CHARS,
     OPS_METRICS_ENABLED,
     OPS_METRICS_MAX_EVENTS,
+    ANSWER_CACHE_ENABLED,
+    ANSWER_CACHE_TTL_SECONDS,
+    STATE_DB_PATH,
     CASE_LOG_DB_PATH,
     FEEDBACK_IMAGE_DIR,
 )
@@ -116,9 +121,20 @@ app.config["MAX_AUDIO_UPLOAD_MB"] = MAX_AUDIO_UPLOAD_MB
 CASE_LOG_DB = CASE_LOG_DB_PATH
 FEEDBACK_IMAGES = FEEDBACK_IMAGE_DIR
 
-# Privacy-safe in-process metrics (reconfigurable via env / tests).
+# Privacy-safe shared SQLite metrics (local facade is reconfigurable in tests).
 if OPS_METRICS_ENABLED:
-    ops_metrics_mod.configure_metrics_store(OPS_METRICS_MAX_EVENTS)
+    ops_metrics_mod.configure_metrics_store(
+        OPS_METRICS_MAX_EVENTS,
+        db_path=STATE_DB_PATH,
+    )
+
+# Shared SQLite answer cache. The corpus manifest is part of every key, so a
+# successful re-ingestion automatically makes older entries unreachable.
+answer_cache_store = (
+    AnswerCache(ANSWER_CACHE_TTL_SECONDS, db_path=STATE_DB_PATH)
+    if ANSWER_CACHE_ENABLED
+    else None
+)
 
 
 def _safe_feedback_image_ext(filename: str, mime_type: str) -> str:
@@ -197,7 +213,7 @@ def _request_log_finish(response):
     payload.update(getattr(g, "log_fields", {}))
     _log_payload("http_request", **payload)
     if OPS_METRICS_ENABLED:
-        ops_metrics_mod.metrics_store.record(
+        ops_metrics_mod.get_metrics_store().record(
             timestamp=_utc_now_iso(),
             **payload,
         )
@@ -313,6 +329,27 @@ def _maybe_simplify_case(case: dict | None, enabled: bool) -> dict | None:
         if isinstance(items, list) and items:
             updated[list_key] = [light_replacements(str(item)) for item in items]
     return updated
+
+
+def _answer_cache_key(retrieval_query: str, resolved, simple_french: bool) -> str:
+    return build_answer_cache_key(
+        retrieval_query,
+        crop_id=resolved.crop_id,
+        growth_stage=resolved.growth_stage,
+        place_id=resolved.place_id,
+        simple_french=simple_french,
+        llm_model=LLM_MODEL,
+        manifest_hash_value=get_active_manifest_hash(),
+    )
+
+
+def _cached_answer_kind(cached: dict) -> str:
+    case = cached.get("case")
+    if isinstance(case, dict) and case.get("risk_level") == "Non confirmé":
+        return "uncertain"
+    if not case and not cached.get("sources"):
+        return "refusal"
+    return "advice"
 
 
 def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict | None]:
@@ -689,7 +726,7 @@ def ops_metrics_view():
         limit = int(request.args.get("limit", "50"))
     except (TypeError, ValueError):
         limit = 50
-    snapshot = ops_metrics_mod.metrics_store.snapshot(limit=limit)
+    snapshot = ops_metrics_mod.get_metrics_store().snapshot(limit=limit)
     snapshot["enabled"] = True
     snapshot["bot"] = BOT_NAME
     return jsonify(snapshot)
@@ -709,6 +746,7 @@ def version():
             "vectorstore_dir": VECTORSTORE_DIR,
             "prefer_markdown_kb": PREFER_MARKDOWN_KB,
             "rag_warmup_on_start": RAG_WARMUP_ON_START,
+            "answer_cache_enabled": ANSWER_CACHE_ENABLED,
         },
     })
 
@@ -850,23 +888,67 @@ def ask():
         query,
         field_context,
         prior_question=prior_question,
+        simple_french=simple_french,
     )
     effective_context = resolved.as_case_fields()
-    weather_signals, weather_payload = _weather_signals_for_location(
-        effective_context.get("location", "")
-    )
     _set_log_fields(
         crop_provided=bool(effective_context["crop"]),
         growth_stage_provided=bool(effective_context["growth_stage"]),
         location_provided=bool(effective_context["location"]),
-        weather_enriched=bool(weather_signals),
+        weather_enriched=False,
         simple_french=simple_french,
         crop_conflict=resolved.crop_conflict,
         followup_expanded=resolved.expanded_from_prior,
+        cache_hit=False,
     )
     retrieval_query = resolved.retrieval_query
     if simple_french:
         retrieval_query = apply_simple_style_to_query(retrieval_query)
+
+    # The active corpus hash is required before a persisted answer can be
+    # trusted. Lookup happens before intent routing and all upstream calls.
+    active_manifest = get_active_manifest_hash()
+    if ANSWER_CACHE_ENABLED and answer_cache_store is not None and active_manifest:
+        cache_key = _answer_cache_key(retrieval_query, resolved, simple_french)
+        try:
+            cached = answer_cache_store.get(cache_key)
+        except Exception as exc:
+            logger.warning("Answer cache lookup skipped: %s", exc)
+            cached = None
+        if cached is not None:
+            answer_kind = _cached_answer_kind(cached)
+            refusal = answer_kind == "refusal"
+            sources = cached.get("sources") or []
+            case = cached.get("case")
+            _set_log_fields(
+                intent="cache",
+                model="cache",
+                outcome="ok",
+                confidence=cached.get("confidence") or "Faible",
+                source_count=len(sources),
+                retrieved_doc_count=len(cached.get("retrieved_chunk_ids") or []),
+                refusal=refusal,
+                answer_kind=answer_kind,
+                audio_generated=False,
+                case_structured=case is not None,
+                cache_hit=True,
+            )
+            payload = {
+                "answer": cached.get("answer") or "",
+                "sources": sources,
+                "confidence": cached.get("confidence") or "Faible",
+                "audio_url": "",
+                "answer_kind": answer_kind,
+                "simple_french": simple_french,
+            }
+            if case is not None:
+                payload["case"] = case
+            return jsonify(payload)
+
+    weather_signals, weather_payload = _weather_signals_for_location(
+        effective_context.get("location", "")
+    )
+    _set_log_fields(weather_enriched=bool(weather_signals))
 
     # Bot self-identification (French + English triggers)
     identity_triggers = [
@@ -1074,6 +1156,25 @@ def ask():
             payload["case"] = case
         if weather_payload is not None and not refusal:
             payload["weather"] = weather_payload
+
+        if ANSWER_CACHE_ENABLED and answer_cache_store is not None:
+            active_manifest = get_active_manifest_hash()
+            if active_manifest:
+                try:
+                    answer_cache_store.set(
+                        _answer_cache_key(
+                            retrieval_query,
+                            resolved,
+                            simple_french,
+                        ),
+                        answer=answer,
+                        case=case,
+                        sources=sources,
+                        confidence=confidence,
+                        retrieved_chunk_ids=retrieved_chunk_ids,
+                    )
+                except Exception as exc:
+                    logger.warning("Answer cache write skipped: %s", exc)
         return jsonify(payload)
 
     except Exception as e:

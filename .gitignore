@@ -23,6 +23,8 @@ chroma_db/
 data/feedback.csv
 data/case_log.sqlite3
 data/case_log.sqlite3-*
+data/runtime_state.sqlite3
+data/runtime_state.sqlite3-*
 data/feedback_images/
 
 # Rejected / unverified generated research — never commit, never ingest.

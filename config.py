@@ -83,6 +83,11 @@ WEB_FETCH_TIMEOUT_SECONDS = float(os.getenv("WEB_FETCH_TIMEOUT_SECONDS", "15.0")
 # --- Local case / feedback log ---
 # Runtime-generated SQLite database. Do not commit it.
 CASE_LOG_DB_PATH = os.getenv("CASE_LOG_DB_PATH", os.path.join("data", "case_log.sqlite3"))
+# Shared runtime state for TTL caches and privacy-safe ops events. SQLite WAL
+# makes this file safe to use from all Gunicorn workers.
+STATE_DB_PATH = os.getenv("STATE_DB_PATH", os.path.join("data", "runtime_state.sqlite3"))
+ANSWER_CACHE_ENABLED = os.getenv("ANSWER_CACHE_ENABLED", "true").lower() == "true"
+ANSWER_CACHE_TTL_SECONDS = int(os.getenv("ANSWER_CACHE_TTL_SECONDS", "86400"))
 # Optional before/after leaf photos linked to feedback rows (git-ignored).
 FEEDBACK_IMAGE_DIR = os.getenv(
     "FEEDBACK_IMAGE_DIR",
@@ -127,6 +132,9 @@ SOIL_TIMEOUT_SECONDS = float(os.getenv("SOIL_TIMEOUT_SECONDS", "18.0"))
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
+# Phase 3/4 privacy contract: question hashes are salted with the existing
+# Flask secret rather than stored or hashed unsalted.
+QUESTION_HASH_SALT = SECRET_KEY
 REQUEST_COOLDOWN_SECONDS = float(os.getenv("REQUEST_COOLDOWN_SECONDS", "2.0"))
 IMAGE_COOLDOWN_SECONDS = float(os.getenv("IMAGE_COOLDOWN_SECONDS", "6.0"))
 MAX_IMAGE_UPLOAD_MB = float(os.getenv("MAX_IMAGE_UPLOAD_MB", "5.0"))
@@ -134,7 +142,7 @@ MAX_IMAGE_UPLOAD_BYTES = int(MAX_IMAGE_UPLOAD_MB * 1024 * 1024)
 # Reject oversized text questions before RAG/TTS work.
 MAX_QUESTION_CHARS = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
 
-# In-process observability ring buffer (privacy-safe aggregates only).
+# SQLite-backed observability window (privacy-safe aggregates only).
 OPS_METRICS_MAX_EVENTS = int(os.getenv("OPS_METRICS_MAX_EVENTS", "200"))
 OPS_METRICS_ENABLED = os.getenv("OPS_METRICS_ENABLED", "true").lower() == "true"
 
