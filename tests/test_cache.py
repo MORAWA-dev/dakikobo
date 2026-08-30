@@ -1,10 +1,12 @@
 """Tests for the shared SQLite TTL cache."""
 
 import sqlite3
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from core import cache as cache_module
-from core.cache import SQLITE_TIMEOUT_SECONDS, TTLCache
+from core.cache import SQLITE_TIMEOUT_SECONDS, TTLCache, interprocess_file_lock
 
 
 def test_ttl_cache_round_trip_and_namespace_isolation(tmp_path):
@@ -92,3 +94,25 @@ def test_phase3_serving_and_dependency_contracts_are_pinned():
     assert "torch==2.2.2" in requirements
     assert "transformers==4.57.6" in requirements
     assert not {"openai", "tiktoken", "rich", "Pygments"} & requirements
+
+
+def test_interprocess_file_lock_serializes_concurrent_build_sections(tmp_path):
+    lock_path = str(tmp_path / "chroma.build.lock")
+    active = 0
+    max_active = 0
+    state_lock = threading.Lock()
+
+    def critical_section(_: int) -> None:
+        nonlocal active, max_active
+        with interprocess_file_lock(lock_path):
+            with state_lock:
+                active += 1
+                max_active = max(max_active, active)
+            time.sleep(0.02)
+            with state_lock:
+                active -= 1
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(critical_section, range(8)))
+
+    assert max_active == 1

@@ -33,6 +33,7 @@ from core.retrieval import (
     set_active_manifest_hash,
 )
 from core.answer_cache import AnswerCache, build_answer_cache_key
+from core.cache import interprocess_file_lock
 from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
 from core.disease import screen_leaf_image, is_configured as disease_configured
@@ -517,7 +518,8 @@ def _expected_vector_store_manifest() -> dict:
     )
 
 
-def _load_or_build_vector_store():
+def _load_or_build_vector_store_locked():
+    """Load/rebuild Chroma while the caller holds the cross-worker file lock."""
     store_exists = vector_store_exists()
     expected_manifest = _expected_vector_store_manifest()
     active_hash = manifest_hash(expected_manifest)
@@ -556,6 +558,15 @@ def _load_or_build_vector_store():
     if db is not None:
         set_active_manifest_hash(active_hash)
     return db
+
+
+def _load_or_build_vector_store():
+    # Chroma performs schema migrations during first creation. Two workers
+    # entering that path together can corrupt the transient `collections_tmp`
+    # table, so serialize build/load publication across processes.
+    lock_path = f"{os.path.abspath(VECTORSTORE_DIR)}.build.lock"
+    with interprocess_file_lock(lock_path):
+        return _load_or_build_vector_store_locked()
 
 
 def get_rag_chain():

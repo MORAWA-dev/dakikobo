@@ -15,6 +15,8 @@ import time
 from contextlib import contextmanager
 from typing import Iterator
 
+import fcntl
+
 from config import STATE_DB_PATH
 
 
@@ -25,6 +27,23 @@ def _ensure_parent_dir(db_path: str) -> None:
     directory = os.path.dirname(os.path.abspath(db_path))
     if directory:
         os.makedirs(directory, exist_ok=True)
+
+
+@contextmanager
+def interprocess_file_lock(lock_path: str) -> Iterator[None]:
+    """Serialize one critical section across local worker processes.
+
+    Kernel-owned ``flock`` locks are released automatically if a worker exits,
+    avoiding stale lock state after a failed Chroma build.
+    """
+    normalized_path = os.path.abspath(lock_path)
+    _ensure_parent_dir(normalized_path)
+    with open(normalized_path, "a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 @contextmanager

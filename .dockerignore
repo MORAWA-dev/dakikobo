@@ -5,6 +5,7 @@ __pycache__
 .DS_Store
 .env
 chroma_db
+chroma_db*.lock
 data/feedback.csv
 data/case_log.sqlite3*
 data/runtime_state.sqlite3*

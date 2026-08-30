@@ -52,7 +52,8 @@ remplacement de l'agent agricole.
 - **Hosted warm-up** — the Docker Space can prepare RAG in the background after startup so the
   first public question is less likely to pay the full indexing cost.
 - **Shared answer and context cache** — SQLite WAL serves repeat grounded answers immediately and
-  shares weather, soil, and privacy-safe ops state across two threaded workers.
+  shares weather, soil, and privacy-safe ops state across two threaded workers; Chroma startup is
+  serialized across workers to prevent concurrent schema migrations.
 - **Voice output (TTS)** — answers can auto-play in French via gTTS and be replayed
   from their answer bubble.
 - **Voice input (STT)** — records a short browser audio clip and transcribes it with

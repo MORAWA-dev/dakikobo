@@ -18,6 +18,7 @@ static/audio/*.mp3
 
 # ChromaDB persisted data (if you switch to persistent storage later)
 chroma_db/
+chroma_db*.lock
 
 # User feedback/case logs (runtime-generated)
 data/feedback.csv

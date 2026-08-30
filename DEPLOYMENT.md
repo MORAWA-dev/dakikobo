@@ -122,6 +122,8 @@ Health check path:
   or `error`.
 - Answer, weather, soil, and ops state share one WAL-enabled SQLite file, so both Gunicorn workers
   see the same cache entries and metrics. The free Space disk is still ephemeral across rebuilds.
+- A kernel file lock serializes first-time Chroma initialization; both workers load the same completed
+  vector store instead of racing its schema migration.
 - A real RAG question can still be slow if it arrives before warm-up finishes; open `/healthz`
   or ask one warm-up question before a live demo.
 - Keep `Data/` available on the deployed service if the vector store must be rebuilt.

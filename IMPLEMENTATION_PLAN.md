@@ -305,6 +305,8 @@ Status legend: `[ ]` todo · `[x]` done.
     Groq, retrieval, weather, and TTS while retaining grounded sources and chunk provenance.
   - Added the salted question-hash helper for the Phase 4 evidence ledger and guarded case-log
     schema initialization once per process/database path.
+  - Serialized Chroma initialization with a process-safe file lock after the two-worker live smoke
+    exposed a concurrent `collections_tmp` migration race.
   - Pruned unused direct dependencies, pinned NumPy/Torch/Transformers, and raised production
     serving to two workers × four threads with a 90-second request timeout.
   - Tests cover TTL expiry/purge, WAL concurrency, cache-key invalidation, router bypass, privacy,
