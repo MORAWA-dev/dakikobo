@@ -522,3 +522,37 @@ cd - && git worktree remove "$WT" --force
 **Next action for the following session**
 - …
 ```
+
+---
+
+### 2026-08-30 — Phase 2 live deployment completed
+
+**Decided**
+
+- Kept the Phase 2 retrieval architecture and repaired the final public-evaluation regression by expanding the reviewed OAPH acronym only in the retrieval query.
+- The expansion uses the verified MAERAH meaning, while the original farmer question remains unchanged for display and answer generation.
+
+**Files changed**
+
+- `core/query_context.py` — add the reviewed OAPH retrieval expansion.
+- `tests/test_query_context.py` — protect the expansion with a regression test.
+
+**Verification**
+
+- Full offline suite: **244 passed**, with one existing PyPDF2 deprecation warning.
+- Public `/version`: commit `2dd12b4866346a49d75a9075d05a390744961409`, `rag_status=ready`.
+- Public `/registry`: 10 crops and 20 places.
+- Strict public RAG evaluation: **14/14 hard-passed (100%)**; the OAPH case passed with HTTP 200, medium confidence, and one grounded source. Five advisory warnings remain non-blocking.
+
+**Git / deploy**
+
+- GitHub feature commit: `cfe791432b159d17e3cc832c9a21a9d339a33885`.
+- Hugging Face Space deploy: `2dd12b4866346a49d75a9075d05a390744961409`.
+
+**Still open**
+
+- Phase 3 is next; keep the production worker count at one until the SQLite state migration is complete.
+
+**Next action for the following session**
+
+- Begin Phase 3 from `plans/dakikobo_assessment_and_plan.md` when requested.
