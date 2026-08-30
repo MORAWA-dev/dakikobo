@@ -84,3 +84,11 @@ def test_registry_ids_are_converted_to_french_prompt_labels():
     assert "lieu: Bobo-Dioulasso" in resolved.retrieval_query
     assert resolved.as_case_fields()["crop"] == "maïs"
     assert resolved.as_case_fields()["location"] == "Bobo-Dioulasso"
+
+
+def test_oaph_acronym_is_expanded_for_stable_reviewed_source_retrieval():
+    resolved = resolve_query_context("C'est quoi l'OAPH au Burkina Faso ?")
+    assert "OAPH = Offensive Agropastorale et Halieutique 2023-2025" in (
+        resolved.retrieval_query
+    )
+    assert "MAERAH" in resolved.retrieval_query

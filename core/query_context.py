@@ -19,6 +19,12 @@ from core.crops import resolve_crop
 from core.places import resolve_place
 
 
+_OAPH_RETRIEVAL_EXPANSION = (
+    "OAPH = Offensive Agropastorale et Halieutique 2023-2025, "
+    "programme national du MAERAH"
+)
+
+
 def _normalize(text: str) -> str:
     text = unicodedata.normalize("NFKD", text or "")
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
@@ -82,6 +88,15 @@ def expand_with_prior(query: str, prior_question: str) -> str:
         f"{prior}\n"
         f"(Précision de l'utilisateur: {query})"
     )
+
+
+def _expand_reviewed_retrieval_terms(query: str) -> str:
+    """Add verified meanings for acronyms whose short form retrieves noisily."""
+    if not re.search(r"\bOAPH\b", query or "", flags=re.IGNORECASE):
+        return query
+    if "Offensive Agropastorale et Halieutique" in query:
+        return query
+    return f"{query}\n(Terme vérifié : {_OAPH_RETRIEVAL_EXPANSION}.)"
 
 
 @dataclass(frozen=True)
@@ -188,6 +203,7 @@ def resolve_query_context(
         question_crop=question_crop,
         crop_conflict=crop_conflict,
     )
+    retrieval_query = _expand_reviewed_retrieval_terms(retrieval_query)
 
     # Registry ids for cache keys and weather/soil/fertilizer lookups. Resolving
     # the effective label back through the registry keeps form-supplied values
