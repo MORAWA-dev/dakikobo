@@ -556,3 +556,48 @@ cd - && git worktree remove "$WT" --force
 **Next action for the following session**
 
 - Begin Phase 3 from `plans/dakikobo_assessment_and_plan.md` when requested.
+
+---
+
+### 2026-08-30 — Phase 3 cache and concurrency deployed
+
+**Decided**
+
+- Moved answer, weather, soil, and privacy-safe ops state to one WAL-enabled SQLite database with a 30-second busy timeout.
+- Answer-cache keys include the normalized resolved retrieval query, canonical crop/place ids, growth stage, Français simple flag, LLM model, and active corpus-manifest hash.
+- Cache hits bypass intent routing, Groq, retrieval, weather enrichment, and TTS while preserving the grounded answer, case, sources, confidence, and top-six chunk provenance.
+- Raised production serving to two Gunicorn workers × four threads with a 90-second timeout only after shared-state tests passed.
+- The first live two-worker deploy exposed a Chroma `collections_tmp` migration race. Added a kernel file lock around vector-store initialization so one worker builds and the other loads the completed store.
+- Pruned unused direct dependencies and pinned NumPy 1.26.4, Torch 2.2.2, and Transformers 4.57.6.
+
+**Files changed**
+
+- `core/cache.py`, `core/answer_cache.py`, `core/ops_metrics.py` — shared SQLite cache/metrics boundary, stable answer keys, salted question hash, bounded cross-worker metrics, and Chroma startup lock.
+- `core/weather.py`, `core/soil.py`, `core/case_log.py` — persistent TTL caches and once-per-process case-log initialization.
+- `app.py`, `config.py`, `Dockerfile`, `Procfile` — `/ask` cache fast path, cache-hit metrics, environment defaults, and concurrent serving.
+- `requirements.txt`, `.env.example`, `.gitignore`, `.dockerignore`, `README.md`, `DEPLOYMENT.md`, `IMPLEMENTATION_PLAN.md` — dependency, runtime-state, deployment, and operator documentation.
+- `tests/test_cache.py`, `tests/test_answer_cache.py`, `tests/test_ops_metrics.py` and route/weather/soil tests — Phase 3 regression and concurrency coverage.
+
+**Verification**
+
+- Full offline suite excluding the separate live `tests/test_rag.py`: **261 passed**, one existing PyPDF2 deprecation warning.
+- Two-worker local Gunicorn smoke: both gthread workers booted; 24 concurrent `/healthz` calls produced one shared ops snapshot with 24 events and coherent p50/p95 values.
+- Public `/version`: deploy `40e92d546d651568edf9f0bb83bc3a409a691081`, answer cache enabled, RAG ready.
+- Twelve alternating public `/healthz` samples reached both workers; both reported `ready` with no Chroma error and distinct successful warm-up completion timestamps.
+- Live repeated OAPH request: first HTTP 200 in 2.49 s; subsequent HTTP 200 responses in 0.46 s. Ops recorded `rag/cache_hit=false` followed by two `cache/cache_hit=true` events with 1.52 ms and 4.01 ms server latency.
+- Public weather and soil responses reported `cached=true`; ops metrics were shared and queryable.
+- Strict public RAG evaluation: **14/14 hard-passed (100%)**, with two non-blocking advisory warnings.
+
+**Git / deploy**
+
+- GitHub Phase 3: `6348f69b` plus Chroma concurrency fix `b6d4d70b`.
+- Hugging Face Space: `40e92d546d651568edf9f0bb83bc3a409a691081`.
+
+**Still open**
+
+- Phase 4 (field journal and evidence ledger) is next in the locked plan.
+- Free-Space cold warm-up remains CPU-bound at roughly four minutes; once warm, two workers remain ready and repeat answers use the shared cache.
+
+**Next action for the following session**
+
+- Begin Phase 4 from `plans/dakikobo_assessment_and_plan.md` when requested.
