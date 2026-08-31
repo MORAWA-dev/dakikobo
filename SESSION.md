@@ -643,10 +643,17 @@ cd - && git worktree remove "$WT" --force
 - Two-worker Gunicorn smoke: both gthread workers booted; 24 concurrent `/feedback` writes returned
   HTTP 200 with 24 unique ids and exactly 24 shared rows. The database reported `journal_mode=wal`,
   `user_version=4`, and `/version` reported field-journal schema 4.
+- Public `/version`: deploy `6995460f5adf57816a7754df52de45f2de021144`, field-journal schema
+  4, answer cache enabled, and RAG ready after the expected roughly four-minute CPU warm-up.
+- Public `/journal/due`: HTTP 200 with `Cache-Control: no-store` and a privacy-minimized empty digest.
+- Live repeated OAPH request: first HTTP 200 via `answer_path=rag` in 3.04 s with a ledger reference;
+  second HTTP 200 via `answer_path=cache` in 0.56 s with a distinct cloned ledger reference.
+- Strict public RAG evaluation: **14/14 hard-passed (100%)**, with five non-blocking advisory warnings.
 
 **Git / deploy**
 
-- GitHub and Hugging Face deployment pending the final commit in this session.
+- GitHub Phase 4: `124e19c82f127c01b12cb3e007386301968e951e`.
+- Hugging Face Space: `6995460f5adf57816a7754df52de45f2de021144`.
 
 **Still open**
 
@@ -654,5 +661,4 @@ cd - && git worktree remove "$WT" --force
 
 **Next action for the following session**
 
-- Confirm the Phase 4 Space commit, `/version`, `/journal/due`, live `/ask` journal metadata, and
-  public RAG evaluation after deployment.
+- Begin Phase 5 (offline-first shell) from the locked plan when requested.
