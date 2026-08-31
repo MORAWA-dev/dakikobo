@@ -1,6 +1,6 @@
 'use strict';
 
-var VERSION = 'dakikobo-phase5-v1';
+var VERSION = 'dakikobo-phase5-v2';
 var SHELL_CACHE = VERSION + '-shell';
 var ANSWER_CACHE = VERSION + '-answers';
 var SHELL = [
@@ -24,15 +24,22 @@ var SHELL = [
     '/examples/fumure_sorgho',
     '/examples/photo_mais'
 ];
+var EXTERNAL_SHELL = [
+    'https://code.jquery.com/jquery-3.6.0.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/webfonts/fa-solid-900.woff2'
+];
 
 self.addEventListener('install', function(event) {
     event.waitUntil(
         caches.open(SHELL_CACHE)
             .then(function(cache) {
                 return cache.addAll(SHELL).then(function() {
-                    return fetch('https://code.jquery.com/jquery-3.6.0.min.js', { mode: 'no-cors' })
-                        .then(function(response) { return cache.put('https://code.jquery.com/jquery-3.6.0.min.js', response); })
-                        .catch(function() { return Promise.resolve(); });
+                    return Promise.all(EXTERNAL_SHELL.map(function(url) {
+                        return fetch(url, { mode: 'no-cors' })
+                            .then(function(response) { return cache.put(url, response); })
+                            .catch(function() { return Promise.resolve(); });
+                    }));
                 });
             })
             .then(function() { return self.skipWaiting(); })
@@ -84,26 +91,44 @@ function answerKey(formData) {
     return '/__dakikobo_answer__?q=' + encodeURIComponent(JSON.stringify(values));
 }
 
-function normalizeCrop(text) {
-    var value = String(text || '').toLowerCase();
-    if (/\bma[iï]s\b/.test(value)) { return 'mais'; }
-    if (/\bni[eé]b[eé]\b/.test(value)) { return 'niebe'; }
-    if (/\bsorgho\b/.test(value)) { return 'sorgho'; }
-    if (/\bmil\b/.test(value)) { return 'mil'; }
-    if (/\barachide\b/.test(value)) { return 'arachide'; }
+function normalizeText(text) {
+    return String(text || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function containsTerm(text, term) {
+    var escaped = normalizeText(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[^a-z0-9])' + escaped + '([^a-z0-9]|$)').test(normalizeText(text));
+}
+
+function normalizeCrop(text, table) {
+    var crops = table && table.crops ? table.crops : {};
+    var cropIds = Object.keys(crops);
+    for (var index = 0; index < cropIds.length; index += 1) {
+        var cropId = cropIds[index];
+        var aliases = [cropId].concat(crops[cropId].aliases || []);
+        if (aliases.some(function(alias) { return containsTerm(text, alias); })) {
+            return cropId;
+        }
+    }
     return '';
 }
 
 function offlineFertilizer(formData) {
-    var question = String(formData.get('messageText') || '');
-    var crop = normalizeCrop(formData.get('crop')) || normalizeCrop(question);
-    var isFertilizer = /engrais|fumure|fertilis|npk|ur[ée]e?|micro-?dose/i.test(question);
-    if (!crop || !isFertilizer) {
-        return Promise.resolve(null);
-    }
     return caches.match('/static/data/fertilizer.json').then(function(response) {
         return response ? response.json() : null;
     }).then(function(table) {
+        var question = String(formData.get('messageText') || '');
+        var crop = normalizeCrop(formData.get('crop'), table) || normalizeCrop(question, table);
+        var isFertilizer = table && (table.keywords || []).some(function(keyword) {
+            return normalizeText(question).indexOf(normalizeText(keyword)) !== -1;
+        });
+        if (!crop || !isFertilizer) {
+            return null;
+        }
         var item = table && table.crops && table.crops[crop];
         if (!item) {
             return null;
@@ -130,6 +155,16 @@ function offlineFertilizer(formData) {
             }
         });
     });
+}
+
+function shouldCacheFirst(url) {
+    if (EXTERNAL_SHELL.indexOf(url.href) !== -1) {
+        return true;
+    }
+    if (url.origin !== self.location.origin) {
+        return false;
+    }
+    return SHELL.indexOf(url.pathname) !== -1;
 }
 
 function networkFirstAsk(request) {
@@ -169,7 +204,15 @@ self.addEventListener('fetch', function(event) {
     if (event.request.method !== 'GET') {
         return;
     }
-    if (url.origin === self.location.origin || url.hostname === 'code.jquery.com') {
+    if (shouldCacheFirst(url)) {
         event.respondWith(cacheFirst(event.request));
     }
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        normalizeCrop: normalizeCrop,
+        offlineFertilizer: offlineFertilizer,
+        shouldCacheFirst: shouldCacheFirst
+    };
+}

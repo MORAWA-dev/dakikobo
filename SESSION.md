@@ -710,3 +710,32 @@ cd - && git worktree remove "$WT" --force
 **Still open**
 
 - No implementation phases remain in the locked Phase 0–5 plan.
+
+---
+
+### 2026-08-31 — Final Phase 0–5 audit and hardening
+
+**Fixed**
+
+- Replaced internal exception details in public API errors with stable French messages while keeping
+  diagnostic detail in server logs.
+- Made the Python fertilizer rules the single source for the offline JSON asset, including every
+  canonical crop alias and fertilizer keyword.
+- Kept all browser writes in the API module and all presentation work in the render module.
+- Restricted service-worker caching to the explicit public shell so weather, health, version,
+  operations, and private journal routes cannot return stale cached data.
+- Tied cached answers to the exact evidence-ledger batch that produced them, including normalized
+  question variants, so feedback never links to a newer unrelated batch.
+- Removed the online-only font dependency and added best-effort caching for the remaining public icon
+  assets.
+
+**Verification**
+
+- Independent standards and Phase 0–5 specification reviews: no remaining confirmed issue.
+- Full offline Python suite: **274 passed**, with only the existing PyPDF2 deprecation warning.
+- JavaScript suite: **6 passed**, including real service-worker install, fetch, online-save, and
+  offline-replay behavior.
+- Real browser with the Flask server stopped: `Quel engrais pour le petit mil ?` produced the mil
+  fertilizer card, sources, confidence, and mandatory confirmation entirely offline.
+- Python compilation, JavaScript syntax, dependency integrity, generated-data parity, and
+  `git diff --check`: passed.

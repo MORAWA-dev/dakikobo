@@ -118,6 +118,29 @@ _FERTILIZER_KEYWORDS = (
 )
 
 
+def build_offline_fertilizer_payload() -> dict:
+    """Return the canonical browser-offline fertilizer data.
+
+    ``scripts/export_offline_fertilizer.py`` writes this payload to the PWA asset.
+    Keeping the builder here makes the Python tool the only hand-edited source for
+    doses, sources, aliases, labels, and intent keywords.
+    """
+    return {
+        "schema_version": 1,
+        "disclaimer": DISCLAIMER,
+        "keywords": list(_FERTILIZER_KEYWORDS),
+        "crops": {
+            crop_id: {
+                "label": _CROP_LABEL[crop_id],
+                "aliases": list(CROPS[crop_id].aliases),
+                "lines": list(recommendation["lines"]),
+                "sources": [dict(source) for source in recommendation["sources"]],
+            }
+            for crop_id, recommendation in _RECOMMENDATIONS.items()
+        },
+    }
+
+
 def is_fertilizer_query(text: str) -> bool:
     """True if the question is about fertilizer/fertilization."""
     t = (text or "").lower()

@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from core.answer_cache import question_hash
-from core.case_log import list_evidence, record_evidence
+from core.case_log import clone_evidence_batch, list_evidence, record_evidence
 from core.retrieval import ground_answer
 
 
@@ -71,3 +71,36 @@ def test_ledger_records_all_three_demotion_reasons_without_plaintext(tmp_path):
     database_bytes = Path(db_path).read_bytes()
     assert all(question.encode("utf-8") not in database_bytes for question in raw_questions)
     assert all(len(row["question_hash"]) == 64 for row in rows)
+
+
+def test_cache_clone_uses_the_exact_evidence_batch_not_the_latest(tmp_path):
+    db_path = str(tmp_path / "case_log.sqlite3")
+    hash_value = question_hash("Même question", salt="test-secret")
+    first = SimpleNamespace(
+        demoted_reason="",
+        score=0.8,
+        chunk_id="first-context",
+        source_title="Premier contexte",
+        kept=True,
+    )
+    second = SimpleNamespace(
+        demoted_reason="low_overlap",
+        score=0.2,
+        chunk_id="second-context",
+        source_title="Second contexte",
+        kept=False,
+    )
+    record_evidence(db_path, question_hash_value=hash_value, decisions=[first], created_at=1.0)
+    record_evidence(db_path, question_hash_value=hash_value, decisions=[second], created_at=2.0)
+
+    clone_evidence_batch(
+        db_path,
+        question_hash_value=hash_value,
+        source_created_at=1.0,
+        target_question_hash_value="new-request-hash",
+        created_at=3.0,
+    )
+
+    cloned = [row for row in list_evidence(db_path) if row["created_at"] == 3.0]
+    assert [row["chunk_id"] for row in cloned] == ["first-context"]
+    assert [row["question_hash"] for row in cloned] == ["new-request-hash"]

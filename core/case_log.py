@@ -251,27 +251,30 @@ def record_evidence(
     return batch_created_at
 
 
-def clone_latest_evidence(
+def clone_evidence_batch(
     db_path: str,
     *,
     question_hash_value: str,
+    source_created_at: float,
+    target_question_hash_value: str = "",
     created_at: float | None = None,
 ) -> float | None:
-    """Clone the latest decision batch for a cache-hit answer."""
+    """Clone one exact decision batch for a cache-hit answer."""
     if not os.path.isfile(db_path) or not question_hash_value:
         return None
     init_case_log(db_path)
     batch_created_at = float(created_at if created_at is not None else time.time())
+    target_hash = target_question_hash_value or question_hash_value
     with sqlite_connection(db_path) as conn:
-        latest = conn.execute(
+        source_count = conn.execute(
             """
-            SELECT MAX(created_at) AS created_at
+            SELECT COUNT(*) AS row_count
             FROM evidence_ledger
-            WHERE question_hash = ?
+            WHERE question_hash = ? AND created_at = ?
             """,
-            (question_hash_value,),
+            (question_hash_value, float(source_created_at)),
         ).fetchone()
-        if latest is None or latest["created_at"] is None:
+        if source_count is None or int(source_count["row_count"] or 0) == 0:
             return None
         conn.execute(
             """
@@ -279,12 +282,17 @@ def clone_latest_evidence(
                 feedback_id, created_at, question_hash, chunk_id,
                 source_title, score, kept, demoted_reason
             )
-            SELECT NULL, ?, question_hash, chunk_id,
+            SELECT NULL, ?, ?, chunk_id,
                    source_title, score, kept, demoted_reason
             FROM evidence_ledger
             WHERE question_hash = ? AND created_at = ?
             """,
-            (batch_created_at, question_hash_value, float(latest["created_at"])),
+            (
+                batch_created_at,
+                target_hash,
+                question_hash_value,
+                float(source_created_at),
+            ),
         )
     return batch_created_at
 

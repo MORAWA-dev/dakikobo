@@ -209,11 +209,12 @@ def test_voice_input_uses_server_side_stt():
 
 
 def test_followup_supports_optional_after_photo():
-    js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
+    render_js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
+    api_js = (ROOT / "static/js/api.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 
-    assert "followup-after-photo" in js
-    assert "after_image" in js
-    assert "FormData" in js
-    assert "/feedback/outcome" in js
+    assert "followup-after-photo" in render_js
+    assert "submitOutcome" in render_js
+    assert "after_image" in api_js
+    assert "/feedback/outcome" in api_js
     assert ".followup-after-photo" in css

@@ -1,7 +1,8 @@
 (function(root) {
     'use strict';
 
-    function create($) {
+    function create($, apiClient) {
+        var api = apiClient || root.DakiKoboApi;
         function scrollChat() {
             var chat = $('.chat-messages')[0];
             if (chat) {
@@ -79,26 +80,14 @@
                 var outcome = $(this).data('outcome');
                 $options.find('.followup-btn').prop('disabled', true);
                 $afterInput.prop('disabled', true);
-                var formData = new FormData();
-                formData.append('feedback_id', feedbackId);
-                formData.append('outcome', outcome);
                 var file = $afterInput[0] && $afterInput[0].files && $afterInput[0].files[0];
-                if (file) {
-                    formData.append('after_image', file);
-                }
-                $.ajax({
-                    type: 'POST',
-                    url: '/feedback/outcome',
-                    data: formData,
-                    processData: false,
-                    contentType: false
-                }).done(function() {
+                api.submitOutcome(feedbackId, outcome, file).then(function() {
                     var thanks = 'Merci pour le suivi !';
                     if (file) {
                         thanks += ' Photo après enregistrée pour évaluation (privée).';
                     }
                     $options.after($('<span class="followup-thanks"></span>').text(thanks));
-                }).fail(function() {
+                }).catch(function() {
                     $options.find('.followup-btn').prop('disabled', false);
                     $afterInput.prop('disabled', false);
                 });
@@ -126,12 +115,12 @@
                 if (journal && journal.ledger_created_at !== null && journal.ledger_created_at !== undefined) {
                     feedbackData.ledger_created_at = journal.ledger_created_at;
                 }
-                $.post('/feedback', feedbackData).done(function(response) {
+                api.submitFeedback(feedbackData).then(function(response) {
                     $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
                     if (response && response.feedback_id) {
                         renderFollowupPrompt(bubble, response.feedback_id);
                     }
-                }).fail(function() {
+                }).catch(function() {
                     $fb.find('.fb-btn').prop('disabled', false);
                 });
             });

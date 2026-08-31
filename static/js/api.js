@@ -67,6 +67,18 @@
         return fetchJson('/crop-labels');
     }
 
+    function submitFeedback(values) {
+        return fetchJson('/feedback', { method: 'POST', body: formBody(values) });
+    }
+
+    function submitOutcome(feedbackId, outcome, file) {
+        var data = formBody({ feedback_id: feedbackId, outcome: outcome });
+        if (file) {
+            data.append('after_image', file);
+        }
+        return fetchJson('/feedback/outcome', { method: 'POST', body: data });
+    }
+
     var exported = {
         fetchJson: fetchJson,
         loadCropLabels: loadCropLabels,
@@ -75,6 +87,8 @@
         loadSoilContext: loadSoilContext,
         loadWeatherContext: loadWeatherContext,
         sendMessage: sendMessage,
+        submitFeedback: submitFeedback,
+        submitOutcome: submitOutcome,
         uploadImageForScreening: uploadImageForScreening
     };
     if (typeof module !== 'undefined' && module.exports) {

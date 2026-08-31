@@ -132,6 +132,8 @@ Health check path:
   or ask one warm-up question before a live demo.
 - The service worker caches the public app shell and previously successful `/ask` responses in the
   visitor's browser. Bump `VERSION` in `static/sw.js` whenever cached frontend assets change.
+- Regenerate the offline fertilizer asset after changing doses, crop aliases, sources, or fertilizer
+  keywords: `.venv/bin/python scripts/export_offline_fertilizer.py`. Verify it with `--check`.
 - Keep `Data/` available on the deployed service if the vector store must be rebuilt.
 - Do not commit `.env`, `chroma_db/`, generated audio, case-log SQLite files, or private exports.
 - A durable production version should move the case-log SQLite database and generated audio to

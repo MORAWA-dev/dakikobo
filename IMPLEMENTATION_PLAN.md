@@ -311,6 +311,8 @@ Status legend: `[ ]` todo · `[x]` done.
     serving to two workers × four threads with a 90-second request timeout.
   - Tests cover TTL expiry/purge, WAL concurrency, cache-key invalidation, router bypass, privacy,
     and cross-worker ops percentiles.
+  - Hosted warm-up was later measured at 190 seconds (16:34:14–16:37:24 UTC) versus the earlier
+    roughly four-minute operational baseline recorded in `SESSION.md`, about 21% shorter.
 
 - [x] **30. Phase 4 field journal and evidence ledger** — `core/case_log.py`, `core/retrieval.py`, `app.py`
   - Migrated the case log additively to schema v4 with crop/place ids, answer path, seven-day
@@ -329,13 +331,15 @@ Status legend: `[ ]` todo · `[x]` done.
   - Added an installable PWA shell with root-scoped service worker, cache-first app/registry/example
     assets, and network-first `/ask` responses with exact cached-answer fallback.
   - Mirrored the authoritative deterministic fertilizer table into a precached JSON asset, guarded
-    by a Python parity test, so supported fertilizer questions remain available without a signal.
+    by a checked-in generator and parity test, so supported fertilizer questions and every canonical
+    crop alias remain available without a signal.
   - Added the French offline status banner and a cautious offline refusal for uncached non-fertilizer
     questions rather than fabricating an answer.
   - Split rendering and network requests into focused browser modules while preserving the existing
     follow-up context, photo question, registry ids, and event behavior.
   - Added `node --test` + jsdom regressions for display-text filtering, safe typed text, and the
-    six-argument photo upload contract.
+    six-argument photo upload contract. Behavioral worker tests cover offline fertilizer aliases and
+    ensure only the explicit shell is cached; weather, health, ops, version, and journal GETs remain live.
 
 ---
 

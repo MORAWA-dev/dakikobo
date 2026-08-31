@@ -246,6 +246,22 @@ def test_crop_labels_route_returns_french_crops():
     assert all(c.get("fr") for c in payload["crops"])
 
 
+def test_crop_labels_error_is_stable_french_and_hides_internal_detail(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "load_crop_labels",
+        lambda: (_ for _ in ()).throw(ValueError("internal path detail")),
+    )
+
+    response = app_module.app.test_client().get("/crop-labels")
+
+    assert response.status_code == 500
+    assert response.get_json()["error"] == (
+        "Les libellés des cultures sont indisponibles pour le moment."
+    )
+    assert "internal" not in response.get_data(as_text=True)
+
+
 def test_version_route_reports_runtime_metadata(monkeypatch):
     client = app_module.app.test_client()
     monkeypatch.setenv("APP_COMMIT_SHA", "abc123")
@@ -1564,6 +1580,18 @@ def test_feedback_writes_sqlite_case_log(tmp_path, monkeypatch):
     assert rows[0]["answer"] == "A"
 
 
+def test_feedback_validation_error_is_in_french():
+    response = app_module.app.test_client().post(
+        "/feedback",
+        data={"rating": "maybe", "question": "Q", "answer": "A"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "L’évaluation doit être positive ou négative."
+    )
+
+
 def test_journal_due_route_returns_only_due_metadata(tmp_path, monkeypatch):
     case_log = str(tmp_path / "case_log.sqlite3")
     monkeypatch.setattr(app_module, "CASE_LOG_DB", case_log)
@@ -1627,7 +1655,7 @@ def test_feedback_outcome_rejects_invalid_outcome(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 400
-    assert response.get_json()["error"] == "invalid outcome"
+    assert response.get_json()["error"] == "Le résultat de suivi est invalide."
 
 
 def test_feedback_outcome_returns_404_for_missing_id(tmp_path, monkeypatch):
@@ -1641,7 +1669,7 @@ def test_feedback_outcome_returns_404_for_missing_id(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 404
-    assert response.get_json()["error"] == "feedback_id not found"
+    assert response.get_json()["error"] == "L’évaluation demandée est introuvable."
 
 
 

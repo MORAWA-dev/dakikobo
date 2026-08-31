@@ -5,7 +5,7 @@
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     background-color: #032e12;
     background: linear-gradient(to bottom, #033914, #09e180);
     display: flex;

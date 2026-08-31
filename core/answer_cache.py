@@ -85,6 +85,8 @@ class AnswerCache:
             "sources",
             "confidence",
             "retrieved_chunk_ids",
+            "evidence_question_hash",
+            "evidence_created_at",
             "cached_at",
         }
         return value if required.issubset(value) else None
@@ -98,6 +100,8 @@ class AnswerCache:
         sources: list[dict],
         confidence: str,
         retrieved_chunk_ids: list[str],
+        evidence_question_hash: str = "",
+        evidence_created_at: float | None = None,
     ) -> dict[str, Any]:
         value = {
             "answer": answer,
@@ -105,6 +109,8 @@ class AnswerCache:
             "sources": sources,
             "confidence": confidence,
             "retrieved_chunk_ids": list(retrieved_chunk_ids),
+            "evidence_question_hash": evidence_question_hash or "",
+            "evidence_created_at": evidence_created_at,
             "cached_at": _utc_now_iso(),
         }
         self._cache.set(key, value)

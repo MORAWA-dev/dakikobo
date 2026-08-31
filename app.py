@@ -48,7 +48,7 @@ from core.case import build_advice_case
 from core.case_log import (
     SCHEMA_VERSION as CASE_LOG_SCHEMA_VERSION,
     VALID_ANSWER_PATHS,
-    clone_latest_evidence,
+    clone_evidence_batch,
     list_due_followups,
     record_evidence,
     record_feedback,
@@ -701,7 +701,11 @@ def crop_labels_route():
     try:
         data = load_crop_labels()
     except (OSError, json.JSONDecodeError, ValueError) as exc:
-        return jsonify({"error": str(exc), "crops": []}), 500
+        logger.warning("Crop labels unavailable: %s", exc)
+        return jsonify({
+            "error": "Les libellés des cultures sont indisponibles pour le moment.",
+            "crops": [],
+        }), 500
     crops = []
     for crop in data.get("crops") or []:
         crop_id = (crop.get("id") or "").strip()
@@ -973,9 +977,17 @@ def ask():
             sources = cached.get("sources") or []
             case = cached.get("case")
             try:
-                ledger_created_at = clone_latest_evidence(
-                    CASE_LOG_DB,
-                    question_hash_value=question_hash(query),
+                cached_evidence_hash = cached.get("evidence_question_hash") or ""
+                cached_evidence_created_at = cached.get("evidence_created_at")
+                ledger_created_at = (
+                    clone_evidence_batch(
+                        CASE_LOG_DB,
+                        question_hash_value=cached_evidence_hash,
+                        source_created_at=float(cached_evidence_created_at),
+                        target_question_hash_value=question_hash(query),
+                    )
+                    if cached_evidence_hash and cached_evidence_created_at is not None
+                    else None
                 )
             except Exception as exc:
                 logger.warning("Evidence ledger cache clone skipped: %s", exc)
@@ -1265,6 +1277,8 @@ def ask():
                         sources=sources,
                         confidence=confidence,
                         retrieved_chunk_ids=retrieved_chunk_ids,
+                        evidence_question_hash=question_hash(query),
+                        evidence_created_at=ledger_created_at,
                     )
                 except Exception as exc:
                     logger.warning("Answer cache write skipped: %s", exc)
@@ -1448,7 +1462,7 @@ def journal_due():
     except Exception as exc:
         logger.warning("Journal due read failed: %s", exc)
         _set_log_fields(outcome="read_error", failure_type=type(exc).__name__)
-        return jsonify({"ok": False, "error": "journal unavailable"}), 500
+        return jsonify({"ok": False, "error": "Le journal est indisponible pour le moment."}), 500
     _set_log_fields(outcome="ok", due_count=len(cases))
     response = jsonify({"ok": True, "due": cases, "count": len(cases)})
     response.headers["Cache-Control"] = "no-store"
@@ -1472,10 +1486,10 @@ def feedback():
 
     if rating not in ("up", "down"):
         _set_log_fields(outcome="validation_error", failure_type="invalid_rating")
-        return jsonify({"ok": False, "error": "invalid rating"}), 400
+        return jsonify({"ok": False, "error": "L’évaluation doit être positive ou négative."}), 400
     if answer_path and answer_path not in VALID_ANSWER_PATHS:
         _set_log_fields(outcome="validation_error", failure_type="invalid_answer_path")
-        return jsonify({"ok": False, "error": "invalid answer path"}), 400
+        return jsonify({"ok": False, "error": "Le type de réponse est invalide."}), 400
 
     try:
         feedback_id = record_feedback(
@@ -1508,7 +1522,7 @@ def feedback():
                     before_ref = stored
             except ValueError:
                 _set_log_fields(outcome="validation_error", failure_type="image_too_large")
-                return jsonify({"ok": False, "error": "image too large"}), 413
+                return jsonify({"ok": False, "error": "L’image envoyée est trop lourde."}), 413
         _set_log_fields(
             outcome="ok",
             rating=rating,
@@ -1523,7 +1537,7 @@ def feedback():
     except Exception as e:
         print(f"ERROR — feedback write failed: {e}")
         _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
-        return jsonify({"ok": False, "error": "write failed"}), 500
+        return jsonify({"ok": False, "error": "L’évaluation n’a pas pu être enregistrée."}), 500
 
 
 @app.route("/feedback/outcome", methods=["POST"])
@@ -1539,7 +1553,7 @@ def feedback_outcome():
 
     if not feedback_id:
         _set_log_fields(outcome="validation_error", failure_type="missing_feedback_id")
-        return jsonify({"ok": False, "error": "missing feedback_id"}), 400
+        return jsonify({"ok": False, "error": "L’identifiant de l’évaluation est manquant."}), 400
 
     after_file = request.files.get("after_image")
     if after_file and after_file.filename:
@@ -1551,7 +1565,7 @@ def feedback_outcome():
             ) or after_ref
         except ValueError:
             _set_log_fields(outcome="validation_error", failure_type="image_too_large")
-            return jsonify({"ok": False, "error": "image too large"}), 413
+            return jsonify({"ok": False, "error": "L’image envoyée est trop lourde."}), 413
 
     try:
         updated = record_outcome(
@@ -1562,15 +1576,15 @@ def feedback_outcome():
         )
     except ValueError:
         _set_log_fields(outcome="validation_error", failure_type="invalid_outcome")
-        return jsonify({"ok": False, "error": "invalid outcome"}), 400
+        return jsonify({"ok": False, "error": "Le résultat de suivi est invalide."}), 400
     except Exception as e:
         print(f"ERROR — outcome write failed: {e}")
         _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
-        return jsonify({"ok": False, "error": "write failed"}), 500
+        return jsonify({"ok": False, "error": "Le suivi n’a pas pu être enregistré."}), 500
 
     if not updated:
         _set_log_fields(outcome="not_found", failure_type="feedback_id_not_found")
-        return jsonify({"ok": False, "error": "feedback_id not found"}), 404
+        return jsonify({"ok": False, "error": "L’évaluation demandée est introuvable."}), 404
 
     _set_log_fields(
         outcome="ok",

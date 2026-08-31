@@ -11,6 +11,7 @@ from core.answer_cache import (
 )
 from core.query_context import resolve_query_context
 from core.ops_metrics import OpsMetricsStore
+from core.case_log import list_evidence
 
 
 def _key(**overrides):
@@ -61,8 +62,12 @@ def test_answer_cache_value_has_locked_provenance_shape(tmp_path):
         "sources",
         "confidence",
         "retrieved_chunk_ids",
+        "evidence_question_hash",
+        "evidence_created_at",
         "cached_at",
     }
+    assert value["evidence_question_hash"] == ""
+    assert value["evidence_created_at"] is None
     assert cache.get("key") == value
 
 
@@ -192,7 +197,8 @@ def test_repeat_rag_question_is_stored_then_served_without_groq(monkeypatch, tmp
         "classify",
         lambda value: (_ for _ in ()).throw(AssertionError("router must be skipped")),
     )
-    second = client.post("/ask", data={"messageText": query})
+    normalized_variant = "  COMMENT CONSERVER LE NIÉBÉ ?  "
+    second = client.post("/ask", data={"messageText": normalized_variant})
 
     assert second.status_code == 200
     assert second.get_json()["answer"] == first.get_json()["answer"]
@@ -200,3 +206,19 @@ def test_repeat_rag_question_is_stored_then_served_without_groq(monkeypatch, tmp
     assert second.get_json()["journal"]["answer_path"] == "cache"
     assert second.get_json()["journal"]["ledger_created_at"] != first_ref
     assert harness.search_calls == 1
+
+    feedback = client.post(
+        "/feedback",
+        data={
+            "rating": "up",
+            "question": normalized_variant.strip(),
+            "answer": second.get_json()["answer"],
+            "answer_path": "cache",
+            "ledger_created_at": second.get_json()["journal"]["ledger_created_at"],
+        },
+    )
+    linked = list_evidence(
+        str(tmp_path / "case_log.sqlite3"),
+        feedback_id=feedback.get_json()["feedback_id"],
+    )
+    assert linked

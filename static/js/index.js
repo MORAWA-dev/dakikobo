@@ -2,7 +2,7 @@ $(function() {
     var BOT_AVATAR = '/static/images/logo.png';
     var BOT_AVATAR_ALT = 'Logo DakiKobo';
     var api = window.DakiKoboApi;
-    var renderModule = window.DakiKoboRender.create($);
+    var renderModule = window.DakiKoboRender.create($, api);
     var cleanDisplayText = renderModule.cleanDisplayText;
     var escapeHtml = renderModule.escapeHtml;
     var renderFeedback = renderModule.renderFeedback;
