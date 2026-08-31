@@ -741,3 +741,12 @@ cd - && git worktree remove "$WT" --force
   fertilizer card, sources, confidence, and mandatory confirmation entirely offline.
 - Python compilation, JavaScript syntax, dependency integrity, generated-data parity, and
   `git diff --check`: passed.
+- Live `/healthz` and `/version` returned HTTP 200 in under one second while correctly reporting
+  `warming`, then `/healthz` reported `ready` after the two-worker CPU warm-up completed.
+- Strict public RAG evaluation: **14/14 hard-passed (100%)**, with five non-blocking advisory warnings.
+
+**Git / deploy**
+
+- GitHub audited code: `571d182876c0cb8ff93f8c21f961c2ed00bbb82e`.
+- Hugging Face Space: `f2ef78280d493e2f08bfd8054b4252324d7301cd`.
+- No implementation phases or confirmed audit issues remain.
