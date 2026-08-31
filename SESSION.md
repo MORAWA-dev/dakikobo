@@ -698,6 +698,14 @@ cd - && git worktree remove "$WT" --force
   `Dose d'engrais pour le sorgho` returned the fixed NPK/urée advice, sources, Fort confidence, and
   mandatory local-agent confirmation entirely from the service worker cache.
 - Node syntax checks and `git diff --check`: passed.
+- Public `/version`: deploy `3a3ade584f9c5882c5aa62e19cf703b0cc7ea76f`, RAG ready after the
+  expected background warm-up. Public manifest, root-scoped worker header, offline banner, frontend
+  modules, and deterministic fertilizer response were all verified live.
+
+**Git / deploy**
+
+- GitHub Phase 5 feature commit: `180c47140a3ae41c52e51999a9ca2a5d0fbea71a`.
+- Hugging Face Space: `3a3ade584f9c5882c5aa62e19cf703b0cc7ea76f`.
 
 **Still open**
 
