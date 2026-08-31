@@ -601,3 +601,58 @@ cd - && git worktree remove "$WT" --force
 **Next action for the following session**
 
 - Begin Phase 4 from `plans/dakikobo_assessment_and_plan.md` when requested.
+
+---
+
+### 2026-08-31 — Phase 4 field journal and evidence ledger implemented
+
+**Decided**
+
+- Migrated the field journal additively to schema v4 with canonical crop/place ids, the answer
+  path (`rag`, `fertilizer`, `vision`, `cache`), and a seven-day follow-up deadline.
+- Added a privacy-safe evidence ledger: every top-six chunk receives its exact score, kept/dropped
+  decision, and `weak_title`, `low_overlap`, or `score_margin` reason under the existing salted
+  question hash. Question and answer text never enter this ledger.
+- `/ask` writes the evidence batch best-effort; `/feedback` links it atomically using the salted
+  hash plus exact batch timestamp. Cache hits clone the original decision batch without another
+  retrieval or Groq call.
+- Added a privacy-minimized `GET /journal/due` digest, plus evidence decisions in private CSV/JSONL
+  feedback exports.
+- Extracted `core/case_contract.py` beneath the case builder and demo examples, moved demo case
+  metadata into declarative profiles, and removed the late-import/per-id workaround from B9.
+
+**Files changed**
+
+- `core/case_log.py`, `core/retrieval.py`, `core/case_contract.py` — schema v4, journal/ledger APIs,
+  exact retrieval decisions, cache-hit evidence cloning, and shared field-case contract.
+- `app.py`, `static/js/index.js`, `config.py`, `.env.example` — two-step response/feedback linkage,
+  answer-path and registry-id propagation, due route, schema visibility, and follow-up default.
+- `scripts/export_feedback_eval.py` — outcome rows joined to privacy-safe chunk decisions.
+- `tests/fixtures/retrieval_golden.json`, `tests/test_evidence_ledger.py`, and case-log/cache/route/export
+  tests — offline golden decisions, migration, privacy, linkage, best-effort, due-digest, and export
+  coverage.
+- `README.md`, `DEPLOYMENT.md`, `IMPLEMENTATION_PLAN.md` — Phase 4 operator and product docs.
+
+**Verification**
+
+- Full offline suite: **268 passed**, one existing PyPDF2 deprecation warning.
+- Phase 4-focused suite after test isolation: **91 passed**.
+- Python compilation, dependency check, and `git diff --check`: passed. Node.js is not installed in
+  the local environment, so standalone `node --check` was unavailable; frontend wiring remains
+  covered by the asset and Flask integration tests.
+- Two-worker Gunicorn smoke: both gthread workers booted; 24 concurrent `/feedback` writes returned
+  HTTP 200 with 24 unique ids and exactly 24 shared rows. The database reported `journal_mode=wal`,
+  `user_version=4`, and `/version` reported field-journal schema 4.
+
+**Git / deploy**
+
+- GitHub and Hugging Face deployment pending the final commit in this session.
+
+**Still open**
+
+- Phase 5 (offline-first shell) is next in the locked plan.
+
+**Next action for the following session**
+
+- Confirm the Phase 4 Space commit, `/version`, `/journal/due`, live `/ask` journal metadata, and
+  public RAG evaluation after deployment.

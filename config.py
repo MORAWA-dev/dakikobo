@@ -83,6 +83,8 @@ WEB_FETCH_TIMEOUT_SECONDS = float(os.getenv("WEB_FETCH_TIMEOUT_SECONDS", "15.0")
 # --- Local case / feedback log ---
 # Runtime-generated SQLite database. Do not commit it.
 CASE_LOG_DB_PATH = os.getenv("CASE_LOG_DB_PATH", os.path.join("data", "case_log.sqlite3"))
+# A rated answer enters the follow-up digest after this many days.
+FOLLOW_UP_DELAY_DAYS = float(os.getenv("FOLLOW_UP_DELAY_DAYS", "7"))
 # Shared runtime state for TTL caches and privacy-safe ops events. SQLite WAL
 # makes this file safe to use from all Gunicorn workers.
 STATE_DB_PATH = os.getenv("STATE_DB_PATH", os.path.join("data", "runtime_state.sqlite3"))

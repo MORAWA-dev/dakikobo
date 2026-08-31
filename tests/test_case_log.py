@@ -1,6 +1,7 @@
 """Tests for the SQLite feedback/case log."""
 
 import sqlite3
+from types import SimpleNamespace
 
 import pytest
 
@@ -8,7 +9,10 @@ from core.case_log import (
     SCHEMA_VERSION,
     VALID_OUTCOMES,
     init_case_log,
+    list_due_followups,
+    list_evidence,
     list_feedback_events,
+    record_evidence,
     record_feedback,
     record_outcome,
     set_before_image_ref,
@@ -24,6 +28,7 @@ def test_record_feedback_creates_sqlite_case_log(tmp_path):
         question="Quand semer le mil ?",
         answer="Après les pluies régulières.",
         created_at="2026-07-03T10:00:00+00:00",
+        follow_up_due_at=123.0,
     )
 
     assert feedback_id == 1
@@ -39,6 +44,10 @@ def test_record_feedback_creates_sqlite_case_log(tmp_path):
             "outcome_at": None,
             "before_image_ref": None,
             "after_image_ref": None,
+            "place_id": None,
+            "crop_id": None,
+            "answer_path": None,
+            "follow_up_due_at": 123.0,
         }
     ]
 
@@ -221,3 +230,80 @@ def test_migration_adds_image_ref_columns(tmp_path):
     assert "after_image_ref" in row
     with sqlite3.connect(db_path) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+        columns = {
+            item[1]
+            for item in conn.execute("PRAGMA table_info(feedback_events)").fetchall()
+        }
+        assert {"place_id", "crop_id", "answer_path", "follow_up_due_at"} <= columns
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='evidence_ledger'"
+        ).fetchone()
+
+
+def test_feedback_links_matching_evidence_batch_and_stores_journal_fields(tmp_path):
+    db_path = str(tmp_path / "case_log.sqlite3")
+    created_at = record_evidence(
+        db_path,
+        question_hash_value="salted-hash",
+        created_at=42.5,
+        decisions=[SimpleNamespace(
+            chunk_id="chunk-1",
+            source_title="Guide mil",
+            score=0.41,
+            kept=True,
+            demoted_reason="",
+        )],
+    )
+    feedback_id = record_feedback(
+        db_path,
+        rating="up",
+        question="Quand semer le mil ?",
+        answer="Après une pluie utile.",
+        place_id="kaya",
+        crop_id="mil",
+        answer_path="rag",
+        follow_up_due_at=100.0,
+        question_hash_value="salted-hash",
+        ledger_created_at=created_at,
+    )
+
+    row = list_feedback_events(db_path)[0]
+    assert row["place_id"] == "kaya"
+    assert row["crop_id"] == "mil"
+    assert row["answer_path"] == "rag"
+    evidence = list_evidence(db_path, feedback_id=feedback_id)
+    assert len(evidence) == 1
+    assert evidence[0]["chunk_id"] == "chunk-1"
+    assert evidence[0]["feedback_id"] == feedback_id
+
+
+def test_due_followups_are_privacy_minimized_and_exclude_outcomes(tmp_path):
+    db_path = str(tmp_path / "case_log.sqlite3")
+    due_id = record_feedback(
+        db_path,
+        rating="down",
+        question="Question privée",
+        answer="Réponse privée",
+        crop_id="sorgho",
+        answer_path="cache",
+        follow_up_due_at=10.0,
+    )
+    completed_id = record_feedback(
+        db_path,
+        rating="up",
+        question="Autre question privée",
+        answer="Autre réponse privée",
+        follow_up_due_at=10.0,
+    )
+    assert record_outcome(
+        db_path,
+        feedback_id=completed_id,
+        outcome="not_applied",
+    )
+
+    due = list_due_followups(db_path, now=11.0)
+    assert [item["feedback_id"] for item in due] == [due_id]
+    assert due[0]["crop_id"] == "sorgho"
+    assert due[0]["answer_path"] == "cache"
+    assert "question" not in due[0]
+    assert "answer" not in due[0]

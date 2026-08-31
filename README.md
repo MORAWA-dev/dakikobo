@@ -43,8 +43,9 @@ remplacement de l'agent agricole.
 
 - **Grounded French answers** — RAG over a local document corpus; off-topic questions
   fall back to an honest "je ne sais pas" instead of hallucinating.
-- **Source citations** — one scored retrieval grounds both the generated answer and
-  its ranked source cards, with stable chunk ids for future evidence tracking.
+- **Source citations and evidence ledger** — one scored retrieval grounds both the generated
+  answer and its ranked source cards; every kept or dropped chunk is recorded by salted question
+  hash with its score and citation decision for private offline evaluation.
 - **Fast inference** — Groq-hosted `openai/gpt-oss-120b`, with reasoning tokens
   hidden so answers stay short and farmer-readable.
 - **Multilingual retrieval** — `paraphrase-multilingual-MiniLM-L12-v2` embeddings for
@@ -72,7 +73,8 @@ remplacement de l'agent agricole.
   forecast cards for selected Burkina Faso locations.
 - **Soil-aware fertilizer context** — SoilGrids texture, organic carbon, pH and retention-risk
   classes combined with deterministic fertilizer guidance.
-- **Feedback capture** — 👍 / 👎 under each answer, with follow-up outcome tracking (was the advice applied? did it help?), stored in a local SQLite case log.
+- **Field journal** — 👍 / 👎, crop/place ids, answer path, optional before/after photos, a
+  seven-day reminder digest and follow-up outcomes are stored in a local SQLite case log.
 - **Français simple** — optional plain-language mode with a field glossary (NPK, microdose, OAPH, etc.).
 - **Field weather enrichment** — known locations can attach rainfall / water-stress signals to answers.
 - **Mobile-first responsive UI** — fills the screen on phones, input pinned to the bottom.
@@ -210,7 +212,10 @@ Open <http://127.0.0.1:5000> in your browser.
 - **Quick chips** above the input send common questions in one tap.
 - **Voice output:** tick *"Activer la lecture vocale"* to hear answers read aloud.
 - **Voice input:** tap the microphone, speak, then tap again to stop or wait for auto-stop.
-- **Feedback:** use 👍 / 👎 under an answer — entries are stored in `data/case_log.sqlite3`.
+- **Feedback:** use 👍 / 👎 under an answer; DakiKobo links the rating and later field outcome to
+  the exact retrieval decisions in `data/case_log.sqlite3`.
+- **Due follow-ups:** `GET /journal/due` returns a privacy-minimized reminder digest without
+  question or answer text.
 
 ---
 
@@ -302,6 +307,7 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `MARKDOWN_FOLDER`      | `Data/markdown`                          | Reviewed Markdown corpus for RAG         |
 | `PREFER_MARKDOWN_KB`   | `true`                                   | Use Markdown first; fallback to PDFs if needed |
 | `CASE_LOG_DB_PATH`     | `data/case_log.sqlite3`                  | Runtime SQLite feedback/case log         |
+| `FOLLOW_UP_DELAY_DAYS` | `7`                                        | Days before a rated case is due for follow-up |
 | `STATE_DB_PATH`        | `data/runtime_state.sqlite3`             | Shared SQLite cache and ops state         |
 | `ANSWER_CACHE_ENABLED` | `true`                                   | Enable corpus-aware repeat-answer cache   |
 | `ANSWER_CACHE_TTL_SECONDS` | `86400`                              | Answer cache lifetime (24 hours)          |
@@ -332,12 +338,14 @@ All tunables live in `config.py` (overridable via environment variables where sh
 
 ```
 dakikobo/
-├── app.py               # Flask entry point + routes (/ , /ask , /feedback)
+├── app.py               # Flask entry point + routes (/ask, /feedback, /journal/due)
 ├── config.py            # Central configuration
 ├── core/
 │   ├── crops.py         # Canonical crop ids, French labels and capabilities
 │   ├── places.py        # Canonical place ids, labels and weather coverage
 │   ├── retrieval.py     # Citation ranking, confidence and stable chunk ids
+│   ├── case_contract.py # Shared field-case data contract
+│   ├── case_log.py      # SQLite field journal and evidence ledger
 │   ├── llm_chain.py     # LLM + RetrievalQA setup and French prompt
 │   └── rag_pipeline.py  # Markdown/PDF ingestion, embeddings, Chroma, TTS
 ├── templates/index.html # Chat UI
@@ -355,7 +363,7 @@ dakikobo/
 - `.env`, `chroma_db/`, generated audio, `data/feedback.csv` and
   `data/case_log.sqlite3*` are git-ignored.
 - `/healthz` reports readiness; `/version` reports app version, commit if exposed
-  by the host, and key runtime config flags.
+  by the host, key runtime config flags, and the field-journal schema version.
 - Runtime logs are JSON lines with route, status, latency, model/feature, failure
   type and confidence where available. Raw questions, answers, images and audio
   are not logged.

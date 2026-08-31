@@ -30,9 +30,10 @@ from core.retrieval import (
     get_active_manifest_hash,
     ground_answer,
     manifest_hash,
+    merge_scored_evidence,
     set_active_manifest_hash,
 )
-from core.answer_cache import AnswerCache, build_answer_cache_key
+from core.answer_cache import AnswerCache, build_answer_cache_key, question_hash
 from core.cache import interprocess_file_lock
 from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
@@ -44,7 +45,16 @@ from core.speech import (
 )
 from core.examples import get_demo_example
 from core.case import build_advice_case
-from core.case_log import record_feedback, record_outcome, set_before_image_ref
+from core.case_log import (
+    SCHEMA_VERSION as CASE_LOG_SCHEMA_VERSION,
+    VALID_ANSWER_PATHS,
+    clone_latest_evidence,
+    list_due_followups,
+    record_evidence,
+    record_feedback,
+    record_outcome,
+    set_before_image_ref,
+)
 from core.query_context import resolve_query_context
 from core.simple_french import (
     apply_simple_style_to_query,
@@ -60,8 +70,8 @@ from core.weather import (
     list_weather_locations,
     resolve_weather_location_id,
 )
-from core.crops import list_crops
-from core.places import list_places
+from core.crops import list_crops, resolve_crop
+from core.places import list_places, resolve_place
 from core.soil import (
     SoilError,
     build_soil_context,
@@ -180,6 +190,22 @@ def _set_log_fields(**fields) -> None:
     current = getattr(g, "log_fields", {})
     current.update({key: value for key, value in fields.items() if value is not None})
     g.log_fields = current
+
+
+def _journal_metadata(
+    *,
+    answer_path: str,
+    crop_id: str = "",
+    place_id: str = "",
+    ledger_created_at: float | None = None,
+) -> dict:
+    """Client round-trip metadata; never exposes the salted question hash."""
+    return {
+        "answer_path": answer_path,
+        "crop_id": crop_id or "",
+        "place_id": place_id or "",
+        "ledger_created_at": ledger_created_at,
+    }
 
 
 def _log_payload(event: str, **fields) -> None:
@@ -758,6 +784,7 @@ def version():
             "prefer_markdown_kb": PREFER_MARKDOWN_KB,
             "rag_warmup_on_start": RAG_WARMUP_ON_START,
             "answer_cache_enabled": ANSWER_CACHE_ENABLED,
+            "field_journal_schema_version": CASE_LOG_SCHEMA_VERSION,
         },
     })
 
@@ -770,6 +797,11 @@ def demo_example(example_id):
             "error": "Exemple introuvable.",
             "confidence": "Faible",
         }), 404
+    input_type = (example.get("case") or {}).get("input_type", "text")
+    answer_path = "vision" if input_type == "image" else (
+        "fertilizer" if input_type == "fertilizer" else "rag"
+    )
+    example["journal"] = _journal_metadata(answer_path=answer_path)
     return jsonify(example)
 
 
@@ -931,6 +963,14 @@ def ask():
             refusal = answer_kind == "refusal"
             sources = cached.get("sources") or []
             case = cached.get("case")
+            try:
+                ledger_created_at = clone_latest_evidence(
+                    CASE_LOG_DB,
+                    question_hash_value=question_hash(query),
+                )
+            except Exception as exc:
+                logger.warning("Evidence ledger cache clone skipped: %s", exc)
+                ledger_created_at = None
             _set_log_fields(
                 intent="cache",
                 model="cache",
@@ -951,6 +991,12 @@ def ask():
                 "audio_url": "",
                 "answer_kind": answer_kind,
                 "simple_french": simple_french,
+                "journal": _journal_metadata(
+                    answer_path="cache",
+                    crop_id=resolved.crop_id,
+                    place_id=resolved.place_id,
+                    ledger_created_at=ledger_created_at,
+                ),
             }
             if case is not None:
                 payload["case"] = case
@@ -1028,6 +1074,11 @@ def ask():
                 "case": case,
                 "answer_kind": "advice",
                 "simple_french": simple_french,
+                "journal": _journal_metadata(
+                    answer_path="fertilizer",
+                    crop_id=resolved.crop_id,
+                    place_id=resolved.place_id,
+                ),
             }
             if weather_payload is not None:
                 payload["weather"] = weather_payload
@@ -1077,10 +1128,16 @@ def ask():
             source_docs,
             score_lookup=lambda: source_scores,
         )
+        evidence_decisions = merge_scored_evidence(
+            scored,
+            grounded_policy,
+            similarity_threshold=SIMILARITY_THRESHOLD,
+        )
         grounded = GroundedAnswer(
             sources=grounded_policy.sources,
             confidence=grounded_policy.confidence,
             retrieved_chunk_ids=retrieved_chunk_ids,
+            evidence_decisions=evidence_decisions,
         )
 
         # Threshold-accepted documents ground generation and citations, while
@@ -1155,6 +1212,16 @@ def ask():
             case_structured=case is not None,
         )
 
+        try:
+            ledger_created_at = record_evidence(
+                CASE_LOG_DB,
+                question_hash_value=question_hash(query),
+                decisions=grounded.evidence_decisions,
+            )
+        except Exception as exc:
+            logger.warning("Evidence ledger write skipped: %s", exc)
+            ledger_created_at = None
+
         payload = {
             "answer": answer,
             "sources": sources,
@@ -1162,6 +1229,12 @@ def ask():
             "audio_url": audio_url,
             "answer_kind": answer_kind,
             "simple_french": simple_french,
+            "journal": _journal_metadata(
+                answer_path="rag",
+                crop_id=resolved.crop_id,
+                place_id=resolved.place_id,
+                ledger_created_at=ledger_created_at,
+            ),
         }
         if case is not None:
             payload["case"] = case
@@ -1334,6 +1407,8 @@ def screen():
         case["confidence"] = confidence
     case = _maybe_simplify_case(case, simple_french)
     audio_url = text_to_speech_to_static(answer)
+    crop_entry = resolve_crop(crop) if crop else None
+    place_entry = resolve_place(location) if location else None
     _set_log_fields(
         outcome="ok",
         confidence=confidence,
@@ -1347,7 +1422,28 @@ def screen():
         "confidence": confidence,
         "audio_url": audio_url,
         "simple_french": simple_french,
+        "journal": _journal_metadata(
+            answer_path="vision",
+            crop_id=crop_entry.id if crop_entry else "",
+            place_id=place_entry.id if place_entry else "",
+        ),
     })
+
+
+@app.route("/journal/due")
+def journal_due():
+    """Privacy-minimized reminder digest for feedback awaiting an outcome."""
+    _set_log_fields(feature="journal_due")
+    try:
+        cases = list_due_followups(CASE_LOG_DB)
+    except Exception as exc:
+        logger.warning("Journal due read failed: %s", exc)
+        _set_log_fields(outcome="read_error", failure_type=type(exc).__name__)
+        return jsonify({"ok": False, "error": "journal unavailable"}), 500
+    _set_log_fields(outcome="ok", due_count=len(cases))
+    response = jsonify({"ok": True, "due": cases, "count": len(cases)})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/feedback", methods=["POST"])
@@ -1357,10 +1453,20 @@ def feedback():
     question = request.form.get("question", "").strip()
     answer = request.form.get("answer", "").strip()
     before_ref = (request.form.get("before_image_ref") or "").strip()[:240]
+    place_id = (request.form.get("place_id") or "").strip()[:80]
+    crop_id = (request.form.get("crop_id") or "").strip()[:80]
+    answer_path = (request.form.get("answer_path") or "").strip()
+    try:
+        ledger_created_at = float(request.form.get("ledger_created_at"))
+    except (TypeError, ValueError):
+        ledger_created_at = None
 
     if rating not in ("up", "down"):
         _set_log_fields(outcome="validation_error", failure_type="invalid_rating")
         return jsonify({"ok": False, "error": "invalid rating"}), 400
+    if answer_path and answer_path not in VALID_ANSWER_PATHS:
+        _set_log_fields(outcome="validation_error", failure_type="invalid_answer_path")
+        return jsonify({"ok": False, "error": "invalid answer path"}), 400
 
     try:
         feedback_id = record_feedback(
@@ -1369,6 +1475,11 @@ def feedback():
             question=question,
             answer=answer,
             before_image_ref=before_ref,
+            place_id=place_id,
+            crop_id=crop_id,
+            answer_path=answer_path,
+            question_hash_value=question_hash(question),
+            ledger_created_at=ledger_created_at,
         )
         # Optional multipart before photo (stored only as opaque local ref).
         before_file = request.files.get("before_image")

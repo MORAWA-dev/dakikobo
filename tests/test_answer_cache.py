@@ -100,6 +100,7 @@ def test_ask_cache_hit_skips_router_rag_weather_and_tts(monkeypatch, tmp_path):
     )
 
     monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", True)
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(tmp_path / "case_log.sqlite3"))
     monkeypatch.setattr(app_module, "answer_cache_store", cache)
     monkeypatch.setattr(app_module, "OPS_METRICS_ENABLED", True)
     monkeypatch.setattr(app_module.ops_metrics_mod, "_metrics_store", metrics)
@@ -137,6 +138,8 @@ def test_ask_cache_hit_skips_router_rag_weather_and_tts(monkeypatch, tmp_path):
     assert payload["confidence"] == "Moyen"
     assert payload["audio_url"] == ""
     assert payload["case"]["crop"] == "mil"
+    assert payload["journal"]["answer_path"] == "cache"
+    assert payload["journal"]["ledger_created_at"] is None
     event = metrics.snapshot(limit=1)["recent"][0]
     assert event["cache_hit"] is True
     assert event["intent"] == "cache"
@@ -163,6 +166,7 @@ def test_repeat_rag_question_is_stored_then_served_without_groq(monkeypatch, tmp
 
     harness = Harness()
     cache = AnswerCache(60, db_path=str(tmp_path / "repeat.sqlite3"))
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(tmp_path / "case_log.sqlite3"))
     monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", True)
     monkeypatch.setattr(app_module, "answer_cache_store", cache)
     monkeypatch.setattr(app_module, "REQUEST_COOLDOWN_SECONDS", 0)
@@ -175,6 +179,8 @@ def test_repeat_rag_question_is_stored_then_served_without_groq(monkeypatch, tmp
     first = client.post("/ask", data={"messageText": query})
     assert first.status_code == 200
     assert harness.search_calls == 1
+    first_ref = first.get_json()["journal"]["ledger_created_at"]
+    assert first_ref is not None
 
     monkeypatch.setattr(
         app_module,
@@ -191,4 +197,6 @@ def test_repeat_rag_question_is_stored_then_served_without_groq(monkeypatch, tmp
     assert second.status_code == 200
     assert second.get_json()["answer"] == first.get_json()["answer"]
     assert second.get_json()["audio_url"] == ""
+    assert second.get_json()["journal"]["answer_path"] == "cache"
+    assert second.get_json()["journal"]["ledger_created_at"] != first_ref
     assert harness.search_calls == 1

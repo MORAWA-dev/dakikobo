@@ -20,6 +20,7 @@ Sources:
 """
 
 from core.crops import CROPS, resolve_crop
+from core.case import build_advice_case
 
 SRC_IJBCS = {
     "title": "Recherche INERA - microdose Burkina",
@@ -152,8 +153,6 @@ def get_fertilizer_advice(
     Optional ``crop`` (from the field-context form) is used when the free text
     does not name a crop.
     """
-    from core.case import build_advice_case
-
     matched = _match_crop(crop or "") or _match_crop(text)
     if matched is None or matched not in _RECOMMENDATIONS:
         return None

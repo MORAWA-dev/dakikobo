@@ -1,0 +1,64 @@
+[
+  {
+    "name": "weak_title",
+    "query": "Comment faire une rotation niébé céréales ?",
+    "documents": [
+      {
+        "title": "Burkina Faso - Profil des moyens d'existence (FEWS NET)",
+        "content": "Calendrier saisonnier et rotation niébé céréales.",
+        "score": 0.4
+      },
+      {
+        "title": "IITA guide niebe",
+        "content": "Rotation niébé céréales, azote et fertilité du sol.",
+        "score": 0.38
+      }
+    ],
+    "expected": {
+      "kept_titles": ["IITA guide niebe"],
+      "demoted": {
+        "Burkina Faso - Profil des moyens d'existence (FEWS NET)": "weak_title"
+      }
+    }
+  },
+  {
+    "name": "low_overlap",
+    "query": "Comment stocker le niébé contre les bruches ?",
+    "documents": [
+      {
+        "title": "IITA niébé",
+        "content": "Stockage du niébé contre les bruches avec des sacs hermétiques.",
+        "score": 0.4
+      },
+      {
+        "title": "Guide maïs",
+        "content": "Semis du maïs après une pluie utile et rendement.",
+        "score": 0.39
+      }
+    ],
+    "expected": {
+      "kept_titles": ["IITA niébé"],
+      "demoted": {"Guide maïs": "low_overlap"}
+    }
+  },
+  {
+    "name": "score_margin",
+    "query": "Comment stocker le niébé contre les bruches ?",
+    "documents": [
+      {
+        "title": "IITA niébé",
+        "content": "Stockage du niébé contre les bruches avec des sacs hermétiques.",
+        "score": 0.42
+      },
+      {
+        "title": "Autre guide niébé",
+        "content": "Stockage du niébé contre les bruches après séchage.",
+        "score": 0.2
+      }
+    ],
+    "expected": {
+      "kept_titles": ["IITA niébé"],
+      "demoted": {"Autre guide niébé": "score_margin"}
+    }
+  }
+]

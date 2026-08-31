@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from config import (
     CITATION_SCORE_MARGIN,
@@ -66,6 +66,18 @@ class GroundedAnswer:
     sources: list[SourceCard]
     confidence: str  # "Fort" | "Moyen" | "Faible"
     retrieved_chunk_ids: list[str]  # sha256(source|content[:64])[:16]
+    evidence_decisions: list["EvidenceDecision"] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class EvidenceDecision:
+    """Offline-testable citation decision for one retrieved chunk."""
+
+    chunk_id: str
+    source_title: str
+    score: float | None
+    kept: bool
+    demoted_reason: str = ""
 
 
 def chunk_id(source_title: str, page_content: str) -> str:
@@ -383,6 +395,68 @@ def _retrieved_chunk_ids(source_docs) -> list[str]:
     return ids
 
 
+def _evidence_decisions(
+    source_docs,
+    *,
+    scores: dict,
+    kept_titles: set[str],
+    reasons: dict[str, str],
+) -> list[EvidenceDecision]:
+    decisions = []
+    for doc in source_docs:
+        metadata = getattr(doc, "metadata", {}) or {}
+        title = metadata.get("source", "Inconnu")
+        kept = title in kept_titles
+        decisions.append(EvidenceDecision(
+            chunk_id=chunk_id(title, getattr(doc, "page_content", "")),
+            source_title=title,
+            score=float(scores[title]) if title in scores else None,
+            kept=kept,
+            demoted_reason="" if kept else reasons.get(title, "low_overlap"),
+        ))
+    return decisions
+
+
+def merge_scored_evidence(
+    scored,
+    grounded: GroundedAnswer,
+    *,
+    similarity_threshold: float,
+) -> list[EvidenceDecision]:
+    """Overlay exact per-chunk scores and include threshold-dropped candidates."""
+    policy_by_chunk = {
+        decision.chunk_id: decision
+        for decision in grounded.evidence_decisions
+    }
+    merged = []
+    for doc, raw_score in scored:
+        metadata = getattr(doc, "metadata", {}) or {}
+        title = metadata.get("source", "Inconnu")
+        identifier = chunk_id(title, getattr(doc, "page_content", ""))
+        policy = policy_by_chunk.get(identifier)
+        if policy is None:
+            merged.append(EvidenceDecision(
+                chunk_id=identifier,
+                source_title=title,
+                score=float(raw_score),
+                kept=False,
+                demoted_reason="low_overlap",
+            ))
+            continue
+        merged.append(EvidenceDecision(
+            chunk_id=identifier,
+            source_title=title,
+            score=float(raw_score),
+            kept=policy.kept and float(raw_score) >= similarity_threshold,
+            demoted_reason=(
+                policy.demoted_reason
+                if policy.demoted_reason
+                else ("" if float(raw_score) >= similarity_threshold else "low_overlap")
+            ),
+        ))
+    return merged
+
+
 def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
     """Build the source cards and confidence from retrieval relevance scores.
 
@@ -405,12 +479,20 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
         scores = {}
 
     retrieved_ids = _retrieved_chunk_ids(source_docs)
+    reasons: dict[str, str] = {}
     if not sources or not scores:
         cards = _as_source_cards(sources, scores)
+        kept_titles = {source["title"] for source in sources}
         return GroundedAnswer(
             sources=cards,
             confidence=_confidence_from_sources(sources),
             retrieved_chunk_ids=retrieved_ids,
+            evidence_decisions=_evidence_decisions(
+                source_docs,
+                scores=scores,
+                kept_titles=kept_titles,
+                reasons=reasons,
+            ),
         )
 
     query_tokens = _citation_tokens(query)
@@ -428,6 +510,9 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
     }
     had_crop_filter = False
     if query_crop_tokens and any(crop_overlaps.values()):
+        for source in sources:
+            if crop_overlaps.get(source["title"], 0) <= 0:
+                reasons[source["title"]] = "low_overlap"
         sources = [s for s in sources if crop_overlaps.get(s["title"], 0) > 0]
         had_crop_filter = True
 
@@ -436,6 +521,9 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
         for title, tokens in source_tokens.items()
     }
     if query_topic_tokens and any(topic_overlaps.get(s["title"], 0) > 0 for s in sources):
+        for source in sources:
+            if topic_overlaps.get(source["title"], 0) <= 0:
+                reasons[source["title"]] = "low_overlap"
         sources = [s for s in sources if topic_overlaps.get(s["title"], 0) > 0]
 
     overlaps = {
@@ -445,15 +533,25 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
     if any(overlaps.values()):
         max_overlap = max(overlaps.values())
         min_overlap = max(1, max_overlap - 1) if max_overlap >= 3 else 1
+        for source in sources:
+            if overlaps.get(source["title"], 0) < min_overlap:
+                reasons[source["title"]] = "low_overlap"
         sources = [s for s in sources if overlaps.get(s["title"], 0) >= min_overlap]
 
     scored_known = [scores[s["title"]] for s in sources if s["title"] in scores]
     if not scored_known:
         cards = _as_source_cards(sources, scores)
+        kept_titles = {source["title"] for source in sources}
         return GroundedAnswer(
             sources=cards,
             confidence=_confidence_from_sources(sources),
             retrieved_chunk_ids=retrieved_ids,
+            evidence_decisions=_evidence_decisions(
+                source_docs,
+                scores=scores,
+                kept_titles=kept_titles,
+                reasons=reasons,
+            ),
         )
 
     top = max(scored_known)
@@ -462,6 +560,10 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
         s for s in sources
         if s["title"] in scores and scores[s["title"]] >= floor
     ]
+    kept_titles_before_margin = {source["title"] for source in kept}
+    for source in sources:
+        if source["title"] not in kept_titles_before_margin:
+            reasons[source["title"]] = "score_margin"
     if not kept:
         kept = [s for s in sources if s["title"] in scores and scores[s["title"]] == top]
 
@@ -472,6 +574,9 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
     # (still better than answering with zero citations after the LLM saw chunks).
     strong = [s for s in kept if not _is_weak_source_title(s["title"])]
     if strong:
+        for source in kept:
+            if _is_weak_source_title(source["title"]):
+                reasons[source["title"]] = "weak_title"
         kept = strong
 
     if not kept:
@@ -479,6 +584,12 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
             sources=[],
             confidence="Faible",
             retrieved_chunk_ids=retrieved_ids,
+            evidence_decisions=_evidence_decisions(
+                source_docs,
+                scores=scores,
+                kept_titles=set(),
+                reasons=reasons,
+            ),
         )
 
     # Prefer title crop match, then content crop overlap, then adjusted score.
@@ -513,10 +624,20 @@ def ground_answer(query: str, source_docs, *, score_lookup) -> GroundedAnswer:
         elif confidence == "Fort":
             confidence = "Moyen"
 
+    dropped_by_limit = ranked[max_sources:]
+    for source in dropped_by_limit:
+        reasons[source["title"]] = "score_margin"
     ranked = ranked[:max_sources]
     cards = _as_source_cards(ranked, scores)
+    kept_titles = {source["title"] for source in ranked}
     return GroundedAnswer(
         sources=cards,
         confidence=confidence,
         retrieved_chunk_ids=retrieved_ids,
+        evidence_decisions=_evidence_decisions(
+            source_docs,
+            scores=scores,
+            kept_titles=kept_titles,
+            reasons=reasons,
+        ),
     )

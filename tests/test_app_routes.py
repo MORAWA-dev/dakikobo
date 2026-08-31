@@ -5,9 +5,21 @@ from pathlib import Path
 import logging
 from types import SimpleNamespace
 
+import pytest
+
 import app as app_module
-from core.case_log import list_feedback_events
+from core.case_log import list_evidence, list_feedback_events, record_feedback
 from core.retrieval import chunk_id, get_active_manifest_hash, manifest_hash
+
+
+@pytest.fixture(autouse=True)
+def _isolate_case_log(tmp_path, monkeypatch):
+    """Route tests must never append synthetic rows to the developer journal."""
+    monkeypatch.setattr(
+        app_module,
+        "CASE_LOG_DB",
+        str(tmp_path / "route_case_log.sqlite3"),
+    )
 
 
 def _query_starts_with(query: str, expected: str) -> None:
@@ -878,6 +890,66 @@ def test_rag_route_returns_unique_sources(monkeypatch):
     assert payload["case"]["needs_human_confirmation"] is True
 
 
+def test_rag_ledger_links_to_feedback_in_two_steps(tmp_path, monkeypatch):
+    case_log = tmp_path / "case_log.sqlite3"
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(case_log))
+    _install_rag(monkeypatch, _FakeRagChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    client = app_module.app.test_client()
+
+    asked = client.post(
+        "/ask",
+        data={
+            "messageText": "Quand semer le mil ?",
+            "crop": "mil",
+            "location": "kaya",
+        },
+    )
+    payload = asked.get_json()
+    assert asked.status_code == 200
+    assert payload["journal"]["answer_path"] == "rag"
+    assert payload["journal"]["crop_id"] == "mil"
+    assert payload["journal"]["place_id"] == "kaya"
+    assert payload["journal"]["ledger_created_at"] is not None
+    assert all(row["feedback_id"] is None for row in list_evidence(str(case_log)))
+
+    feedback_data = {
+        "rating": "up",
+        "question": "Quand semer le mil ?",
+        "answer": payload["answer"],
+        **payload["journal"],
+    }
+    feedback_response = client.post("/feedback", data=feedback_data)
+    feedback_id = feedback_response.get_json()["feedback_id"]
+
+    linked = list_evidence(str(case_log), feedback_id=feedback_id)
+    assert len(linked) == 3
+    assert all(row["question_hash"] != "Quand semer le mil ?" for row in linked)
+    journal_row = list_feedback_events(str(case_log))[0]
+    assert journal_row["answer_path"] == "rag"
+    assert journal_row["crop_id"] == "mil"
+    assert journal_row["place_id"] == "kaya"
+
+
+def test_evidence_write_failure_never_blocks_answer(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", str(tmp_path / "case_log.sqlite3"))
+    _install_rag(monkeypatch, _FakeRagChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module,
+        "record_evidence",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    response = app_module.app.test_client().post(
+        "/ask",
+        data={"messageText": "Quand semer le mil ?"},
+    )
+    assert response.status_code == 200
+    assert "saison des pluies" in response.get_json()["answer"]
+    assert response.get_json()["journal"]["ledger_created_at"] is None
+
+
 def test_rag_route_attaches_field_context_to_case(monkeypatch):
     client = app_module.app.test_client()
     seen = {}
@@ -1490,6 +1562,29 @@ def test_feedback_writes_sqlite_case_log(tmp_path, monkeypatch):
     assert rows[0]["rating"] == "up"
     assert rows[0]["question"] == "Q"
     assert rows[0]["answer"] == "A"
+
+
+def test_journal_due_route_returns_only_due_metadata(tmp_path, monkeypatch):
+    case_log = str(tmp_path / "case_log.sqlite3")
+    monkeypatch.setattr(app_module, "CASE_LOG_DB", case_log)
+    record_feedback(
+        case_log,
+        rating="down",
+        question="Question privée",
+        answer="Réponse privée",
+        crop_id="mil",
+        answer_path="rag",
+        follow_up_due_at=1.0,
+    )
+
+    response = app_module.app.test_client().get("/journal/due")
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    assert payload["count"] == 1
+    assert payload["due"][0]["crop_id"] == "mil"
+    assert "question" not in payload["due"][0]
+    assert "answer" not in payload["due"][0]
 
 
 def test_feedback_outcome_route_updates_row(tmp_path, monkeypatch):

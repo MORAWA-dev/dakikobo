@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from uuid import uuid4
 
-DEFAULT_DISEASE_CONFIRMATION = "Montrez la plante à un agent agricole pour confirmer."
-DEFAULT_ADVICE_CONFIRMATION = "Confirmez avec un agent agricole local avant une décision coûteuse."
+from core.case_contract import (
+    DEFAULT_ADVICE_CONFIRMATION,
+    DEFAULT_DISEASE_CONFIRMATION,
+    FieldCase,
+    case_title_for,
+)
 
 # Livelihood / market profiles often match crop names but are weak field advice.
 _WEAK_DISPLAY_SOURCE_MARKERS = (
@@ -19,13 +22,6 @@ _WEAK_DISPLAY_SOURCE_MARKERS = (
     "zones socio",
     "household survey",
 )
-
-_CASE_TITLES = {
-    "image": "Cas de terrain - feuille",
-    "fertilizer": "Conseil engrais",
-    "text": "Conseil agricole",
-}
-
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -130,11 +126,6 @@ def _strip_disclaimer(answer: str, disclaimer: str) -> str:
     if disclaimer and disclaimer in answer:
         return answer.replace(disclaimer, "").strip()
     return answer
-
-
-def case_title_for(input_type: str) -> str:
-    """French title for a field-case card."""
-    return _CASE_TITLES.get(_clean_text(input_type), "Conseil agricole")
 
 
 def split_french_sentences(text: str) -> list[str]:
@@ -315,39 +306,6 @@ def _advice_sections(answer: str, disclaimer: str) -> dict[str, list[str] | str]
         "actions": actions[:4],
         "do_not": do_not[:3],
     }
-
-
-@dataclass
-class FieldCase:
-    case_id: str
-    created_at: str
-    input_type: str
-    crop: str = ""
-    growth_stage: str = ""
-    location: str = ""
-    question: str = ""
-    image_present: bool = False
-    answer: str = ""
-    summary: str = ""
-    observations: list[str] = field(default_factory=list)
-    possible_causes: list[str] = field(default_factory=list)
-    evidence: list[str] = field(default_factory=list)
-    actions: list[str] = field(default_factory=list)
-    do_not: list[str] = field(default_factory=list)
-    confidence: str = "Moyen"
-    risk_level: str = "À vérifier"
-    needs_human_confirmation: bool = True
-    confirmation: str = DEFAULT_DISEASE_CONFIRMATION
-    disclaimer: str = ""
-    sources: list[dict[str, str]] = field(default_factory=list)
-    case_title: str = ""
-    weather_signals: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        data = asdict(self)
-        if not data.get("case_title"):
-            data["case_title"] = case_title_for(self.input_type)
-        return data
 
 
 def build_disease_case(

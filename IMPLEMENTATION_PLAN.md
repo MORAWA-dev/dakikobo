@@ -312,6 +312,19 @@ Status legend: `[ ]` todo · `[x]` done.
   - Tests cover TTL expiry/purge, WAL concurrency, cache-key invalidation, router bypass, privacy,
     and cross-worker ops percentiles.
 
+- [x] **30. Phase 4 field journal and evidence ledger** — `core/case_log.py`, `core/retrieval.py`, `app.py`
+  - Migrated the case log additively to schema v4 with crop/place ids, answer path, seven-day
+    follow-up due time, and a WAL-enabled evidence ledger.
+  - `/ask` records every kept and dropped retrieval chunk with exact score and the stable
+    `weak_title`, `low_overlap`, or `score_margin` decision. `/feedback` links that batch using a
+    salted question hash and exact response reference; cache hits clone the original decisions.
+  - Added the privacy-minimized `/journal/due` digest and joined chunk decisions into the private
+    CSV/JSONL feedback export.
+  - Extracted the shared field-case contract and replaced demo-specific case hardcoding, removing
+    the late circular-import workaround.
+  - Added an offline JSON golden set and migration, privacy, best-effort, two-step linkage, due-case,
+    and export regression tests. No Groq or network access is required.
+
 ---
 
 ## Later / parked (do **not** attempt now)

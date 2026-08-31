@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from core.case import build_advice_case
+from core.case_contract import DemoCaseProfile
+
 
 _TEXT_SOURCE = {
     "title": "Exemple DakiKobo - base locale",
@@ -157,6 +160,11 @@ DEMO_EXAMPLES = {
         "sources": [_FERTILIZER_SOURCE],
         "confidence": "Fort",
         "audio_url": "",
+        "_case_profile": {
+            "input_type": "fertilizer",
+            "crop": "sorgho",
+            "risk_level": "Faible si confirmé localement",
+        },
     },
     "photo_mais": {
         "kind": "case",
@@ -208,12 +216,11 @@ DEMO_EXAMPLES = {
 
 def get_demo_example(example_id: str) -> dict | None:
     """Return a copy of a public demo example, or None if it does not exist."""
-    from core.case import build_advice_case
-
     example = DEMO_EXAMPLES.get(example_id)
     if example is None:
         return None
     result = deepcopy(example)
+    profile = DemoCaseProfile.from_mapping(result.pop("_case_profile", None))
     # Text/fertilizer demos get the same evidence-first card shape as live /ask.
     # Refusals stay plain (no fake evidence card).
     if example_id == "hors_sujet" or result.get("answer_kind") == "refusal":
@@ -221,19 +228,13 @@ def get_demo_example(example_id: str) -> dict | None:
         result.pop("case", None)
         return result
     if result.get("kind") == "message" and not result.get("case"):
-        crop = "sorgho" if example_id == "fumure_sorgho" else ""
-        input_type = "fertilizer" if example_id == "fumure_sorgho" else "text"
         result["case"] = build_advice_case(
             answer=result.get("answer", ""),
             question=result.get("question", ""),
-            input_type=input_type,
-            crop=crop,
+            input_type=profile.input_type,
+            crop=profile.crop,
             sources=result.get("sources") or [],
             confidence=result.get("confidence") or "Moyen",
-            risk_level=(
-                "Faible si confirmé localement"
-                if input_type == "fertilizer"
-                else "À vérifier"
-            ),
+            risk_level=profile.risk_level,
         )
     return result

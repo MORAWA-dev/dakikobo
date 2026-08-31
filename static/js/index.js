@@ -92,7 +92,7 @@ $(function() {
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
     }
 
-    function appendMessage(message, isUser, sources, question, confidence, audioUrl) {
+    function appendMessage(message, isUser, sources, question, confidence, audioUrl, journal) {
         var messageClass = isUser ? 'user-message' : 'bot-message';
         // Updated logo reference to DakiKobo
         var logoHTML = isUser ? '' : '<div class="bot-logo"><img src="' + BOT_AVATAR + '" alt="' + BOT_AVATAR_ALT + '"></div>';
@@ -114,7 +114,7 @@ $(function() {
                 renderSources(bubble, sources);
                 renderAudioReplay(bubble, audioUrl);
                 if (question) {
-                    renderFeedback(bubble, question, message);
+                    renderFeedback(bubble, question, message, journal);
                 }
             });
         }
@@ -123,7 +123,7 @@ $(function() {
         return messageElement;
     }
 
-    function renderFeedback(bubble, question, answer) {
+    function renderFeedback(bubble, question, answer, journal) {
         var $fb = $('<div class="feedback"></div>');
         var $up = $('<button type="button" class="fb-btn" data-rating="up" aria-label="Réponse utile">👍</button>');
         var $down = $('<button type="button" class="fb-btn" data-rating="down" aria-label="Réponse pas utile">👎</button>');
@@ -132,7 +132,18 @@ $(function() {
         $fb.on('click', '.fb-btn', function() {
             var rating = $(this).data('rating');
             $fb.find('.fb-btn').prop('disabled', true);
-            $.post('/feedback', { rating: rating, question: question, answer: answer })
+            var feedbackData = {
+                rating: rating,
+                question: question,
+                answer: answer,
+                crop_id: journal && journal.crop_id ? journal.crop_id : '',
+                place_id: journal && journal.place_id ? journal.place_id : '',
+                answer_path: journal && journal.answer_path ? journal.answer_path : ''
+            };
+            if (journal && journal.ledger_created_at !== null && journal.ledger_created_at !== undefined) {
+                feedbackData.ledger_created_at = journal.ledger_created_at;
+            }
+            $.post('/feedback', feedbackData)
                 .done(function(response) {
                     $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
                     var feedbackId = response && response.feedback_id;
@@ -409,7 +420,7 @@ $(function() {
         return 'Cas de terrain - feuille';
     }
 
-    function appendCaseMessage(caseData, fallbackAnswer, sources, confidenceOverride, audioUrl, question) {
+    function appendCaseMessage(caseData, fallbackAnswer, sources, confidenceOverride, audioUrl, question, journal) {
         var logoHTML = '<div class="bot-logo"><img src="' + BOT_AVATAR + '" alt="' + BOT_AVATAR_ALT + '"></div>';
         var messageElement = $('<div class="message-container bot-container">' +
                             logoHTML +
@@ -506,7 +517,7 @@ $(function() {
         );
         renderAudioReplay(bubble, audioUrl);
         if (question) {
-            renderFeedback(bubble, question, answerText);
+            renderFeedback(bubble, question, answerText, journal);
         }
         $('.chat-messages').append(messageElement);
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
@@ -1017,10 +1028,11 @@ $(function() {
                         response.sources,
                         response.confidence,
                         response.audio_url,
-                        prompt
+                        prompt,
+                        response.journal
                     );
                 } else {
-                    appendMessage(response.answer, false, response.sources, prompt, response.confidence);
+                    appendMessage(response.answer, false, response.sources, prompt, response.confidence, '', response.journal);
                 }
                 isProcessing = false;
                 enableInput();
@@ -1431,10 +1443,11 @@ $(function() {
                                 sources,
                                 response.confidence,
                                 audioUrl,
-                                message
+                                message,
+                                response.journal
                             );
                         } else {
-                            appendMessage(answer, false, sources, message, response.confidence, audioUrl);
+                            appendMessage(answer, false, sources, message, response.confidence, audioUrl, response.journal);
                         }
 
                         if ($('#voiceReadingCheckbox').is(':checked') && audioUrl) {
@@ -1577,7 +1590,8 @@ $(function() {
                             response.sources,
                             response.confidence,
                             response.audio_url,
-                            context.question || "Photo maladie"
+                            context.question || "Photo maladie",
+                            response.journal
                         );
                     } else {
                         appendMessage(response.answer, false, response.sources, null, response.confidence, response.audio_url);

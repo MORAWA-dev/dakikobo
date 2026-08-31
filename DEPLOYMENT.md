@@ -122,11 +122,14 @@ Health check path:
   or `error`.
 - Answer, weather, soil, and ops state share one WAL-enabled SQLite file, so both Gunicorn workers
   see the same cache entries and metrics. The free Space disk is still ephemeral across rebuilds.
+- The separate WAL-enabled case-log database stores the field journal and privacy-safe evidence
+  ledger. `/journal/due` exposes only ids and due metadata, never question or answer text.
 - A kernel file lock serializes first-time Chroma initialization; both workers load the same completed
   vector store instead of racing its schema migration.
 - A real RAG question can still be slow if it arrives before warm-up finishes; open `/healthz`
   or ask one warm-up question before a live demo.
 - Keep `Data/` available on the deployed service if the vector store must be rebuilt.
-- Do not commit `.env`, `chroma_db/`, generated audio files, or feedback CSV files.
-- A serious production version should move feedback from CSV to a database and move generated audio to object storage.
+- Do not commit `.env`, `chroma_db/`, generated audio, case-log SQLite files, or private exports.
+- A durable production version should move the case-log SQLite database and generated audio to
+  persistent managed storage; Hugging Face free-Space disk can be replaced on rebuild.
 - If traffic grows, separate ingestion/vector-store building from the Flask web process.

@@ -26,7 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import CASE_LOG_DB_PATH
-from core.case_log import list_feedback_events
+from core.case_log import list_feedback_with_evidence
 
 
 DEFAULT_OUTPUT = os.path.join("reports", "feedback_eval.csv")
@@ -68,6 +68,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def _row_dict(row: dict) -> dict:
     before = row.get("before_image_ref") or ""
     after = row.get("after_image_ref") or ""
+    evidence = [
+        {
+            "chunk_id": item.get("chunk_id"),
+            "source_title": item.get("source_title"),
+            "score": item.get("score"),
+            "kept": bool(item.get("kept")),
+            "demoted_reason": item.get("demoted_reason") or "",
+        }
+        for item in (row.get("evidence") or [])
+    ]
     return {
         "id": row.get("id"),
         "created_at": row.get("created_at"),
@@ -76,16 +86,23 @@ def _row_dict(row: dict) -> dict:
         "answer": row.get("answer"),
         "outcome": row.get("outcome"),
         "outcome_at": row.get("outcome_at"),
+        "place_id": row.get("place_id") or "",
+        "crop_id": row.get("crop_id") or "",
+        "answer_path": row.get("answer_path") or "",
+        "follow_up_due_at": row.get("follow_up_due_at"),
         "before_image_ref": before,
         "after_image_ref": after,
         "before_image_exists": bool(before and Path(before).is_file()),
         "after_image_exists": bool(after and Path(after).is_file()),
+        "evidence_count": len(evidence),
+        "kept_evidence_count": sum(1 for item in evidence if item["kept"]),
+        "evidence_ledger": json.dumps(evidence, ensure_ascii=False, separators=(",", ":")),
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
-    rows = list_feedback_events(args.db)
+    rows = list_feedback_with_evidence(args.db)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -97,10 +114,17 @@ def main(argv: list[str] | None = None) -> int:
         "answer",
         "outcome",
         "outcome_at",
+        "place_id",
+        "crop_id",
+        "answer_path",
+        "follow_up_due_at",
         "before_image_ref",
         "after_image_ref",
         "before_image_exists",
         "after_image_exists",
+        "evidence_count",
+        "kept_evidence_count",
+        "evidence_ledger",
     ]
     records = [_row_dict(row) for row in rows]
 
