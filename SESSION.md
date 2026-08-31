@@ -728,11 +728,13 @@ cd - && git worktree remove "$WT" --force
   question variants, so feedback never links to a newer unrelated batch.
 - Removed the online-only font dependency and added best-effort caching for the remaining public icon
   assets.
+- Kept `/healthz` and `/version` responsive during the multi-minute RAG warm-up by making the
+  published-chain readiness sentinel a lock-free read.
 
 **Verification**
 
 - Independent standards and Phase 0–5 specification reviews: no remaining confirmed issue.
-- Full offline Python suite: **274 passed**, with only the existing PyPDF2 deprecation warning.
+- Full offline Python suite: **275 passed**, with only the existing PyPDF2 deprecation warning.
 - JavaScript suite: **6 passed**, including real service-worker install, fetch, online-save, and
   offline-replay behavior.
 - Real browser with the Flask server stopped: `Quel engrais pour le petit mil ?` produced the mil

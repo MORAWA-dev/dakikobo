@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import logging
+from threading import Thread
 from types import SimpleNamespace
 
 import pytest
@@ -231,6 +232,27 @@ def test_health_route_is_lightweight():
     assert payload["rag_ready"] is False
     assert payload["rag_status"] in {"cold", "warming", "ready", "error"}
     assert payload["rag_warmup"]["status"] == payload["rag_status"]
+
+
+def test_rag_runtime_status_does_not_wait_for_initialization_lock(monkeypatch):
+    result = {}
+    monkeypatch.setattr(app_module, "_rag_chain", None)
+    monkeypatch.setattr(app_module, "_rag_warmup_started", True)
+    monkeypatch.setattr(app_module, "_rag_warmup_error", None)
+
+    app_module._rag_lock.acquire()
+    try:
+        reader = Thread(
+            target=lambda: result.update(app_module._rag_runtime_status()),
+            daemon=True,
+        )
+        reader.start()
+        reader.join(timeout=0.5)
+        assert not reader.is_alive(), "readiness status waited for the RAG build lock"
+    finally:
+        app_module._rag_lock.release()
+
+    assert result["status"] == "warming"
 
 
 def test_crop_labels_route_returns_french_crops():

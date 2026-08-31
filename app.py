@@ -656,9 +656,11 @@ def _rag_runtime_status() -> dict:
         finished_at = _rag_warmup_finished_at
         error = _rag_warmup_error
 
-    # Keep readiness reads under the same lock used to publish the chain.
-    with _rag_lock:
-        rag_ready = _rag_chain is not None
+    # `_rag_chain` is published only after `_rag_db` and the complete chain are
+    # ready. Reading that sentinel must stay lock-free: `_rag_lock` is held for
+    # the full model/index warm-up, and health checks need to report `warming`
+    # immediately while that work is in progress.
+    rag_ready = _rag_chain is not None
 
     if rag_ready:
         status = "ready"
