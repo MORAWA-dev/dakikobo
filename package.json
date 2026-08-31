@@ -1,0 +1,10 @@
+{
+  "name": "dakikobo-frontend-tests",
+  "private": true,
+  "scripts": {
+    "test:js": "node --test tests/js/*.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

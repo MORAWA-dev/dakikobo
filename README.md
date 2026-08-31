@@ -67,6 +67,9 @@ remplacement de l'agent agricole.
   and required field confirmation.
 - **Deterministic fertilizer doses** — source-grounded INERA/Burkina recommendations (never
   invented), with a "confirmez avec votre agent" disclaimer.
+- **Offline-first PWA** — after one connected load, the app shell, registry, demo examples and
+  previously saved answers remain available; the same deterministic fertilizer tables work without
+  network access, while uncached questions receive an honest offline notice.
 - **Leaf disease screening (optional)** — upload a leaf photo for a hedged French screening via
   Gemini Vision, with a "ceci n'est pas un diagnostic" disclaimer (requires a Gemini API key).
 - **Weather-aware field signals** — Open-Meteo rainfall, ET0, soil moisture and short-term
@@ -95,6 +98,7 @@ remplacement de l'agent agricole.
 | Weather data     | Open-Meteo Forecast API                               |
 | Soil indicators  | SoilGrids REST API                                    |
 | Runtime state    | SQLite WAL (answer/weather/soil caches + ops metrics) |
+| Offline web app  | Service worker + Web App Manifest                    |
 
 ---
 

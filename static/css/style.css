@@ -1785,3 +1785,19 @@ details.sources-details[open] > .sources-summary::before {
     font-size: 12px;
     max-width: 100%;
 }
+
+.offline-banner {
+    position: sticky;
+    top: 0;
+    z-index: 1100;
+    padding: 8px 16px;
+    background: #7a4a00;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.offline-banner[hidden] {
+    display: none;
+}

@@ -11,6 +11,10 @@
       type="image/x-png"
     />
     <title>DakiKobo</title>
+    <meta name="theme-color" content="#315c2b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="DakiKobo" />
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}" />
 
     <link
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
@@ -26,6 +30,9 @@
     />
   </head>
   <body>
+    <div id="offlineBanner" class="offline-banner" role="status" hidden>
+      Mode hors ligne — dernières réponses enregistrées
+    </div>
     <div class="chat-container">
       <div class="chat-header">
         <div class="logo-title">
@@ -376,6 +383,8 @@
       </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='js/render.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
   </body>
 </html>

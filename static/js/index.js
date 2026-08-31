@@ -1,6 +1,15 @@
 $(function() {
     var BOT_AVATAR = '/static/images/logo.png';
     var BOT_AVATAR_ALT = 'Logo DakiKobo';
+    var api = window.DakiKoboApi;
+    var renderModule = window.DakiKoboRender.create($);
+    var cleanDisplayText = renderModule.cleanDisplayText;
+    var escapeHtml = renderModule.escapeHtml;
+    var renderFeedback = renderModule.renderFeedback;
+    var renderSources = renderModule.renderSources;
+    var safeSourceUrl = renderModule.safeSourceUrl;
+    var sourceMetaItems = renderModule.sourceMetaItems;
+    var typeMessage = renderModule.typeMessage;
 
     // Note: We keep the synth/msg variables, but primarily use the <audio> element due to cross-browser issues with SpeechSynthesis.
     var synth = window.speechSynthesis;
@@ -123,107 +132,6 @@ $(function() {
         return messageElement;
     }
 
-    function renderFeedback(bubble, question, answer, journal) {
-        var $fb = $('<div class="feedback"></div>');
-        var $up = $('<button type="button" class="fb-btn" data-rating="up" aria-label="Réponse utile">👍</button>');
-        var $down = $('<button type="button" class="fb-btn" data-rating="down" aria-label="Réponse pas utile">👎</button>');
-        $fb.append($up).append($down);
-
-        $fb.on('click', '.fb-btn', function() {
-            var rating = $(this).data('rating');
-            $fb.find('.fb-btn').prop('disabled', true);
-            var feedbackData = {
-                rating: rating,
-                question: question,
-                answer: answer,
-                crop_id: journal && journal.crop_id ? journal.crop_id : '',
-                place_id: journal && journal.place_id ? journal.place_id : '',
-                answer_path: journal && journal.answer_path ? journal.answer_path : ''
-            };
-            if (journal && journal.ledger_created_at !== null && journal.ledger_created_at !== undefined) {
-                feedbackData.ledger_created_at = journal.ledger_created_at;
-            }
-            $.post('/feedback', feedbackData)
-                .done(function(response) {
-                    $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
-                    var feedbackId = response && response.feedback_id;
-                    if (feedbackId) {
-                        renderFollowupPrompt(bubble, feedbackId);
-                    }
-                })
-                .fail(function() {
-                    $fb.find('.fb-btn').prop('disabled', false);
-                });
-        });
-
-        bubble.append($fb);
-        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
-    }
-
-    function renderFollowupPrompt(bubble, feedbackId) {
-        var $prompt = $('<div class="followup-prompt"></div>');
-        $prompt.append($('<div class="followup-label"></div>').text('Avez-vous appliqué ce conseil ?'));
-        var $options = $('<div class="followup-options"></div>');
-        var outcomes = [
-            { value: 'applied_improved', label: '✅ Oui, amélioré' },
-            { value: 'applied_unchanged', label: '➡️ Pas de changement' },
-            { value: 'applied_worse', label: '⚠️ Résultat pire' },
-            { value: 'not_applied', label: '❌ Non appliqué' },
-            { value: 'not_sure', label: '🤷 Pas sûr' }
-        ];
-        outcomes.forEach(function(item) {
-            var $btn = $('<button type="button" class="followup-btn"></button>')
-                .attr('data-outcome', item.value)
-                .text(item.label);
-            $options.append($btn);
-        });
-        $prompt.append($options);
-
-        var $afterBlock = $('<div class="followup-after-photo"></div>');
-        $afterBlock.append(
-            $('<label class="followup-after-label"></label>')
-                .text('Photo après (optionnel, pour le suivi de parcelle)')
-        );
-        var $afterInput = $('<input type="file" accept="image/*" capture="environment" class="followup-after-input">');
-        $afterBlock.append($afterInput);
-        $prompt.append($afterBlock);
-
-        $options.on('click', '.followup-btn', function() {
-            var outcome = $(this).data('outcome');
-            $options.find('.followup-btn').prop('disabled', true);
-            $afterInput.prop('disabled', true);
-
-            var formData = new FormData();
-            formData.append('feedback_id', feedbackId);
-            formData.append('outcome', outcome);
-            var file = $afterInput[0] && $afterInput[0].files && $afterInput[0].files[0];
-            if (file) {
-                formData.append('after_image', file);
-            }
-
-            $.ajax({
-                type: 'POST',
-                url: '/feedback/outcome',
-                data: formData,
-                processData: false,
-                contentType: false
-            })
-                .done(function() {
-                    var thanks = 'Merci pour le suivi !';
-                    if (file) {
-                        thanks += ' Photo après enregistrée pour évaluation (privée).';
-                    }
-                    $options.after($('<span class="followup-thanks"></span>').text(thanks));
-                })
-                .fail(function() {
-                    $options.find('.followup-btn').prop('disabled', false);
-                    $afterInput.prop('disabled', false);
-                });
-        });
-
-        bubble.append($prompt);
-        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
-    }
 
     function confidenceClass(confidence) {
         var value = (confidence || '').toString().toLowerCase();
@@ -249,76 +157,6 @@ $(function() {
         bubble.append($line);
     }
 
-    function renderSources(bubble, sources) {
-        if (!sources || sources.length === 0) {
-            return;
-        }
-        var $box = $('<div class="sources"></div>');
-        $box.append($('<span class="sources-label"></span>').text('Sources :'));
-        sources.forEach(function(src) {
-            if (typeof src === 'string') {
-                $box.append($('<span class="source-chip"></span>').text(src));
-                return;
-            }
-            var title = src.title || 'Source';
-            var type = src.type || 'Source';
-            var snippet = src.snippet || '';
-            var url = safeSourceUrl(src.url);
-            var $card = $('<div class="source-card"></div>');
-            var $top = $('<div class="source-card-top"></div>');
-            $top.append($('<span class="source-type"></span>').text(type));
-            if (url) {
-                $top.append(
-                    $('<a class="source-title source-title-link" target="_blank" rel="noopener noreferrer"></a>')
-                        .attr('href', url)
-                        .text(title)
-                );
-            } else {
-                $top.append($('<span class="source-title"></span>').text(title));
-            }
-            $card.append($top);
-            var metaItems = sourceMetaItems(src);
-            if (metaItems.length) {
-                var $meta = $('<div class="source-meta"></div>');
-                metaItems.forEach(function(item) {
-                    var $item = $('<span class="source-meta-item"></span>');
-                    $item.append($('<strong></strong>').text(item.label + ' : '));
-                    $item.append($('<span></span>').text(item.value));
-                    $meta.append($item);
-                });
-                $card.append($meta);
-            }
-            var cleanSnippet = cleanDisplayText(snippet);
-            if (cleanSnippet && cleanSnippet.length <= 160) {
-                $card.append($('<p class="source-snippet"></p>').text(cleanSnippet));
-            }
-            $box.append($card);
-        });
-        bubble.append($box);
-        $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
-    }
-
-    function safeSourceUrl(url) {
-        if (!url || typeof url !== 'string') {
-            return '';
-        }
-        return /^https?:\/\//i.test(url) ? url : '';
-    }
-
-    function sourceMetaItems(src) {
-        var items = [];
-        [
-            ['Éditeur', src.publisher],
-            ['Année', src.year],
-            ['Pays', src.country],
-            ['Revue', src.review_status]
-        ].forEach(function(item) {
-            if (item[1]) {
-                items.push({ label: item[0], value: item[1] });
-            }
-        });
-        return items;
-    }
 
     function asList(value) {
         if (!value) {
@@ -330,24 +168,6 @@ $(function() {
         return [value];
     }
 
-    function cleanDisplayText(text) {
-        if (!text || typeof text !== 'string') {
-            return '';
-        }
-        var t = text.replace(/\s+/g, ' ').trim();
-        // Hide FEWS-style market dumps if they slipped through.
-        if (/route commerciale|march[eé]s villageois|vente de bois|→/i.test(t) && t.length > 40) {
-            return '';
-        }
-        if ((t.match(/,/g) || []).length >= 5) {
-            return '';
-        }
-        return t;
-    }
-
-    function escapeHtml(text) {
-        return $('<div></div>').text(text == null ? '' : String(text)).html();
-    }
 
     function asCleanList(value, maxItems) {
         var max = maxItems || 3;
@@ -659,25 +479,6 @@ $(function() {
         return messageElement;
     }
 
-    function typeMessage(message, element, speed = 15, onComplete) {
-        let i = 0;
-        let rendered = '';
-        const safeMessage = message == null ? '' : String(message);
-        element.text('');
-        const typingInterval = setInterval(() => {
-            if (i < safeMessage.length) {
-                rendered += safeMessage.charAt(i);
-                element.text(rendered);
-                i++;
-            } else {
-                clearInterval(typingInterval);
-                if (typeof onComplete === 'function') {
-                    onComplete();
-                }
-            }
-            $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
-        }, speed);
-    }
 
     function showTypingIndicator() {
         var typingIndicator = $('<div class="typing-indicator bot-message"><span></span><span></span><span></span></div>');
@@ -691,7 +492,7 @@ $(function() {
 
     $('#chatbot-form-btn').click(function(e) {
         e.preventDefault();
-        sendMessage();
+        submitMessage();
     });
 
     $('.examples-panel').on('click', '.example-card', function(e) {
@@ -707,7 +508,7 @@ $(function() {
     $('#messageText').keypress(function(e) {
         if (e.which == 13) {
             e.preventDefault();
-            sendMessage();
+            submitMessage();
         }
     });
 
@@ -821,7 +622,7 @@ $(function() {
             var speechResult = event.results[0][0].transcript;
             $('#messageText').val(speechResult);
             setVoiceRecording(false);
-            sendMessage();
+            submitMessage();
         };
 
         recognition.onerror = function(event) {
@@ -873,7 +674,7 @@ $(function() {
                 $('#messageText').val(transcript);
                 isProcessing = false;
                 enableInput();
-                sendMessage();
+                submitMessage();
             },
             error: function(jqXHR) {
                 removeTypingIndicator();
@@ -1014,10 +815,8 @@ $(function() {
         appendMessage(prompt, true);
         showTypingIndicator();
 
-        $.ajax({
-            type: "GET",
-            url: "/examples/" + encodeURIComponent(exampleId),
-            success: function(response) {
+        api.loadDemoExample(exampleId)
+            .then(function(response) {
                 removeTypingIndicator();
                 if (response.error) {
                     appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
@@ -1036,17 +835,16 @@ $(function() {
                 }
                 isProcessing = false;
                 enableInput();
-            },
-            error: function() {
+            })
+            .catch(function() {
                 removeTypingIndicator();
                 appendMessage("Désolé, cet exemple n'est pas disponible pour le moment.", false, null, null, 'Faible');
                 isProcessing = false;
                 enableInput();
-            }
-        });
+            });
     }
 
-    function loadWeatherContext(locationId, locationName) {
+    function showWeatherContext(locationId, locationName) {
         if (!locationId || isProcessing) {
             return;
         }
@@ -1056,11 +854,8 @@ $(function() {
         appendMessage('Météo agricole - ' + locationName, true);
         showTypingIndicator();
 
-        $.ajax({
-            type: "GET",
-            url: "/weather",
-            data: { location: locationId },
-            success: function(response) {
+        api.loadWeatherContext(locationId)
+            .then(function(response) {
                 removeTypingIndicator();
                 if (response.error) {
                     appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
@@ -1069,17 +864,16 @@ $(function() {
                 }
                 isProcessing = false;
                 enableInput();
-            },
-            error: function() {
+            })
+            .catch(function() {
                 removeTypingIndicator();
                 appendMessage("Désolé, la météo agricole n'est pas disponible pour le moment.", false, null, null, 'Faible');
                 isProcessing = false;
                 enableInput();
-            }
-        });
+            });
     }
 
-    function loadSoilContext(locationId, locationName, cropId, cropName) {
+    function showSoilContext(locationId, locationName, cropId, cropName) {
         if (!locationId || !cropId || isProcessing) {
             return;
         }
@@ -1089,11 +883,8 @@ $(function() {
         appendMessage('Sol + engrais - ' + cropName + ' / ' + locationName, true);
         showTypingIndicator();
 
-        $.ajax({
-            type: "GET",
-            url: "/soil",
-            data: { location: locationId, crop: cropId },
-            success: function(response) {
+        api.loadSoilContext(locationId, cropId)
+            .then(function(response) {
                 removeTypingIndicator();
                 if (response.error) {
                     appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
@@ -1102,14 +893,13 @@ $(function() {
                 }
                 isProcessing = false;
                 enableInput();
-            },
-            error: function() {
+            })
+            .catch(function() {
                 removeTypingIndicator();
                 appendMessage("Désolé, le contexte sol n'est pas disponible pour le moment.", false, null, null, 'Faible');
                 isProcessing = false;
                 enableInput();
-            }
-        });
+            });
     }
 
     function getFieldLocationValue() {
@@ -1385,7 +1175,7 @@ $(function() {
         return false;
     }
 
-    function sendMessage() {
+    function submitMessage() {
         var message = $('#messageText').val().trim();
         if (message && !isProcessing) {
             isProcessing = true;
@@ -1407,18 +1197,15 @@ $(function() {
             $('#messageText').val('');
             showTypingIndicator();
 
-            $.ajax({
-                type: "POST",
-                url: "/ask",
-                data: {
+            api.sendMessage({
                     messageText: message,
                     crop: ctx.crop,
                     growth_stage: ctx.growth_stage,
                     location: ctx.location,
                     simple_french: ctx.simple_french ? '1' : '0',
                     prior_question: prior
-                },
-                success: function(response) {
+                })
+                .then(function(response) {
                     removeTypingIndicator();
                     if (response.error) {
                         appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
@@ -1456,19 +1243,18 @@ $(function() {
                     }
                     isProcessing = false;
                     enableInput();
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
+                })
+                .catch(function(error) {
                     removeTypingIndicator();
-                    console.log(errorThrown);
-                    var errPayload = jqXHR && jqXHR.responseJSON;
+                    console.log(error);
+                    var errPayload = error && error.payload;
                     var errText = (errPayload && errPayload.answer)
                         ? errPayload.answer
                         : "Désolé, une erreur est survenue pendant le traitement. Veuillez réessayer plus tard.";
                     appendMessage(errText, false, null, null, (errPayload && errPayload.confidence) || 'Faible');
                     isProcessing = false;
                     enableInput();
-                }
-            });
+                });
         }
     }
 
@@ -1550,7 +1336,7 @@ $(function() {
             };
             $form.find('input, select, button').prop('disabled', true);
             $form.addClass('submitted');
-            uploadImageForScreening(file, context);
+            submitImageForScreening(file, context);
         }
 
         $form.on('submit', function(e) {
@@ -1563,22 +1349,18 @@ $(function() {
         });
     }
 
-    function uploadImageForScreening(file, context) {
-        var formData = new FormData();
-        formData.append('image', file);
-        formData.append('crop', context.crop || '');
-        formData.append('growth_stage', context.growth_stage || '');
-        formData.append('location', context.location || '');
-        formData.append('simple_french', isSimpleFrenchEnabled() ? '1' : '0');
+    function submitImageForScreening(file, context) {
         showTypingIndicator();
 
-        $.ajax({
-            type: "POST",
-            url: "/screen",
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
+        api.uploadImageForScreening(
+            file,
+            context.crop || '',
+            context.growth_stage || '',
+            context.location || '',
+            isSimpleFrenchEnabled(),
+            context.question || "Photo maladie"
+        )
+            .then(function(response) {
                 removeTypingIndicator();
                 if (response.error) {
                     appendMessage("Erreur : " + response.error, false, null, null, response.confidence);
@@ -1602,14 +1384,13 @@ $(function() {
                 }
                 isProcessing = false;
                 enableInput();
-            },
-            error: function() {
+            })
+            .catch(function() {
                 removeTypingIndicator();
                 appendMessage("Désolé, l'analyse de l'image a échoué. Veuillez réessayer.", false, null, null, 'Faible');
                 isProcessing = false;
                 enableInput();
-            }
-        });
+            });
     }
 
     // Leaf-photo disease screening (Gemini Vision via /screen)
@@ -1643,7 +1424,7 @@ $(function() {
             return;
         }
         var $selected = $('#weatherLocation option:selected');
-        loadWeatherContext($selected.val(), $selected.text());
+        showWeatherContext($selected.val(), $selected.text());
     });
 
     $('#soilBtn').click(function(e) {
@@ -1653,7 +1434,7 @@ $(function() {
         }
         var $location = $('#soilLocation option:selected');
         var $crop = $('#soilCrop option:selected');
-        loadSoilContext($location.val(), $location.text(), $crop.val(), $crop.text());
+        showSoilContext($location.val(), $location.text(), $crop.val(), $crop.text());
     });
 
     // Welcome message (French — primary language for Burkina Faso farmers)
@@ -1701,19 +1482,22 @@ $(function() {
 
     // Populate selects from the canonical registry first, then init the context.
     // If it fails, chat and custom-location entry remain usable without stale ids.
-    $.getJSON('/registry')
-        .done(function(data) {
+    api.loadRegistry()
+        .then(function(data) {
             populateRegistrySelects(data.crops || [], data.places || []);
         })
-        .always(function() {
+        .catch(function() {
+            // Custom location entry remains usable without the registry.
+        })
+        .finally(function() {
             initFieldContext();
         });
 
-    $.getJSON('/crop-labels')
-        .done(function(data) {
+    api.loadCropLabels()
+        .then(function(data) {
             applyCropLabels(data.crops || []);
         })
-        .fail(function() {
+        .catch(function() {
             // Registry labels remain the default when this optional glossary fails.
         });
 
@@ -1747,4 +1531,19 @@ $(function() {
     setTimeout(function() {
         appendMessage(welcomeMessage, false);
     }, 500);
+
+    function setOfflineBanner(visible) {
+        $('#offlineBanner').prop('hidden', !visible);
+    }
+
+    setOfflineBanner(!navigator.onLine);
+    window.addEventListener('offline', function() { setOfflineBanner(true); });
+    window.addEventListener('online', function() { setOfflineBanner(false); });
+    window.addEventListener('dakikobo:offline-fallback', function() { setOfflineBanner(true); });
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(error) {
+            console.warn("Le mode hors ligne n'a pas pu être activé.", error);
+        });
+    }
 });

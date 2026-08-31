@@ -87,6 +87,8 @@ git push hf main
 9. Wait for the Space to build, then open `/healthz` to confirm the Flask process is alive.
 10. Watch `/healthz` until `rag_status` is `ready`; the Docker image starts RAG warm-up in the background.
 11. Open `/version` to confirm the deployed model/config flags.
+12. Open the app once online, reload it, then briefly disable the network and ask
+    `Dose d'engrais pour le sorgho`. The offline banner and fixed fertilizer card should appear.
 
 Free Space caveats:
 
@@ -128,6 +130,8 @@ Health check path:
   vector store instead of racing its schema migration.
 - A real RAG question can still be slow if it arrives before warm-up finishes; open `/healthz`
   or ask one warm-up question before a live demo.
+- The service worker caches the public app shell and previously successful `/ask` responses in the
+  visitor's browser. Bump `VERSION` in `static/sw.js` whenever cached frontend assets change.
 - Keep `Data/` available on the deployed service if the vector store must be rebuilt.
 - Do not commit `.env`, `chroma_db/`, generated audio, case-log SQLite files, or private exports.
 - A durable production version should move the case-log SQLite database and generated audio to

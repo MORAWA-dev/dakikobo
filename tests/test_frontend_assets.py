@@ -30,7 +30,7 @@ def test_credibility_modal_is_wired_in_frontend_assets():
 
 def test_source_cards_render_review_metadata():
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 
     assert "éditeur, année et statut de revue" in html
@@ -98,13 +98,15 @@ def test_simple_french_toggle_is_wired():
 
 
 def test_crop_labels_client_is_wired():
-    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
-    assert "function applyCropLabels" in js
-    assert "/crop-labels" in js
+    index_js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    api_js = (ROOT / "static/js/api.js").read_text(encoding="utf-8")
+    assert "function applyCropLabels" in index_js
+    assert "/crop-labels" in api_js
 
 
 def test_field_context_local_storage_is_wired():
     js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    render_js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
 
@@ -119,7 +121,7 @@ def test_field_context_local_storage_is_wired():
     assert "Non confirmé" in js
     # Compact answer cards: lead paragraph, clean lists, collapsed sources.
     assert "case-lead" in js
-    assert "function cleanDisplayText" in js
+    assert "function cleanDisplayText" in render_js
     assert "function renderCompactSources" in js
     assert "À faire" in js
     assert "case-weather-line" in js
@@ -160,22 +162,20 @@ def test_text_field_context_panel_is_wired():
 
 
 def test_phase_zero_frontend_regressions_are_fixed():
-    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    render_js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
+    api_js = (ROOT / "static/js/api.js").read_text(encoding="utf-8")
+    index_js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
 
-    assert "/route commerciale|march[eé]s villageois|vente de bois|→/i" in js
-    assert "vente de bois||" not in js
-    assert "function escapeHtml" in js
+    assert "/route commerciale|march[eé]s villageois|vente de bois|→/i" in render_js
+    assert "vente de bois||" not in render_js
+    assert "function escapeHtml" in render_js
 
-    type_body = js.split("function typeMessage", 1)[1].split(
-        "function showTypingIndicator", 1
-    )[0]
+    type_body = render_js.split("function typeMessage", 1)[1].split("return {", 1)[0]
     assert ".html(" not in type_body
     assert "element.text(rendered)" in type_body
 
-    upload_body = js.split("function uploadImageForScreening", 1)[1].split(
-        "// Leaf-photo disease screening", 1
-    )[0]
-    assert 'context.question || "Photo maladie"' in upload_body
+    assert "function uploadImageForScreening(file, crop, growthStage, location, simpleFrench, question)" in api_js
+    assert 'context.question || "Photo maladie"' in index_js
 
 
 def test_registry_populates_all_five_dynamic_selects():
@@ -209,7 +209,7 @@ def test_voice_input_uses_server_side_stt():
 
 
 def test_followup_supports_optional_after_photo():
-    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 
     assert "followup-after-photo" in js

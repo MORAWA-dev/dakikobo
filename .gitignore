@@ -13,6 +13,10 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
+# Frontend test dependencies and local pnpm cache
+node_modules/
+.pnpm-store/
+
 # Generated audio files (TTS output)
 static/audio/*.mp3
 

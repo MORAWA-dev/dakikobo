@@ -325,6 +325,18 @@ Status legend: `[ ]` todo · `[x]` done.
   - Added an offline JSON golden set and migration, privacy, best-effort, two-step linkage, due-case,
     and export regression tests. No Groq or network access is required.
 
+- [x] **31. Phase 5 offline-first shell and frontend modules** — `static/sw.js`, `static/js/api.js`, `static/js/render.js`
+  - Added an installable PWA shell with root-scoped service worker, cache-first app/registry/example
+    assets, and network-first `/ask` responses with exact cached-answer fallback.
+  - Mirrored the authoritative deterministic fertilizer table into a precached JSON asset, guarded
+    by a Python parity test, so supported fertilizer questions remain available without a signal.
+  - Added the French offline status banner and a cautious offline refusal for uncached non-fertilizer
+    questions rather than fabricating an answer.
+  - Split rendering and network requests into focused browser modules while preserving the existing
+    follow-up context, photo question, registry ids, and event behavior.
+  - Added `node --test` + jsdom regressions for display-text filtering, safe typed text, and the
+    six-argument photo upload contract.
+
 ---
 
 ## Later / parked (do **not** attempt now)
@@ -337,7 +349,6 @@ Status legend: `[ ]` todo · `[x]` done.
 - **Offline / edge inference (local LLM)** — out of scope for the deadline and the hardware.
 - **Local-language generation (Mooré / Dioula / Fulfuldé)** — a research project, not a feature;
   French first.
-- **PWA install + service worker** — nice-to-have; deferred until the core trust features land.
 - **Firebase / user accounts / admin dashboard** — unnecessary backend complexity for v1.
 
 ---

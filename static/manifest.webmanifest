@@ -1,0 +1,19 @@
+{
+  "name": "DakiKobo — assistant agricole",
+  "short_name": "DakiKobo",
+  "lang": "fr",
+  "description": "Conseils agricoles prudents et sourcés pour le Burkina Faso.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7ef",
+  "theme_color": "#315c2b",
+  "icons": [
+    {
+      "src": "/static/images/logo.png",
+      "sizes": "1200x1200",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

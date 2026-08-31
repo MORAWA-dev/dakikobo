@@ -662,3 +662,43 @@ cd - && git worktree remove "$WT" --force
 **Next action for the following session**
 
 - Begin Phase 5 (offline-first shell) from the locked plan when requested.
+
+---
+
+### 2026-08-31 — Phase 5 offline-first PWA implemented
+
+**Decided**
+
+- Added a root-scoped service worker and Web App Manifest. The app shell, registry, crop labels,
+  quota-safe examples, images, and deterministic fertilizer data are precached after the first
+  connected load.
+- `/ask` is network-first. Successful responses are saved under a normalized request key and replayed
+  when the same question is asked offline. Supported fertilizer questions use the fixed local table;
+  uncached questions fail honestly in French instead of inventing advice.
+- Split reusable rendering into `static/js/render.js` and HTTP requests into `static/js/api.js`, while
+  retaining field context, short follow-ups, photo context, and existing event order in `index.js`.
+- Added the exact offline banner: `Mode hors ligne — dernières réponses enregistrées`.
+
+**Files changed**
+
+- `static/sw.js`, `static/manifest.webmanifest`, `static/data/fertilizer.json` — PWA shell, cached
+  answers, and zero-LLM offline fertilizer path.
+- `static/js/render.js`, `static/js/api.js`, `static/js/index.js`, `templates/index.html`,
+  `static/css/style.css`, `app.py` — frontend modules, offline UI, root worker route, and registration.
+- `package.json`, `pnpm-lock.yaml`, `tests/js/frontend.test.js`, `tests/test_phase5_offline.py`, and
+  frontend asset tests — jsdom runner, safety regressions, PWA wiring, and authoritative table parity.
+- `.gitignore`, `README.md`, `IMPLEMENTATION_PLAN.md` — dependency ignores and final Phase 5 docs.
+
+**Verification**
+
+- JavaScript suite: **3 passed** (`node --test` + jsdom).
+- Full offline Python suite excluding the separate live RAG test: **270 passed**, one existing PyPDF2
+  deprecation warning.
+- Browser test with the local Flask server stopped after first load: offline banner appeared and
+  `Dose d'engrais pour le sorgho` returned the fixed NPK/urée advice, sources, Fort confidence, and
+  mandatory local-agent confirmation entirely from the service worker cache.
+- Node syntax checks and `git diff --check`: passed.
+
+**Still open**
+
+- No implementation phases remain in the locked Phase 0–5 plan.

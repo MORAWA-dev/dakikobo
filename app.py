@@ -686,6 +686,15 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/sw.js")
+def service_worker():
+    """Serve the static worker at the site root so it can control every route."""
+    response = app.send_static_file("sw.js")
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.route("/crop-labels")
 def crop_labels_route():
     """French-primary crop labels for the field UI (local names optional later)."""

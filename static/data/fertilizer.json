@@ -1,0 +1,48 @@
+{
+  "disclaimer": "⚠️ Ce sont des recommandations générales issues de la recherche (INERA). Confirmez toujours avec votre agent agricole : la bonne dose dépend de votre sol, de la pluie et de vos moyens.",
+  "crops": {
+    "sorgho": {
+      "label": "le sorgho",
+      "lines": [
+        "Dose vulgarisée : 100 kg/ha de NPK (14-23-14) au semis + 50 kg/ha d'urée (46 %) à la montaison.",
+        "Microdose (plus économique) : 2 g de NPK par poquet (~62,5 kg/ha) au semis + 1 g d'urée par poquet (~31,25 kg/ha) à la montaison."
+      ],
+      "sources": [{"title": "Recherche INERA - microdose Burkina", "type": "Outil engrais", "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose."}]
+    },
+    "mil": {
+      "label": "le mil",
+      "lines": [
+        "Dose vulgarisée : 100 kg/ha de NPK (14-23-14) au semis + 50 kg/ha d'urée (46 %) à la montaison.",
+        "Microdose (plus économique) : 3 g de NPK par poquet (~62,5 kg/ha) au semis + 1,5 g d'urée par poquet (~46,88 kg/ha) à la montaison."
+      ],
+      "sources": [{"title": "Recherche INERA - microdose Burkina", "type": "Outil engrais", "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose."}]
+    },
+    "mais": {
+      "label": "le maïs",
+      "lines": [
+        "Dose vulgarisée : 150 kg/ha de NPK (14-23-14) au semis + 100 kg/ha d'urée (46 %) en couverture.",
+        "Le maïs est très exigeant : un sol pauvre donne de faibles rendements. La fumure organique et la rotation aident beaucoup."
+      ],
+      "sources": [{"title": "Sciences et Techniques du Burkina - maïs", "type": "Outil engrais", "snippet": "Dose vulgarisée du maïs: NPK au semis et urée en couverture."}]
+    },
+    "niebe": {
+      "label": "le niébé",
+      "lines": [
+        "Dose vulgarisée : 100 kg/ha de NPK (14-23-14), sans urée — le niébé est une légumineuse qui fixe l'azote de l'air.",
+        "Un faible apport d'azote suffit ; la fumure organique améliore le rendement."
+      ],
+      "sources": [
+        {"title": "Recherche INERA - microdose Burkina", "type": "Outil engrais", "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose."},
+        {"title": "Sciences et Techniques du Burkina - légumineuses", "type": "Outil engrais", "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate."}
+      ]
+    },
+    "arachide": {
+      "label": "l'arachide",
+      "lines": [
+        "L'arachide est une légumineuse : elle fixe l'azote de l'air, donc un faible apport d'azote (~14 kg N/ha) suffit.",
+        "Privilégiez la fumure organique (fumier) et le phosphate ; évitez les fortes doses d'urée."
+      ],
+      "sources": [{"title": "Sciences et Techniques du Burkina - légumineuses", "type": "Outil engrais", "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate."}]
+    }
+  }
+}
