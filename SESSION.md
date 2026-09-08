@@ -888,3 +888,40 @@ cd - && git worktree remove "$WT" --force
   live deployed RAG evaluation.
 - The current fail-closed source inventory remains intentionally narrow. Do not self-promote sources or
   rebuild/deploy it merely to increase coverage before the documented expert review.
+
+---
+
+### 2026-09-08 — Farmer-safety baseline published and deployed
+
+**Decision**
+
+- The owner explicitly authorized synchronizing GitHub and the live Hugging Face Space after the
+  remaining agronomist, production-persistence, device, and participant evidence gates were explained.
+- Published the validated engineering baseline without promoting pending sources or adding private
+  runtime data. Pre-existing untracked `.agents/`, `.gitattributes`, and `skills-lock.json` remained
+  outside the GitHub commit.
+
+**Git / deploy**
+
+- GitHub implementation commit: `327adbd66a19ed0bc61fd0b3e9551a84767c4e0e`
+  (`Implement farmer safety improvements`).
+- Hugging Face deployment commit: `5b8f2d4f10cf4c7e9a9eefaf42310d7070751256`.
+- User-level Git LFS initialization succeeded. The earlier attempted system-wide installation failed
+  harmlessly because the user cannot write `/etc/gitconfig`; hooks remained enabled for pushes.
+
+**Production verification**
+
+- Public `/version` reported deployment `5b8f2d4f10cf4c7e9a9eefaf42310d7070751256`, field-journal
+  schema **5**, the expected Groq/embedding models, and `rag_status=ready`.
+- Public `/healthz` returned `ok=true`, `rag_ready=true`, and a completed warm-up.
+- Strict public RAG evaluation: **14/14 hard-passed (100%)**, no mandatory safety failure and no
+  advisory failure. Three non-blocking `source_terms` warnings remained for niébé storage, compost/
+  soil, and niébé rotation.
+
+**Still open**
+
+- Deployment does not substitute for agronomist provenance approval, approved benchmark expectations,
+  real-phone accessibility/offline-update checks, participant comprehension sessions, or explicit
+  verification that the production secret, journal database, and images survive host replacement.
+- The fail-closed corpus remains intentionally narrow; do not promote pending sources merely to widen
+  coverage.
