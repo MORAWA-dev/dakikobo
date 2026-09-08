@@ -952,3 +952,15 @@ cd - && git worktree remove "$WT" --force
 
 - Commit and push the reviewed correction to GitHub, deploy that exact GitHub tree to Hugging Face,
   then verify remote versions, health, safety behavior, and the strict public evaluation.
+
+**Published verification**
+
+- GitHub correction commit: `95ba47e56dab17ece18dbc316d2d8d6e86ce202d`
+  (`Enforce farmer safety review gates`).
+- Hugging Face deployment commit: `270c542f1f7947f1b47364748c454bc791770146`
+  (`Deploy GitHub main 95ba47e5 to Space`).
+- Public `/version` reported the Hugging Face commit above; `/healthz` returned `ok=true`,
+  `rag_ready=true`, and `rag_status=ready`.
+- Live fertilizer checks withheld an exact sorghum dose with `confidence=Faible`, no sources/case,
+  and asked for clarification when sorghum and maize were both named.
+- Strict public evaluation: **14/14 hard-passed (100%)**. Three non-blocking advisory warnings remain.
