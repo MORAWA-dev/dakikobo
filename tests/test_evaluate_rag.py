@@ -161,12 +161,14 @@ def test_format_report_contains_summary_checks_and_sources():
         label="Fumure sorgho",
         method="POST",
         path="/ask",
-        min_sources=1,
+        max_sources=0,
+        allowed_confidence=("Faible",),
     )
     payload = {
-        "answer": "Dose NPK puis urée.",
-        "confidence": "Fort",
-        "sources": [{"title": "Sciences et Techniques du Burkina", "type": "Outil engrais"}],
+        "answer": "Les doses exactes sont temporairement retirées. Consultez un agent agricole.",
+        "answer_kind": "refusal",
+        "confidence": "Faible",
+        "sources": [],
     }
     result = EvalResult(case, 200, 250, payload)
     result.checks = checks_for(case, result)
@@ -182,10 +184,10 @@ def test_format_report_contains_summary_checks_and_sources():
     assert "# DakiKobo RAG Evaluation Report" in report
     assert "## Flakiness note" in report
     assert "advisory" in report.lower()
-    assert "0 passed / 1 total" in report
+    assert "1 passed / 1 total" in report
     assert "deterministic_fertilizer" in report
-    assert "Sciences et Techniques du Burkina" in report
-    assert "`PASS` min_sources" in report
+    assert "- Aucun" in report
+    assert "`PASS` max_sources" in report
 
 
 def test_format_report_marks_advisory_failures_as_warn():

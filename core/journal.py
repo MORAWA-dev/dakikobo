@@ -11,10 +11,8 @@ import io
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 from core.cache import interprocess_file_lock, sqlite_connection
-from core.case_log import init_case_log, record_feedback, record_outcome, VALID_OUTCOMES
-
-RETENTION_DAYS = 90
-MAX_CASES = 100
+from config import JOURNAL_MAX_CASES, JOURNAL_RETENTION_DAYS
+from core.case_log import init_case_log, record_feedback, VALID_OUTCOMES
 
 
 def _remove_photo(ref, directory):
@@ -37,7 +35,7 @@ def journal_connection(db_path, image_dir):
                 conn.execute('DELETE FROM evidence_ledger WHERE feedback_id=?', (row['id'],))
                 conn.execute('DELETE FROM feedback_events WHERE id=?', (row['id'],))
             # Unlinked evidence contains no text but also has a bounded lifetime.
-            conn.execute('DELETE FROM evidence_ledger WHERE feedback_id IS NULL AND created_at < ?', (time.time()-RETENTION_DAYS*86400,))
+            conn.execute('DELETE FROM evidence_ledger WHERE feedback_id IS NULL AND created_at < ?', (time.time()-JOURNAL_RETENTION_DAYS*86400,))
             yield conn
 
 
@@ -46,7 +44,7 @@ def list_owned(db_path, owner, image_dir, *, due=False):
         rows = conn.execute('''SELECT id AS feedback_id, created_at, question, answer,
             crop_id, place_id, answer_path, follow_up_due_at, outcome, expires_at
             FROM feedback_events WHERE owner_hash=? AND expires_at>?
-            ORDER BY id DESC LIMIT ?''', (owner, time.time(), MAX_CASES)).fetchall()
+            ORDER BY id DESC LIMIT ?''', (owner, time.time(), JOURNAL_MAX_CASES)).fetchall()
         result = [dict(row) for row in rows]
     if due:
         result = [{k: v for k, v in row.items() if k not in ('question', 'answer')}
@@ -61,11 +59,11 @@ def save_owned(db_path, owner, image_dir, *, request_id, **values):
         if previous:
             return previous['id']
         count = conn.execute('SELECT count(*) FROM feedback_events WHERE owner_hash=?', (owner,)).fetchone()[0]
-        if count >= MAX_CASES:
+        if count >= JOURNAL_MAX_CASES:
             raise ValueError('Votre journal est plein. Supprimez un ancien conseil avant de continuer.')
         # Commit retention cleanup before the existing ledger-aware insert opens its connection.
         conn.commit()
-        return record_feedback(db_path, owner_hash=owner, expires_at=time.time()+RETENTION_DAYS*86400,
+        return record_feedback(db_path, owner_hash=owner, expires_at=time.time()+JOURNAL_RETENTION_DAYS*86400,
                                request_id=request_id, **values)
 
 

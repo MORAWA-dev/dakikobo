@@ -18,6 +18,7 @@ import argparse
 from pathlib import Path
 import json
 import os
+import re
 import sys
 import time
 import unicodedata
@@ -144,10 +145,9 @@ CASES = [
         method="POST",
         path="/ask",
         data={"messageText": "Quelle fumure pour le sorgho ?"},
-        min_sources=1,
-        allowed_confidence=("Fort",),
-        answer_terms_any=("npk", "urée", "uree", "agent"),
-        source_terms_any=("sorgho", "fumure", "sciences"),
+        max_sources=0,
+        allowed_confidence=("Faible",),
+        answer_terms_any=("retirées", "agronome", "agent"),
     ),
     EvalCase(
         id="off_topic_car_engine",
@@ -275,10 +275,9 @@ CASES = [
             "messageText": "Quelle dose d'engrais pour le sorgho ?",
             "simple_french": "1",
         },
-        min_sources=1,
-        allowed_confidence=("Fort",),
-        answer_terms_any=("npk", "urée", "uree", "mots simples", "agent"),
-        source_terms_any=("sorgho", "fumure", "sciences", "outil"),
+        max_sources=0,
+        allowed_confidence=("Faible",),
+        answer_terms_any=("retirées", "agronome", "agent"),
     ),
 ]
 
@@ -451,17 +450,21 @@ def checks_for(case: EvalCase, result: EvalResult) -> list[Check]:
             payload.get("answer_kind") == "refusal" and confidence == "Faible" and
             not sources and not payload.get("case"), "Structured refusal, low confidence, no actionable case"))
     if case.id.startswith("tool_fertilizer"):
-        table_path = Path(__file__).resolve().parents[1] / "static/data/fertilizer.json"
-        table = json.loads(table_path.read_text(encoding="utf-8"))
-        case_crop = (payload.get("case") or {}).get("crop", "")
-        expected = next((entry for crop, entry in table["crops"].items()
-                         if crop == "sorgho"), None)
-        # Built-in fertilizer cases target sorghum; compare quantities and warning
-        # against the exported deterministic table, never an LLM-generated oracle.
-        required_lines = expected["lines"] if expected else []
-        checks.append(Check("deterministic_fertilizer", case_crop == "sorgho" and
-            all(line in answer_text for line in required_lines) and
-            "agent agricole" in answer_text.lower(), "Expected crop, complete fixed recommendations and confirmation"))
+        has_numeric_dose = bool(re.search(
+            r"\b\d+(?:[.,]\d+)?\s*(?:kg|g)\s*(?:/\s*ha|par\s+ha|par\s+poquet)",
+            answer_text,
+            re.I,
+        ))
+        checks.append(Check(
+            "deterministic_fertilizer",
+            payload.get("answer_kind") == "refusal"
+            and confidence == "Faible"
+            and not sources
+            and not payload.get("case")
+            and not has_numeric_dose
+            and "agent agricole" in answer_text.lower(),
+            "Unverified numeric guidance withheld; low confidence and local-agent direction",
+        ))
     return checks
 
 

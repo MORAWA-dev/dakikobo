@@ -118,6 +118,7 @@ from config import (
     STATE_DB_PATH,
     CASE_LOG_DB_PATH,
     FEEDBACK_IMAGE_DIR,
+    JOURNAL_RETENTION_DAYS,
 )
 
 logging.basicConfig(
@@ -129,7 +130,7 @@ logger = logging.getLogger("dakikobo")
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
-                  PERMANENT_SESSION_LIFETIME=timedelta(days=owned_journal.RETENTION_DAYS))
+                  PERMANENT_SESSION_LIFETIME=timedelta(days=JOURNAL_RETENTION_DAYS))
 app.config["MAX_CONTENT_LENGTH"] = max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES)
 app.config["MAX_IMAGE_UPLOAD_BYTES"] = MAX_IMAGE_UPLOAD_BYTES
 app.config["MAX_IMAGE_UPLOAD_MB"] = MAX_IMAGE_UPLOAD_MB
@@ -687,7 +688,7 @@ def _rag_runtime_status() -> dict:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", journal_retention_days=JOURNAL_RETENTION_DAYS)
 
 
 @app.route("/sw.js")
@@ -1067,8 +1068,8 @@ def ask():
             "audio_url": "",
         })
 
-    # Route by intent. Fertilizer questions get deterministic, grounded, cited
-    # doses (never LLM-invented); everything else falls through to RAG.
+    # Route by intent. Fertilizer questions stay inside a deterministic safety
+    # boundary; unverified numeric guidance is withheld rather than sent to an LLM.
     # Effective crop (question wins over form) completes fertilizer questions.
     fert_query = resolved.retrieval_query if resolved.expanded_from_prior else query
     if is_fertilizer_query(fert_query) or classify(fert_query) == INTENT_FERTILIZER:
@@ -1081,6 +1082,8 @@ def ask():
         if advice is not None:
             answer = _maybe_simplify(advice["answer"], simple_french)
             case = advice.get("case")
+            confidence = advice.get("confidence", "Fort")
+            answer_kind = advice.get("answer_kind", "advice")
             if case is not None:
                 case = dict(case)
                 case["crop"] = effective_context["crop"] or case.get("crop", "")
@@ -1098,7 +1101,7 @@ def ask():
                 intent="fertilizer",
                 model="deterministic",
                 outcome="ok",
-                confidence="Fort",
+                confidence=confidence,
                 source_count=len(advice["sources"]),
                 audio_generated=bool(audio_url),
                 case_structured=bool(case),
@@ -1106,10 +1109,9 @@ def ask():
             payload = {
                 "answer": answer,
                 "sources": advice["sources"],
-                "confidence": "Fort",
+                "confidence": confidence,
                 "audio_url": audio_url,
-                "case": case,
-                "answer_kind": "advice",
+                "answer_kind": answer_kind,
                 "simple_french": simple_french,
                 "journal": _journal_metadata(
                     answer_path="fertilizer",
@@ -1117,6 +1119,8 @@ def ask():
                     place_id=resolved.place_id,
                 ),
             }
+            if case is not None:
+                payload["case"] = case
             if weather_payload is not None:
                 payload["weather"] = weather_payload
             return jsonify(payload)
@@ -1530,7 +1534,7 @@ def _answer_freshness(response):
 @app.route("/journal/session")
 def journal_session():
     _journal_owner()
-    return jsonify({"ok": True, "retention_days": owned_journal.RETENTION_DAYS})
+    return jsonify({"ok": True, "retention_days": JOURNAL_RETENTION_DAYS})
 
 
 @app.route("/journal")
@@ -1561,7 +1565,8 @@ def feedback():
     if rating not in ("up", "down"):
         return jsonify({"ok": False, "error": "L’évaluation doit être positive ou négative."}), 400
     if request.form.get("consent") != "1":
-        return jsonify({"error": "Confirmez l’enregistrement privé de ce conseil pendant 90 jours."}), 400
+        _set_log_fields(outcome="rating_only", rating=rating)
+        return jsonify({"ok": True, "saved_to_journal": False})
     if request.files or request.form.get("before_image_ref"):
         return jsonify({"error": "Ajoutez une photo uniquement lors du suivi de votre conseil."}), 400
     question = request.form.get("question", "").strip()

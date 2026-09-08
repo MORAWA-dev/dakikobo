@@ -9,24 +9,17 @@ def test_detects_fertilizer_intent():
     assert not is_fertilizer_query("quand semer le mil ?")
 
 
-def test_sorgho_dose_is_grounded_with_disclaimer():
+def test_unverified_sorgho_dose_is_withheld_with_disclaimer():
     advice = get_fertilizer_advice("dose d'engrais pour le sorgho")
     assert advice is not None
     answer = advice["answer"]
-    # Specific, source-grounded numbers (not invented).
-    assert "100 kg/ha de NPK (14-23-14)" in answer
-    assert "50 kg/ha d'urée" in answer
-    # Mandatory French disclaimer.
-    assert "Confirmez toujours avec votre agent agricole" in answer
-    assert advice["sources"], "fertilizer advice must cite a source"
-    assert advice["sources"][0]["type"] == "Outil engrais"
-    assert advice["sources"][0]["snippet"]
-    assert advice["case"]["input_type"] == "fertilizer"
-    assert advice["case"]["crop"] == "sorgho"
-    assert advice["case"]["summary"]
-    assert advice["case"]["actions"]
-    assert advice["case"]["do_not"]
-    assert advice["case"]["case_title"] == "Conseil engrais"
+    assert "100 kg/ha" not in answer
+    assert "temporairement retirées" in answer
+    assert "agent agricole" in answer
+    assert advice["sources"] == []
+    assert advice["case"] is None
+    assert advice["confidence"] == "Faible"
+    assert advice["answer_kind"] == "refusal"
 
 
 def test_each_supported_crop_returns_advice():
@@ -53,7 +46,13 @@ def test_form_crop_fills_missing_crop_name():
         location="Kaya",
     )
     assert advice is not None
-    assert "100 kg/ha de NPK" in advice["answer"]
-    assert advice["case"]["crop"] == "sorgho"
-    assert advice["case"]["growth_stage"] == "levée / jeune plant"
-    assert advice["case"]["location"] == "Kaya"
+    assert "dose exacte" in advice["answer"]
+    assert advice["case"] is None
+
+
+def test_multiple_or_unsupported_crops_never_select_first_match():
+    multiple = get_fertilizer_advice("engrais pour le mil et le maïs")
+    unsupported = get_fertilizer_advice("engrais pour le soja")
+    assert multiple["answer_kind"] == "clarification"
+    assert unsupported["answer_kind"] == "refusal"
+    assert multiple["sources"] == unsupported["sources"] == []

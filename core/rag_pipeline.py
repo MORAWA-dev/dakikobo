@@ -1,7 +1,7 @@
 # core/rag_pipeline.py — RAG data ingestion, vector store, and TTS utilities
 
 import os
-from core.source_policy import eligible_source, source_review
+from core.source_policy import eligible_source, source_review, split_markdown_frontmatter
 import glob
 import hashlib
 import json
@@ -60,10 +60,6 @@ def fetch_website_content(url: str) -> list[Document]:
 # LOCAL KNOWLEDGE EXTRACTION
 # =================================================================
 
-def _clean_frontmatter_value(value: str) -> str:
-    return value.strip().strip("\"'")
-
-
 def _normalize_list_value(value: str) -> str:
     """Flatten a YAML-ish list like '[sorghum, millet]' to 'sorghum, millet'.
 
@@ -75,42 +71,6 @@ def _normalize_list_value(value: str) -> str:
         value = value[1:-1]
     parts = [p.strip().strip("\"'") for p in value.split(",")]
     return ", ".join(p for p in parts if p)
-
-
-def _split_markdown_frontmatter(raw_text: str) -> tuple[dict[str, str], str]:
-    """Return simple YAML-style frontmatter and markdown body.
-
-    The converted corpus uses flat `key: value` metadata. A small parser keeps
-    ingestion dependency-free and avoids requiring PyYAML in the public Space.
-    """
-    text = raw_text.lstrip("\ufeff")
-    if not text.startswith("---"):
-        return {}, raw_text
-
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}, raw_text
-
-    end_index = None
-    for index, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            end_index = index
-            break
-
-    if end_index is None:
-        return {}, raw_text
-
-    metadata = {}
-    for line in lines[1:end_index]:
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        key = key.strip()
-        if key:
-            metadata[key] = _clean_frontmatter_value(value)
-
-    body = "\n".join(lines[end_index + 1 :]).strip()
-    return metadata, body
 
 
 def _source_label_for_markdown(md_file: str, metadata: dict[str, str]) -> str:
@@ -219,7 +179,7 @@ def load_markdown_from_folder(folder_path: str) -> list[Document]:
             print(f"Error reading Markdown {f}: {e}")
             continue
 
-        metadata, body = _split_markdown_frontmatter(raw_text)
+        metadata, body = split_markdown_frontmatter(raw_text)
         if body.strip():
             doc_metadata = {
                 "source": _source_label_for_markdown(f, metadata),

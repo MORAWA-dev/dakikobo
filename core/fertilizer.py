@@ -19,7 +19,7 @@ Sources:
     recommandée.
 """
 
-from core.crops import CROPS, resolve_crop
+from core.crops import CROPS, resolve_crop, resolve_crops
 from core.case import build_advice_case
 
 SRC_IJBCS = {
@@ -121,6 +121,16 @@ _FERTILIZER_KEYWORDS = (
     "micro-dose",
 )
 
+# Phase B safety gate: keep every unverified figure out of public payloads until
+# an agronomist records exact provenance for the active table.
+NUMERIC_GUIDANCE_VERIFIED = False
+WITHHELD_NOTICE = (
+    "Les doses exactes sont temporairement retirées : leur source, leur "
+    "formulation et leurs conditions d’application doivent encore être vérifiées "
+    "par un agronome. Demandez la dose adaptée à votre agent agricole avant "
+    "toute application."
+)
+
 
 def build_offline_fertilizer_payload() -> dict:
     """Return the canonical browser-offline fertilizer data.
@@ -140,8 +150,17 @@ def build_offline_fertilizer_payload() -> dict:
             crop_id: {
                 "label": _CROP_LABEL[crop_id],
                 "aliases": list(CROPS[crop_id].aliases),
-                "lines": list(recommendation["lines"]),
-                "sources": [dict(source) for source in recommendation["sources"]],
+                "available": NUMERIC_GUIDANCE_VERIFIED,
+                "lines": (
+                    list(recommendation["lines"])
+                    if NUMERIC_GUIDANCE_VERIFIED
+                    else [WITHHELD_NOTICE]
+                ),
+                "sources": (
+                    [dict(source) for source in recommendation["sources"]]
+                    if NUMERIC_GUIDANCE_VERIFIED
+                    else []
+                ),
             }
             for crop_id, recommendation in _RECOMMENDATIONS.items()
         },
@@ -183,9 +202,46 @@ def get_fertilizer_advice(
     Optional ``crop`` (from the field-context form) is used when the free text
     does not name a crop.
     """
-    matched = _match_crop(crop or "") or _match_crop(text)
+    named = resolve_crops(text)
+    if len(named) > 1:
+        labels = ", ".join(item.label_fr for item in named)
+        return {
+            "answer": (
+                f"Vous avez cité plusieurs cultures ({labels}). Indiquez une seule "
+                "culture pour éviter une mauvaise fumure."
+            ),
+            "sources": [],
+            "case": None,
+            "confidence": "Faible",
+            "answer_kind": "clarification",
+        }
+    if named and not named[0].fertilizer_supported:
+        return {
+            "answer": (
+                f"Je n’ai pas de dose d’engrais vérifiée pour le {named[0].label_fr}. "
+                "Demandez conseil à un agent agricole local."
+            ),
+            "sources": [],
+            "case": None,
+            "confidence": "Faible",
+            "answer_kind": "refusal",
+        }
+
+    matched = (named[0].id if named else None) or _match_crop(crop or "")
     if matched is None or matched not in _RECOMMENDATIONS:
         return None
+
+    if not NUMERIC_GUIDANCE_VERIFIED:
+        return {
+            "answer": (
+                f"Pour {_CROP_LABEL[matched]}, je ne peux pas encore donner une "
+                f"dose exacte en toute sécurité.\n\n⚠️ {WITHHELD_NOTICE}"
+            ),
+            "sources": [],
+            "case": None,
+            "confidence": "Faible",
+            "answer_kind": "refusal",
+        }
 
     rec = _RECOMMENDATIONS[matched]
     sources = [dict(src) for src in rec["sources"]]

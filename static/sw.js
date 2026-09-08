@@ -164,6 +164,17 @@ function offlineFertilizer(formData) {
         if (!item) {
             return offlineCropClarification('unsupported');
         }
+        if (item.available === false) {
+            return offlineJson({
+                answer: 'Mode hors ligne : pour ' + item.label + ', ' + item.lines.join(' '),
+                sources: [],
+                confidence: 'Faible',
+                audio_url: '',
+                offline: true,
+                saved_at: table.updated_at,
+                answer_kind: 'refusal'
+            });
+        }
         var answer = '🌱 Fumure recommandée pour ' + item.label + ' au Burkina Faso :\n' +
             item.lines.map(function(line) { return '• ' + line; }).join('\n') + '\n\n' + table.disclaimer;
         return offlineJson({

@@ -67,6 +67,21 @@ def resolve_crop(text: str) -> Crop | None:
     return None
 
 
+def resolve_crops(text: str) -> list[Crop]:
+    """Return every distinct crop explicitly named in free text."""
+    normalized = _normalize(text)
+    if not normalized:
+        return []
+    return [
+        crop
+        for crop in CROPS.values()
+        if any(
+            re.search(rf"(?<!\w){re.escape(_normalize(alias))}(?!\w)", normalized)
+            for alias in crop.aliases
+        )
+    ]
+
+
 def list_crops() -> list[dict]:
     """Registry payload for ``/registry`` and the frontend bridge."""
     return [

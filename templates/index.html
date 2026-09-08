@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-journal-retention-days="{{ journal_retention_days }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -204,7 +204,7 @@
       <section id="journalPanel" class="journal-panel" aria-label="Mes conseils privés" hidden>
         <button id="journalClose" type="button">Fermer le journal</button>
         <h2>Mes conseils</h2>
-        <p>Privés sur ce navigateur, conservés 90 jours sur le serveur. Sur un téléphone partagé, les autres utilisateurs du navigateur peuvent les voir. Aucune notification n’est envoyée.</p>
+        <p>Privés sur ce navigateur, conservés {{ journal_retention_days }} jours sur le serveur. Sur un téléphone partagé, les autres utilisateurs du navigateur peuvent les voir. Aucune notification n’est envoyée.</p>
         <div class="journal-content"></div>
         <p id="journalStatus" role="status"></p>
         <button id="deleteJournal" type="button">Supprimer tout mon journal</button>

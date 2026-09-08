@@ -184,6 +184,9 @@ Status legend: `[ ]` todo · `[x]` done.
     get grounded numbers (with TTS + source chips) and never hit the model's invention risk.
   - Added `tests/test_fertilizer.py` (4 tests, no network): intent detection, grounded sorgho dose
     + disclaimer, all 5 crops covered, and deferral to RAG when no crop is named. All pass.
+  - **September 2026 safety correction:** deterministic routing remains active, but every exact
+    numeric recommendation is withheld online and offline until the F6 agronomist provenance gate is
+    satisfied. Ambiguous multi-crop and unsupported-crop requests refuse or ask for clarification.
 
 - [x] **18. Intent router** — `core/router.py`, `app.py`
   - *Done when:* fertilizer questions hit the fertilizer tool, everything else hits RAG, and
@@ -349,7 +352,7 @@ Status legend: `[ ]` todo · `[x]` done.
     added cache age/corpus checks, excluded dynamic context from answer caching, and made chat reset
     clear the prior-question state and active playback.
   - Made source ingestion fail closed on explicit owner/agronomist review, removed startup web
-    ingestion, inventoried current candidates, withheld inconsistent millet microdose equivalents,
+    ingestion, inventoried current candidates, withheld all unverified numeric fertilizer guidance,
     and strengthened mandatory evaluator contracts.
   - Added farmer task starters, default simple French, immediate answer rendering, transcript review,
     photo resizing, local jQuery, offline-readiness messaging, private journal controls, shared

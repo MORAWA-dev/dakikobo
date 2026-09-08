@@ -183,6 +183,12 @@ fertilizer claims, mandatory evaluator contracts, farmer task entry points, defa
 immediate rendering, transcript review, photo resizing, locally served required assets, shared request
 budgets, and full pull-request regression gates.
 
+The 8 September release review tightened that baseline: all exact fertilizer doses are now withheld
+online and offline until the F6 agronomist provenance gate is complete. Rating-only feedback no
+longer requires journal consent, journal retention limits are configuration-backed, and explicit
+multi-crop questions now ask for clarification. Phase D's offline write/retry behavior and the full
+visible version/freshness presentation remain incomplete and must not be described as finished.
+
 This does not complete the product evidence gates. Phase E has only a draft 60-case benchmark, a
 scorecard tool that fails closed, and a pilot guide. Agronomist provenance review, approved benchmark
 expectations, real-phone accessibility/usability checks, participant sessions, production persistence,

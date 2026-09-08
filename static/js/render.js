@@ -99,10 +99,11 @@
         }
 
         function renderFeedback(bubble, question, answer, journal) {
+            var retentionDays = Number(document.documentElement.dataset.journalRetentionDays || 90);
             var $fb = $('<div class="feedback"></div>');
             var $up = $('<button type="button" class="fb-btn" data-rating="up" aria-label="Réponse utile">👍</button>');
             var $down = $('<button type="button" class="fb-btn" data-rating="down" aria-label="Réponse pas utile">👎</button>');
-            $fb.append($('<p></p>').text('Enregistrer ce conseil dans mon journal privé pendant 90 jours (question et réponse). Accessible sur ce navigateur ; supprimable à tout moment.'));
+            $fb.append($('<p></p>').text('Facultatif : enregistrer ce conseil dans mon journal privé pendant ' + retentionDays + ' jours (question et réponse). Accessible sur ce navigateur ; supprimable à tout moment.'));
             var $consent = $('<input type="checkbox">');
             $fb.append($('<label></label>').append($consent).append(document.createTextNode(' Je souhaite enregistrer ce conseil.')));
             var $research = $('<input type="checkbox">');
@@ -113,13 +114,12 @@
             var $status = $('<p role="status"></p>');
             $fb.append($status);
             $fb.on('click', '.fb-btn', function() {
-                if (!$consent.is(':checked')) { $status.text('Cochez votre accord pour enregistrer ce conseil.'); return; }
                 var rating = $(this).data('rating');
                 $fb.find('.fb-btn').prop('disabled', true);
                 var feedbackData = {
                     rating: rating,
-                    consent: '1',
-                    research_consent: $research.is(':checked') ? '1' : '0',
+                    consent: $consent.is(':checked') ? '1' : '0',
+                    research_consent: $consent.is(':checked') && $research.is(':checked') ? '1' : '0',
                     request_id: requestId,
                     question: question,
                     answer: answer,
@@ -134,6 +134,8 @@
                     $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
                     if (response && response.feedback_id) {
                         $status.text('Conseil enregistré. Retrouvez-le dans « Mes conseils » pour noter le résultat plus tard.');
+                    } else {
+                        $status.text('Merci. Votre avis a été pris en compte sans enregistrer la question ni la réponse.');
                     }
                 }).catch(function() {
                     $fb.find('.fb-btn').prop('disabled', false);

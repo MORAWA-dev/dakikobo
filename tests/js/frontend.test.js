@@ -190,14 +190,17 @@ test('les alias canoniques fonctionnent pour la fumure hors ligne', async functi
 
     const response = await worker.offlineFertilizer(form);
     const payload = await response.json();
-    assert.equal(payload.case.crop, 'mil');
-    assert.match(payload.answer, /100 kg\/ha de NPK/);
+    assert.equal(payload.case, undefined);
+    assert.equal(payload.confidence, 'Faible');
+    assert.match(payload.answer, /petit mil|le mil/);
+    assert.doesNotMatch(payload.answer, /\d+\s*(kg|g)\b/i);
 
     const groundnut = new FormData();
     groundnut.append('messageText', "Quelle fumure pour la cacahuète ?");
     groundnut.append('crop', '');
     const groundnutPayload = await (await worker.offlineFertilizer(groundnut)).json();
-    assert.equal(groundnutPayload.case.crop, 'arachide');
+    assert.equal(groundnutPayload.case, undefined);
+    assert.match(groundnutPayload.answer, /arachide/);
 });
 
 test('installation, navigation et réponses enregistrées fonctionnent sans réseau', async function() {
@@ -269,7 +272,10 @@ test('la culture explicite prime sur une ancienne sélection hors ligne', async 
     const form = new FormData();
     form.set('crop', 'sorgho');
     form.set('messageText', 'Quel engrais pour le maïs ?');
-    assert.equal((await (await worker.offlineFertilizer(form)).json()).case.crop, 'maïs');
+    const payload = await (await worker.offlineFertilizer(form)).json();
+    assert.match(payload.answer, /maïs/);
+    assert.doesNotMatch(payload.answer, /sorgho/);
+    assert.equal(payload.answer_kind, 'refusal');
 });
 
 test('hors ligne demande une clarification pour une culture ambiguë ou non prise en charge', async function() {

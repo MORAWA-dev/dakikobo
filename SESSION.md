@@ -925,3 +925,30 @@ cd - && git worktree remove "$WT" --force
   verification that the production secret, journal database, and images survive host replacement.
 - The fail-closed corpus remains intentionally narrow; do not promote pending sources merely to widen
   coverage.
+
+---
+
+### 2026-09-08 — Release review safety correction prepared
+
+**Review and decisions**
+
+- Confirmed GitHub `main` at `c23f13e0798bcf3945b7ab90afb912c39d305bc4` and the Hugging Face
+  Space at `5ec73978890aa2cbf0aff11483e98bfa1b53d995` before making changes.
+- A standards/spec review found that unverified numeric fertilizer guidance was still publicly
+  enabled despite the F6 release gate. Exact doses are now withheld online and offline until
+  agronomist provenance approval; explicit multi-crop questions ask for clarification.
+- Rating-only feedback no longer requires consent to save full question/answer text. Journal retention
+  and capacity are configurable. The duplicated Markdown frontmatter parser was consolidated.
+- Phase D offline journal write/retry and complete visible version/freshness presentation remain open;
+  the plan now says so explicitly.
+
+**Verification before publication**
+
+- Full offline Python suite: **290 passed**, with the existing PyPDF2 deprecation warning.
+- JavaScript suite: **13 passed**. Python compilation, generated fertilizer asset stability, and
+  `git diff --check` passed.
+
+**Next action**
+
+- Commit and push the reviewed correction to GitHub, deploy that exact GitHub tree to Hugging Face,
+  then verify remote versions, health, safety behavior, and the strict public evaluation.

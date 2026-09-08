@@ -36,7 +36,10 @@ def test_due_digest_is_owned(clients):
 def test_consent_idempotence_deletion_and_legacy_isolation(clients):
     from core.case_log import record_feedback
     owner, other = clients
-    assert owner.post('/feedback', data={'rating':'up','question':'Q','answer':'A'}).status_code == 400
+    rating_only = owner.post('/feedback', data={'rating':'up','question':'Q','answer':'A'})
+    assert rating_only.status_code == 200
+    assert rating_only.json == {'ok': True, 'saved_to_journal': False}
+    assert owner.get('/journal').json['cases'] == []
     data = {'rating':'up','question':'Q','answer':'A','consent':'1','request_id':'retry-one'}
     first = owner.post('/feedback', data=data).json['feedback_id']
     assert owner.post('/feedback', data=data).json['feedback_id'] == first

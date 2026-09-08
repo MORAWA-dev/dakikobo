@@ -682,10 +682,10 @@ def test_soil_route_combines_context_and_fertilizer(monkeypatch):
 
     assert response.status_code == 200
     assert payload["soil"] == soil_payload
-    assert "100 kg/ha de NPK" in payload["fertilizer"]["answer"]
-    assert payload["fertilizer"]["sources"][0]["type"] == "Outil engrais"
+    assert "temporairement retirées" in payload["fertilizer"]["answer"]
+    assert payload["fertilizer"]["sources"] == []
     assert payload["sources"][0]["type"] == "Sol"
-    assert payload["sources"][1]["type"] == "Outil engrais"
+    assert len(payload["sources"]) == 1
     assert payload["confidence"] == "Moyen"
 
 
@@ -826,14 +826,12 @@ def test_fertilizer_route_uses_tool_not_rag(monkeypatch):
     payload = response.get_json()
 
     assert response.status_code == 200
-    assert "100 kg/ha de NPK" in payload["answer"]
-    assert payload["sources"][0]["type"] == "Outil engrais"
-    assert payload["confidence"] == "Fort"
+    assert "temporairement retirées" in payload["answer"]
+    assert payload["sources"] == []
+    assert payload["confidence"] == "Faible"
     assert payload["audio_url"] == "/static/audio/fertilizer.mp3"
-    assert payload["case"]["input_type"] == "fertilizer"
-    assert payload["case"]["crop"] == "sorgho"
-    assert payload["case"]["actions"]
-    assert payload["case"]["do_not"]
+    assert payload["answer_kind"] == "refusal"
+    assert "case" not in payload
 
 
 def test_fertilizer_route_uses_form_crop_when_text_omits_crop(monkeypatch):
@@ -853,10 +851,9 @@ def test_fertilizer_route_uses_form_crop_when_text_omits_crop(monkeypatch):
     payload = response.get_json()
 
     assert response.status_code == 200
-    assert "100 kg/ha de NPK" in payload["answer"]
-    assert payload["case"]["crop"] == "mil"
-    assert payload["case"]["growth_stage"] == "croissance végétative"
-    assert payload["case"]["location"] == "Dori"
+    assert "dose exacte" in payload["answer"]
+    assert payload["confidence"] == "Faible"
+    assert "case" not in payload
 
 
 def test_ask_enriches_case_with_weather_when_location_known(monkeypatch):
@@ -889,8 +886,9 @@ def test_ask_enriches_case_with_weather_when_location_known(monkeypatch):
     payload = response.get_json()
 
     assert response.status_code == 200
-    assert payload["case"]["weather_signals"]
-    assert "Pluie utile" in payload["case"]["weather_signals"][0]
+    assert payload["weather"]["insights"]
+    assert "case" not in payload
+    assert "Pluie utile" in payload["weather"]["insights"][0]["label"]
     assert payload["weather"]["location"]["id"] == "kaya"
 
 
