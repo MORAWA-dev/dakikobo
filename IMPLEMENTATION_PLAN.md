@@ -341,6 +341,25 @@ Status legend: `[ ]` todo · `[x]` done.
     six-argument photo upload contract. Behavioral worker tests cover offline fertilizer aliases and
     ensure only the explicit shell is cached; weather, health, ops, version, and journal GETs remain live.
 
+- [x] **32. Farmer-safety engineering baseline** — September 2026 follow-up plan
+  - Migrated the journal additively to schema v5 with anonymous browser ownership, explicit consent,
+    90-day expiry, idempotent saves, owned reads/writes/deletion, attachment re-encoding, and
+    research-export consent filtering. Legacy unowned rows remain operator-only.
+  - Aligned offline crop precedence with the server, rejected ambiguous/unsupported crop requests,
+    added cache age/corpus checks, excluded dynamic context from answer caching, and made chat reset
+    clear the prior-question state and active playback.
+  - Made source ingestion fail closed on explicit owner/agronomist review, removed startup web
+    ingestion, inventoried current candidates, withheld inconsistent millet microdose equivalents,
+    and strengthened mandatory evaluator contracts.
+  - Added farmer task starters, default simple French, immediate answer rendering, transcript review,
+    photo resizing, local jQuery, offline-readiness messaging, private journal controls, shared
+    cross-worker request budgets, and complete PR regression gates.
+  - Local gate: 288 Python tests and 12 JavaScript tests pass; compilation, generated-asset stability,
+    diff checks, blank-scorecard rejection, and an isolated runtime journal smoke pass.
+  - **Release remains blocked** on agronomist source/dose review, real-phone accessibility/usability
+    checks, the farmer/extension-agent pilot, production persistence verification, and live RAG
+    evaluation after the intentionally stricter eligible-source rebuild.
+
 ---
 
 ## Later / parked (do **not** attempt now)

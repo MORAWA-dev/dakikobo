@@ -1,0 +1,33 @@
+name: Offline regression tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GROQ_API_KEY: ci-placeholder
+      RAG_WARMUP_ON_START: 'false'
+      HF_HUB_OFFLINE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements.txt
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: python -m pytest -q tests --ignore=tests/test_rag.py
+      - run: pnpm test:js
+      - run: python scripts/export_offline_fertilizer.py && git diff --exit-code -- static/data/fertilizer.json

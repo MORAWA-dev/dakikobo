@@ -1801,3 +1801,39 @@ details.sources-details[open] > .sources-summary::before {
 .offline-banner[hidden] {
     display: none;
 }
+
+/* Farmer tasks and private journal: keep controls usable on narrow phones. */
+.farmer-tasks { display:flex; gap:6px; overflow-x:auto; padding:8px 12px; flex-shrink:0; }
+.farmer-tasks button { flex:0 0 auto; border:1px solid #315c2b; background:#f3f8ee; color:#254722; border-radius:14px; padding:8px 12px; min-height:44px; }
+.field-simple-french { margin:4px 12px; }
+.journal-panel { position:absolute; inset:60px 10px 10px; z-index:30; padding:16px; background:#fff; overflow:auto; border:2px solid #315c2b; border-radius:12px; }
+.journal-panel[hidden] { display:none; }
+.journal-entry { border-bottom:1px solid #c6d5be; padding:12px 0; }
+.journal-answer { white-space:pre-wrap; }
+.journal-panel button { min-height:44px; margin:5px; }
+.feedback label { display:block; font-size:0.9rem; margin:6px 0; }
+#inputHint, #offlineReady { font-size:0.8rem; margin:4px 12px; color:#385232; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid #a86400; outline-offset:2px; }
+/* Local symbols keep core controls visible without an icon CDN. */
+.fas { font-style:normal; display:inline-block; }
+.fa-paper-plane::before { content:'➤'; }
+.fa-microphone::before { content:'🎙'; }
+.fa-camera::before { content:'📷'; }
+.fa-tools::before { content:'⚒'; }
+.fa-shield-alt::before { content:'ⓘ'; }
+.fa-times::before { content:'×'; }
+.fa-chevron-down::before { content:'⌄'; }
+.fa-seedling::before { content:'🌱'; }
+.fa-volume-up::before { content:'🔊'; }
+.fa-cloud-sun::before { content:'☀'; }
+@media (max-width:400px) { .chat-input form { gap:3px; } #toolsToggle span { display:none; } .farmer-tasks { padding:4px 8px; } }
+@media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
+
+@media (max-width:480px) {
+    #chatbot-form { flex-wrap:wrap; gap:6px; }
+    #messageText { flex:1 1 100%; width:100%; min-width:0; box-sizing:border-box; margin:0; }
+    #chatbot-form-btn, #chatbot-form-btn-voice, #chatbot-form-btn-image, #toolsToggle { min-width:44px; min-height:44px; margin:0; }
+    #toolsToggle { width:auto; padding:0 12px; }
+    #toolsToggle span { display:inline; }
+    #offlineReady { font-size:11px; }
+}

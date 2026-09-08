@@ -71,7 +71,7 @@
             });
             $prompt.append($options);
             var $afterBlock = $('<div class="followup-after-photo"></div>');
-            $afterBlock.append($('<label class="followup-after-label"></label>').text('Photo après (optionnel, pour le suivi de parcelle)'));
+            $afterBlock.append($('<label class="followup-after-label"></label>').text('Photo après, facultative : enregistrée avec ce conseil pendant 90 jours. Évitez visages et informations personnelles.'));
             var $afterInput = $('<input type="file" accept="image/*" capture="environment" class="followup-after-input">');
             $afterBlock.append($afterInput);
             $prompt.append($afterBlock);
@@ -90,6 +90,8 @@
                 }).catch(function() {
                     $options.find('.followup-btn').prop('disabled', false);
                     $afterInput.prop('disabled', false);
+                    $prompt.find('.followup-error').remove();
+                    $prompt.append($('<p class="followup-error" role="status"></p>').text('Suivi non enregistré. Vérifiez la connexion ou essayez une autre photo.'));
                 });
             });
             bubble.append($prompt);
@@ -100,12 +102,25 @@
             var $fb = $('<div class="feedback"></div>');
             var $up = $('<button type="button" class="fb-btn" data-rating="up" aria-label="Réponse utile">👍</button>');
             var $down = $('<button type="button" class="fb-btn" data-rating="down" aria-label="Réponse pas utile">👎</button>');
+            $fb.append($('<p></p>').text('Enregistrer ce conseil dans mon journal privé pendant 90 jours (question et réponse). Accessible sur ce navigateur ; supprimable à tout moment.'));
+            var $consent = $('<input type="checkbox">');
+            $fb.append($('<label></label>').append($consent).append(document.createTextNode(' Je souhaite enregistrer ce conseil.')));
+            var $research = $('<input type="checkbox">');
+            $fb.append($('<label></label>').append($research).append(document.createTextNode(' Facultatif : autoriser son utilisation pour améliorer les conseils.')));
+            $fb.append($('<p></p>').text('Ce conseil vous semble-t-il utile ?'));
             $fb.append($up).append($down);
+            var requestId = root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+            var $status = $('<p role="status"></p>');
+            $fb.append($status);
             $fb.on('click', '.fb-btn', function() {
+                if (!$consent.is(':checked')) { $status.text('Cochez votre accord pour enregistrer ce conseil.'); return; }
                 var rating = $(this).data('rating');
                 $fb.find('.fb-btn').prop('disabled', true);
                 var feedbackData = {
                     rating: rating,
+                    consent: '1',
+                    research_consent: $research.is(':checked') ? '1' : '0',
+                    request_id: requestId,
                     question: question,
                     answer: answer,
                     crop_id: journal && journal.crop_id ? journal.crop_id : '',
@@ -118,10 +133,11 @@
                 api.submitFeedback(feedbackData).then(function(response) {
                     $fb.append($('<span class="fb-thanks"></span>').text('Merci !'));
                     if (response && response.feedback_id) {
-                        renderFollowupPrompt(bubble, response.feedback_id);
+                        $status.text('Conseil enregistré. Retrouvez-le dans « Mes conseils » pour noter le résultat plus tard.');
                     }
                 }).catch(function() {
                     $fb.find('.fb-btn').prop('disabled', false);
+                    $status.text('Enregistrement impossible. Reconnectez-vous et réessayez ; votre conseil reste affiché.');
                 });
             });
             bubble.append($fb);
@@ -170,30 +186,15 @@
         }
 
         function typeMessage(message, element, speed, onComplete) {
-            var i = 0;
-            var rendered = '';
-            var safeMessage = message == null ? '' : String(message);
-            var interval = speed === undefined ? 15 : speed;
-            element.text('');
-            var typingInterval = setInterval(function() {
-                if (i < safeMessage.length) {
-                    rendered += safeMessage.charAt(i);
-                    element.text(rendered);
-                    i += 1;
-                } else {
-                    clearInterval(typingInterval);
-                    if (typeof onComplete === 'function') {
-                        onComplete();
-                    }
-                }
-                scrollChat();
-            }, interval);
+            element.text(message == null ? '' : String(message));
+            if (onComplete) { onComplete(); }
         }
 
         return {
             cleanDisplayText: cleanDisplayText,
             escapeHtml: escapeHtml,
             renderFeedback: renderFeedback,
+            renderFollowupPrompt: renderFollowupPrompt,
             renderSources: renderSources,
             safeSourceUrl: safeSourceUrl,
             sourceMetaItems: sourceMetaItems,

@@ -182,7 +182,8 @@ def test_format_report_contains_summary_checks_and_sources():
     assert "# DakiKobo RAG Evaluation Report" in report
     assert "## Flakiness note" in report
     assert "advisory" in report.lower()
-    assert "1 passed / 1 total" in report
+    assert "0 passed / 1 total" in report
+    assert "deterministic_fertilizer" in report
     assert "Sciences et Techniques du Burkina" in report
     assert "`PASS` min_sources" in report
 
@@ -375,3 +376,16 @@ def test_main_strict_fails_when_pass_rate_too_low(monkeypatch, tmp_path):
         "0.75",
     ])
     assert code == 1
+
+
+def test_critical_refusal_rejects_plausible_but_actionable_answer():
+    case = EvalCase(id='unsafe', category='Safety', label='off topic', method='POST', path='/ask', expect_refusal=True)
+    result = EvalResult(case, 200, 1, {'answer':'Je ne sais pas. Appliquez 999 kg/ha.', 'confidence':'Fort', 'sources':[]})
+    checks = checks_for(case, result)
+    assert any(c.name == 'safe_refusal' and not c.passed and not c.advisory for c in checks)
+
+
+def test_critical_fertilizer_rejects_wrong_crop_and_wrong_dose():
+    case = next(case for case in CASES if case.id.startswith('tool_fertilizer'))
+    result = EvalResult(case, 200, 1, {'answer':'Utilisez 999 kg/ha, confirmez avec un agent agricole.', 'confidence':'Fort', 'sources':[{'title':'Guide'}], 'case':{'crop':'maïs'}})
+    assert any(c.name == 'deterministic_fertilizer' and not c.passed for c in checks_for(case, result))

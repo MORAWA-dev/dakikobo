@@ -56,7 +56,7 @@ def test_expected_markdown_present():
 
 
 def test_load_markdown_returns_documents():
-    docs = load_markdown_from_folder(os.path.join("Data", "markdown", "knowledge_base"))
+    docs = load_markdown_from_folder(os.path.join("Data", "markdown", "scraped_reviewed"))
     assert len(docs) > 0, "Markdown ingestion produced no Documents"
     for d in docs:
         assert isinstance(d, Document)
@@ -66,7 +66,7 @@ def test_load_markdown_returns_documents():
         assert d.metadata.get("markdown_file"), "Document missing markdown_file metadata"
         assert d.metadata.get("data_format") == "markdown"
     original_sources = {os.path.basename(d.metadata["source_file"]) for d in docs}
-    assert "farmer_training_manual.pdf" in original_sources
+    assert all(d.metadata["review_status"] == "reviewed_by_owner" for d in docs)
 
 
 def test_load_markdown_preserves_review_metadata(tmp_path):
@@ -82,7 +82,7 @@ language: "fr"
 country: "Burkina Faso"
 publisher: "Source officielle"
 license: "unknown"
-review_status: "reviewed_by_codex"
+review_status: "reviewed_by_owner"
 scraped_at: "2026-07-02T10:00:00+00:00"
 reviewed_at: "2026-07-02T11:00:00+00:00"
 topics: "semis, pluie"
@@ -103,7 +103,7 @@ Contenu agricole vérifié.
     assert metadata["source_id"] == "example_source"
     assert metadata["source_url"] == "https://example.test/guide"
     assert metadata["doc_type"] == "scraped_web"
-    assert metadata["review_status"] == "reviewed_by_codex"
+    assert metadata["review_status"] == "reviewed_by_owner"
     assert metadata["license"] == "unknown"
     assert metadata["topics"] == "semis, pluie"
     assert metadata["crops"] == "mil, sorgho"
@@ -112,7 +112,8 @@ Contenu agricole vérifié.
 def test_source_manifest_tracks_markdown_content(tmp_path):
     active = tmp_path / "active.md"
     skipped = tmp_path / "_index.md"
-    active.write_text("contenu A", encoding="utf-8")
+    approved_header = "---\ntitle: Guide\nsource_file: guide.pdf\nreview_status: reviewed_by_owner\n---\n"
+    active.write_text(approved_header + "contenu A", encoding="utf-8")
     skipped.write_text("ignore", encoding="utf-8")
 
     files = list_markdown_files(str(tmp_path))
@@ -127,10 +128,10 @@ def test_source_manifest_tracks_markdown_content(tmp_path):
     assert manifest["embedding_model"] == config.EMBEDDING_MODEL
     assert manifest["external_sources"] == ["https://example.test/source"]
     assert manifest["files"][0]["path"].endswith("active.md")
-    assert manifest["files"][0]["bytes"] == len("contenu A".encode("utf-8"))
+    assert manifest["files"][0]["bytes"] == len((approved_header + "contenu A").encode("utf-8"))
 
     first_hash = manifest["files"][0]["sha256"]
-    active.write_text("contenu B", encoding="utf-8")
+    active.write_text(approved_header + "contenu B", encoding="utf-8")
     changed = build_source_manifest(files, source_type="Markdown")
 
     assert changed["files"][0]["sha256"] != first_hash
@@ -156,29 +157,16 @@ def test_stale_vector_store_manifest_is_rejected(tmp_path, monkeypatch):
     assert db is None
 
 
-def test_load_pdfs_returns_documents():
-    folder = os.path.join("Data", "knowledge_base")
-    docs = load_pdfs_from_folder(folder)
-    if not docs:
-        pdf_files = glob.glob(os.path.join(folder, "*.pdf"))
-        lfs_pointers = [
-            p for p in pdf_files
-            if open(p, "rb").read(80).startswith(
-                b"version https://git-lfs.github.com/spec/v1"
-            )
-        ]
-        if pdf_files and len(lfs_pointers) == len(pdf_files):
-            pytest.skip(
-                "PDF fallback files are Git LFS pointers in this checkout; "
-                "Markdown ingestion is the primary deployed path."
-            )
-    assert len(docs) > 0, "ingestion produced no Documents"
-    for d in docs:
-        assert isinstance(d, Document)
-        assert d.page_content.strip(), "Document has empty text"
-        assert d.metadata.get("source"), "Document missing source metadata"
-    sources = {d.metadata["source"] for d in docs}
-    assert "farmer_training_manual.pdf" in sources
+def test_load_pdfs_requires_review_then_preserves_provenance(tmp_path, monkeypatch):
+    source = tmp_path / "guide.pdf"
+    source.write_bytes(b"%PDF-test")
+    monkeypatch.setattr(rag_pipeline, "extract_pdf_text", lambda path: "Conseil agricole")
+    assert load_pdfs_from_folder(str(tmp_path)) == []
+    source.with_suffix(".pdf.review.json").write_text(json.dumps({"review_status":"reviewed_by_owner", "title":"Guide", "source_file":"guide.pdf"}))
+    docs = load_pdfs_from_folder(str(tmp_path))
+    assert len(docs) == 1
+    assert docs[0].metadata["review_status"] == "reviewed_by_owner"
+    assert docs[0].page_content == "Conseil agricole"
 
 
 def test_fetch_website_content_uses_configured_timeout(monkeypatch):

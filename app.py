@@ -1,3 +1,9 @@
+import secrets
+import re
+from pathlib import Path
+from datetime import timedelta
+from hashlib import sha256
+from core import journal as owned_journal
 # app.py — DakiKobo Flask entry point
 
 import os
@@ -122,6 +128,8 @@ logger = logging.getLogger("dakikobo")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  PERMANENT_SESSION_LIFETIME=timedelta(days=owned_journal.RETENTION_DAYS))
 app.config["MAX_CONTENT_LENGTH"] = max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES)
 app.config["MAX_IMAGE_UPLOAD_BYTES"] = MAX_IMAGE_UPLOAD_BYTES
 app.config["MAX_IMAGE_UPLOAD_MB"] = MAX_IMAGE_UPLOAD_MB
@@ -359,7 +367,7 @@ def _maybe_simplify_case(case: dict | None, enabled: bool) -> dict | None:
 
 
 def _answer_cache_key(retrieval_query: str, resolved, simple_french: bool) -> str:
-    return build_answer_cache_key(
+    return "farmer-v1:" + build_answer_cache_key(
         retrieval_query,
         crop_id=resolved.crop_id,
         growth_stage=resolved.growth_stage,
@@ -540,7 +548,7 @@ def _expected_vector_store_manifest() -> dict:
     return build_source_manifest(
         source_files,
         source_type=source_type,
-        external_sources=KNOWLEDGE_URLS,
+        external_sources=[],
     )
 
 
@@ -565,14 +573,8 @@ def _load_or_build_vector_store_locked():
         print("1. Clearing existing vector store for a clean rebuild...")
         clear_vector_store()
 
-    print("1. Fetching external content...")
+    # Network candidates must pass the same offline review before indexing.
     website_docs = []
-    try:
-        for url in KNOWLEDGE_URLS:
-            website_docs.extend(fetch_website_content(url))
-    except Exception as e:
-        print(f"Warning: Web scraping failed: {e}")
-        website_docs = []
 
     local_docs, local_source = _load_local_knowledge_documents()
     print(
@@ -691,7 +693,15 @@ def index():
 @app.route("/sw.js")
 def service_worker():
     """Serve the static worker at the site root so it can control every route."""
-    response = app.send_static_file("sw.js")
+    worker = Path(app.static_folder, "sw.js").read_text()
+    digest = sha256()
+    for file in sorted(Path(app.static_folder).rglob("*")):
+        if file.is_file() and "audio" not in file.parts:
+            digest.update(file.relative_to(app.static_folder).as_posix().encode())
+            digest.update(file.read_bytes())
+    digest.update(Path(app.template_folder, "index.html").read_bytes())
+    digest.update(json.dumps(_expected_vector_store_manifest(), sort_keys=True).encode())
+    response = app.response_class(worker.replace("__ASSET_REVISION__", digest.hexdigest()[:16]), mimetype="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
     response.headers["Cache-Control"] = "no-cache"
     return response
@@ -963,10 +973,13 @@ def ask():
     if simple_french:
         retrieval_query = apply_simple_style_to_query(retrieval_query)
 
+    dynamic_context = bool(effective_context.get("location")) or bool(
+        re.search(r"météo|meteo|aujourd|demain|prévision|prevision|cette semaine", query, re.I))
+    g.dynamic_context = dynamic_context
     # The active corpus hash is required before a persisted answer can be
     # trusted. Lookup happens before intent routing and all upstream calls.
     active_manifest = get_active_manifest_hash()
-    if ANSWER_CACHE_ENABLED and answer_cache_store is not None and active_manifest:
+    if ANSWER_CACHE_ENABLED and answer_cache_store is not None and active_manifest and not dynamic_context:
         cache_key = _answer_cache_key(retrieval_query, resolved, simple_french)
         try:
             cached = answer_cache_store.get(cache_key)
@@ -1009,6 +1022,7 @@ def ask():
             )
             payload = {
                 "answer": cached.get("answer") or "",
+                "saved_at": cached.get("cached_at"),
                 "sources": sources,
                 "confidence": cached.get("confidence") or "Faible",
                 "audio_url": "",
@@ -1264,7 +1278,7 @@ def ask():
         if weather_payload is not None and not refusal:
             payload["weather"] = weather_payload
 
-        if ANSWER_CACHE_ENABLED and answer_cache_store is not None:
+        if ANSWER_CACHE_ENABLED and answer_cache_store is not None and not dynamic_context:
             active_manifest = get_active_manifest_hash()
             if active_manifest:
                 try:
@@ -1455,146 +1469,152 @@ def screen():
     })
 
 
+def _journal_owner():
+    if "journal_owner" not in session:
+        session["journal_owner"] = secrets.token_urlsafe(32)
+        session.permanent = True
+    return sha256(session["journal_owner"].encode()).hexdigest()
+
+
+@app.before_request
+def _shared_resource_budget():
+    if request.path not in ("/ask", "/screen", "/speech", "/feedback", "/feedback/outcome", "/weather", "/soil"):
+        return None
+    from core.rate_budget import consume
+    from config import BUDGET_CLIENT_PER_MINUTE, BUDGET_GLOBAL_PER_MINUTE, BUDGET_GLOBAL_PER_DAY
+    # Forwarded addresses are not trusted without a configured reverse-proxy boundary.
+    identity = question_hash("budget:" + (request.remote_addr or "unknown"))
+    try:
+        retry = consume(app.config.get("BUDGET_DB_PATH", STATE_DB_PATH), identity,
+                        minute_limit=BUDGET_CLIENT_PER_MINUTE,
+                        global_minute_limit=BUDGET_GLOBAL_PER_MINUTE,
+                        daily_limit=BUDGET_GLOBAL_PER_DAY)
+    except Exception:
+        logger.exception("Resource budget unavailable")
+        return jsonify({"error": "Service temporairement indisponible. Réessayez plus tard."}), 503
+    if retry:
+        response = jsonify({"error": "Le service est très sollicité. Réessayez un peu plus tard.", "retry_after": retry})
+        response.headers["Retry-After"] = str(retry)
+        return response, 429
+
+
+@app.before_request
+def _protect_journal_origin():
+    if request.path.startswith(("/feedback", "/journal")) and request.method in ("POST", "DELETE"):
+        origin = request.headers.get("Origin")
+        if request.headers.get("Sec-Fetch-Site") == "cross-site" or (origin and origin.rstrip("/") != request.host_url.rstrip("/")):
+            return jsonify({"error": "Ouvrez DakiKobo pour modifier votre journal."}), 403
+
+
+@app.after_request
+def _private_journal_headers(response):
+    if request.path.startswith(("/journal", "/feedback")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.after_request
+def _answer_freshness(response):
+    if request.path == "/ask" and response.is_json:
+        data = response.get_json(silent=True) or {}
+        cacheable = bool(response.status_code == 200 and data.get("sources") and not getattr(g, "dynamic_context", True))
+        data["saved_at"] = data.get("saved_at") or _utc_now_iso()
+        response.set_data(app.json.dumps(data))
+        response.headers["X-DakiKobo-Cacheable"] = "1" if cacheable else "0"
+        response.headers["X-DakiKobo-Corpus"] = get_active_manifest_hash() or ""
+        response.headers["X-DakiKobo-Saved-At"] = str(datetime.fromisoformat(data["saved_at"]).timestamp())
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/journal/session")
+def journal_session():
+    _journal_owner()
+    return jsonify({"ok": True, "retention_days": owned_journal.RETENTION_DAYS})
+
+
+@app.route("/journal")
 @app.route("/journal/due")
 def journal_due():
-    """Privacy-minimized reminder digest for feedback awaiting an outcome."""
     _set_log_fields(feature="journal_due")
     try:
-        cases = list_due_followups(CASE_LOG_DB)
-    except Exception as exc:
-        logger.warning("Journal due read failed: %s", exc)
-        _set_log_fields(outcome="read_error", failure_type=type(exc).__name__)
-        return jsonify({"ok": False, "error": "Le journal est indisponible pour le moment."}), 500
-    _set_log_fields(outcome="ok", due_count=len(cases))
-    response = jsonify({"ok": True, "due": cases, "count": len(cases)})
-    response.headers["Cache-Control"] = "no-store"
-    return response
+        rows = owned_journal.list_owned(CASE_LOG_DB, _journal_owner(), FEEDBACK_IMAGES,
+                                       due=request.path.endswith("/due"))
+        key = "due" if request.path.endswith("/due") else "cases"
+        return jsonify({"ok": True, key: rows, "count": len(rows)})
+    except Exception:
+        logger.exception("Journal read failed")
+        return jsonify({"ok": False, "error": "Le journal est indisponible pour le moment."}), 503
+
+
+@app.route("/journal", methods=["DELETE"])
+@app.route("/journal/<int:case_id>", methods=["DELETE"])
+def journal_delete(case_id=None):
+    count = owned_journal.delete_owned(CASE_LOG_DB, _journal_owner(), FEEDBACK_IMAGES, case_id)
+    return jsonify({"ok": True, "deleted": count})
 
 
 @app.route("/feedback", methods=["POST"])
 def feedback():
     _set_log_fields(feature="feedback")
     rating = request.form.get("rating", "").strip()
+    if rating not in ("up", "down"):
+        return jsonify({"ok": False, "error": "L’évaluation doit être positive ou négative."}), 400
+    if request.form.get("consent") != "1":
+        return jsonify({"error": "Confirmez l’enregistrement privé de ce conseil pendant 90 jours."}), 400
+    if request.files or request.form.get("before_image_ref"):
+        return jsonify({"error": "Ajoutez une photo uniquement lors du suivi de votre conseil."}), 400
     question = request.form.get("question", "").strip()
     answer = request.form.get("answer", "").strip()
-    before_ref = (request.form.get("before_image_ref") or "").strip()[:240]
-    place_id = (request.form.get("place_id") or "").strip()[:80]
-    crop_id = (request.form.get("crop_id") or "").strip()[:80]
-    answer_path = (request.form.get("answer_path") or "").strip()
-    try:
-        ledger_created_at = float(request.form.get("ledger_created_at"))
-    except (TypeError, ValueError):
-        ledger_created_at = None
-
-    if rating not in ("up", "down"):
-        _set_log_fields(outcome="validation_error", failure_type="invalid_rating")
-        return jsonify({"ok": False, "error": "L’évaluation doit être positive ou négative."}), 400
+    if not question or not answer or len(question) > MAX_QUESTION_CHARS or len(answer) > 12000:
+        return jsonify({"error": "Le conseil est vide ou trop long pour être enregistré."}), 400
+    answer_path = request.form.get("answer_path", "")
     if answer_path and answer_path not in VALID_ANSWER_PATHS:
-        _set_log_fields(outcome="validation_error", failure_type="invalid_answer_path")
-        return jsonify({"ok": False, "error": "Le type de réponse est invalide."}), 400
-
+        return jsonify({"error": "Le type de réponse est invalide."}), 400
+    request_id = request.form.get("request_id", "") or secrets.token_urlsafe(24)
+    if len(request_id) > 100:
+        return jsonify({"error": "La référence de sauvegarde est invalide."}), 400
     try:
-        feedback_id = record_feedback(
-            CASE_LOG_DB,
-            rating=rating,
-            question=question,
-            answer=answer,
-            before_image_ref=before_ref,
-            place_id=place_id,
-            crop_id=crop_id,
-            answer_path=answer_path,
-            question_hash_value=question_hash(question),
-            ledger_created_at=ledger_created_at,
+        timestamp = float(request.form.get("ledger_created_at", ""))
+        if not __import__("math").isfinite(timestamp):
+            timestamp = None
+    except (ValueError, TypeError):
+        timestamp = None
+    try:
+        feedback_id = owned_journal.save_owned(
+            CASE_LOG_DB, _journal_owner(), FEEDBACK_IMAGES, request_id=request_id,
+            rating=rating, question=question, answer=answer,
+            crop_id=request.form.get("crop_id", "")[:80],
+            place_id=request.form.get("place_id", "")[:80], answer_path=answer_path,
+            question_hash_value=question_hash(question), ledger_created_at=timestamp,
+            research_consent=request.form.get("research_consent") == "1",
         )
-        # Optional multipart before photo (stored only as opaque local ref).
-        before_file = request.files.get("before_image")
-        if before_file and before_file.filename:
-            try:
-                stored = _store_feedback_image(
-                    feedback_id=feedback_id,
-                    kind="before",
-                    file_storage=before_file,
-                )
-                if stored:
-                    set_before_image_ref(
-                        CASE_LOG_DB,
-                        feedback_id=feedback_id,
-                        before_image_ref=stored,
-                    )
-                    before_ref = stored
-            except ValueError:
-                _set_log_fields(outcome="validation_error", failure_type="image_too_large")
-                return jsonify({"ok": False, "error": "L’image envoyée est trop lourde."}), 413
-        _set_log_fields(
-            outcome="ok",
-            rating=rating,
-            feedback_id=feedback_id,
-            before_image_stored=bool(before_ref),
-        )
-        return jsonify({
-            "ok": True,
-            "feedback_id": feedback_id,
-            "before_image_ref": before_ref or "",
-        })
-    except Exception as e:
-        print(f"ERROR — feedback write failed: {e}")
-        _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
-        return jsonify({"ok": False, "error": "L’évaluation n’a pas pu être enregistrée."}), 500
+        return jsonify({"ok": True, "feedback_id": feedback_id})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        logger.exception("Journal save failed")
+        return jsonify({"error": "L’évaluation n’a pas pu être enregistrée."}), 503
 
 
 @app.route("/feedback/outcome", methods=["POST"])
 def feedback_outcome():
-    """Record follow-up outcome after a farmer applies (or not) advice."""
     _set_log_fields(feature="feedback_outcome")
     try:
-        feedback_id = int(request.form.get("feedback_id", 0))
-    except (ValueError, TypeError):
-        feedback_id = 0
-    outcome_value = request.form.get("outcome", "").strip()
-    after_ref = (request.form.get("after_image_ref") or "").strip()[:240]
-
-    if not feedback_id:
-        _set_log_fields(outcome="validation_error", failure_type="missing_feedback_id")
-        return jsonify({"ok": False, "error": "L’identifiant de l’évaluation est manquant."}), 400
-
-    after_file = request.files.get("after_image")
-    if after_file and after_file.filename:
-        try:
-            after_ref = _store_feedback_image(
-                feedback_id=feedback_id,
-                kind="after",
-                file_storage=after_file,
-            ) or after_ref
-        except ValueError:
-            _set_log_fields(outcome="validation_error", failure_type="image_too_large")
-            return jsonify({"ok": False, "error": "L’image envoyée est trop lourde."}), 413
-
+        case_id = int(request.form.get("feedback_id", 0))
+    except (TypeError, ValueError):
+        case_id = 0
     try:
-        updated = record_outcome(
-            CASE_LOG_DB,
-            feedback_id=feedback_id,
-            outcome=outcome_value,
-            after_image_ref=after_ref,
-        )
-    except ValueError:
-        _set_log_fields(outcome="validation_error", failure_type="invalid_outcome")
-        return jsonify({"ok": False, "error": "Le résultat de suivi est invalide."}), 400
-    except Exception as e:
-        print(f"ERROR — outcome write failed: {e}")
-        _set_log_fields(outcome="write_error", failure_type=type(e).__name__)
-        return jsonify({"ok": False, "error": "Le suivi n’a pas pu être enregistré."}), 500
-
+        updated = owned_journal.update_owned(CASE_LOG_DB, _journal_owner(), FEEDBACK_IMAGES,
+            case_id, request.form.get("outcome", ""), request.files.get("after_image"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        logger.exception("Journal outcome failed")
+        return jsonify({"error": "Le suivi n’a pas pu être enregistré."}), 503
     if not updated:
-        _set_log_fields(outcome="not_found", failure_type="feedback_id_not_found")
-        return jsonify({"ok": False, "error": "L’évaluation demandée est introuvable."}), 404
-
-    _set_log_fields(
-        outcome="ok",
-        rating_outcome=outcome_value,
-        feedback_id=feedback_id,
-        after_image_stored=bool(after_ref),
-    )
-    return jsonify({"ok": True, "after_image_ref": after_ref or ""})
+        return jsonify({"error": "L’évaluation demandée est introuvable."}), 404
+    return jsonify({"ok": True})
 
 
 if RAG_WARMUP_ON_START:

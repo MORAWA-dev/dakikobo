@@ -1,8 +1,10 @@
 'use strict';
 
-var VERSION = 'dakikobo-phase5-v2';
+var VERSION = 'dakikobo-farmer-v1-__ASSET_REVISION__';
 var SHELL_CACHE = VERSION + '-shell';
 var ANSWER_CACHE = VERSION + '-answers';
+var ANSWER_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+var ANSWER_LIMIT = 50;
 var SHELL = [
     '/',
     '/registry',
@@ -12,6 +14,7 @@ var SHELL = [
     '/static/js/render.js',
     '/static/js/api.js',
     '/static/js/index.js',
+    '/static/vendor/jquery-3.6.0.min.js',
     '/static/images/logo.png',
     '/static/images/user_avatar.png',
     '/static/data/fertilizer.json',
@@ -24,11 +27,7 @@ var SHELL = [
     '/examples/fumure_sorgho',
     '/examples/photo_mais'
 ];
-var EXTERNAL_SHELL = [
-    'https://code.jquery.com/jquery-3.6.0.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/webfonts/fa-solid-900.woff2'
-];
+var EXTERNAL_SHELL = [];
 
 self.addEventListener('install', function(event) {
     event.waitUntil(
@@ -117,21 +116,53 @@ function normalizeCrop(text, table) {
     return '';
 }
 
+function offlineCropClarification(reason) {
+    var messages = {
+        ambiguous: "Mode hors ligne : vous avez indiqué plusieurs cultures. Nommez une seule culture dans votre question : mil, sorgho, maïs, niébé ou arachide.",
+        unsupported: "Mode hors ligne : le conseil engrais pour cette culture n'est pas disponible. Choisissez parmi : mil, sorgho, maïs, niébé ou arachide.",
+        missing: "Mode hors ligne : précisez la culture dans votre question : mil, sorgho, maïs, niébé ou arachide."
+    };
+    return offlineJson({
+        answer: messages[reason] || messages.missing,
+        confidence: 'Faible',
+        sources: [],
+        offline: true,
+        clarification_required: true
+    });
+}
+
 function offlineFertilizer(formData) {
     return caches.match('/static/data/fertilizer.json').then(function(response) {
         return response ? response.json() : null;
     }).then(function(table) {
-        var question = String(formData.get('messageText') || '');
-        var crop = normalizeCrop(formData.get('crop'), table) || normalizeCrop(question, table);
-        var isFertilizer = table && (table.keywords || []).some(function(keyword) {
-            return normalizeText(question).indexOf(normalizeText(keyword)) !== -1;
-        });
-        if (!crop || !isFertilizer) {
+        if (!table || !table.crops) {
             return null;
         }
-        var item = table && table.crops && table.crops[crop];
-        if (!item) {
+        var question = String(formData.get('messageText') || '');
+        var isFertilizer = (table.keywords || []).some(function(keyword) {
+            return normalizeText(question).indexOf(normalizeText(keyword)) !== -1;
+        });
+        if (!isFertilizer) {
             return null;
+        }
+        var detected = (table.registry || []).filter(function(item) {
+            return [item.id].concat(item.aliases).some(function(alias) { return containsTerm(question, alias); });
+        });
+        // Multiple or unsupported explicit crops must not inherit a stale selection.
+        if (detected.length > 1) { return offlineCropClarification('ambiguous'); }
+        if (detected.length === 1 && !table.crops[detected[0].id]) {
+            return offlineCropClarification('unsupported');
+        }
+        var crop = detected.length ? detected[0].id : normalizeCrop(question, table);
+        if (!crop && formData.get('prior_question')) { return offlineCropClarification('missing'); }
+        crop = crop || normalizeCrop(formData.get('crop'), table);
+        if (table.review_expires_at && Date.parse(table.review_expires_at) <= Date.now()) { return null; }
+        if (!crop) {
+            return offlineCropClarification('missing');
+        }
+        var item = table.crops[crop];
+        if (!item) {
+            return offlineCropClarification('unsupported');
         }
         var answer = '🌱 Fumure recommandée pour ' + item.label + ' au Burkina Faso :\n' +
             item.lines.map(function(line) { return '• ' + line; }).join('\n') + '\n\n' + table.disclaimer;
@@ -141,6 +172,8 @@ function offlineFertilizer(formData) {
             confidence: 'Fort',
             audio_url: '',
             offline: true,
+            saved_at: table.updated_at,
+            evidence_status: 'Référence précise à confirmer avec un agent agricole.',
             case: {
                 case_title: 'Conseil engrais',
                 input_type: 'fertilizer',
@@ -167,33 +200,60 @@ function shouldCacheFirst(url) {
     return SHELL.indexOf(url.pathname) !== -1;
 }
 
-function networkFirstAsk(request) {
-    return request.clone().formData().then(function(formData) {
-        var key = new Request(answerKey(formData));
-        return fetch(request.clone()).then(function(response) {
-            if (response.ok) {
-                caches.open(ANSWER_CACHE).then(function(cache) { cache.put(key, response.clone()); });
+async function networkFirstAsk(request) {
+    var formData = await request.clone().formData();
+    var key = new Request(answerKey(formData));
+    var cache = await caches.open(ANSWER_CACHE);
+    try {
+        var response = await fetch(request.clone());
+        if (response.ok && response.headers.get('X-DakiKobo-Cacheable') === '1' && response.headers.get('X-DakiKobo-Corpus')) {
+            // Await the write so the worker lifetime includes durable persistence.
+            try {
+                var corpus = response.headers.get('X-DakiKobo-Corpus');
+                var marker = await cache.match('/__corpus__');
+                if (marker && (await marker.text()) !== corpus) {
+                    await caches.delete(ANSWER_CACHE);
+                    cache = await caches.open(ANSWER_CACHE);
+                }
+                await cache.put('/__corpus__', new Response(corpus));
+                await cache.put(key, response.clone());
+                var keys = await cache.keys();
+                while (keys.length > ANSWER_LIMIT + 1) {
+                    var oldest = keys.shift();
+                    if (new URL(oldest.url).pathname !== '/__corpus__') { await cache.delete(oldest); }
+                }
+            } catch (_) { /* Storage full/private mode must not discard the online answer. */ }
+        }
+        return response;
+    } catch (_) {
+        var cached = await cache.match(key);
+        if (cached) {
+            var saved = Number(cached.headers.get('X-DakiKobo-Saved-At')) * 1000;
+            var age = Date.now() - saved;
+            var marker = await cache.match('/__corpus__');
+            if (saved && age >= 0 && age < ANSWER_MAX_AGE_MS && marker &&
+                (await marker.text()) === cached.headers.get('X-DakiKobo-Corpus')) {
+                var payload = await cached.json();
+                payload.offline = true;
+                payload.saved_at = new Date(saved).toISOString();
+                return offlineJson(payload);
             }
-            return response;
-        }).catch(function() {
-            return caches.open(ANSWER_CACHE).then(function(cache) { return cache.match(key); })
-                .then(function(cached) {
-                    if (cached) {
-                        return cached.json().then(function(payload) { return offlineJson(payload); });
-                    }
-                    return offlineFertilizer(formData);
-                })
-                .then(function(fallback) {
-                    return fallback || offlineJson({
-                        answer: "Mode hors ligne : cette question n'est pas encore enregistrée. Reconnectez-vous pour obtenir une réponse sourcée.",
-                        confidence: 'Faible',
-                        sources: [],
-                        offline: true
-                    }, 503);
-                });
-        });
-    });
+        }
+        var fallback = await offlineFertilizer(formData);
+        return fallback || offlineJson({
+            answer: "Mode hors ligne : ce conseil est absent ou trop ancien. Reconnectez-vous pour une réponse sourcée à jour.",
+            confidence: 'Faible', sources: [], offline: true
+        }, 503);
+    }
 }
+
+self.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'CLEAR_SAVED_ANSWERS') {
+        event.waitUntil(caches.delete(ANSWER_CACHE).then(function() {
+            if (event.ports && event.ports[0]) { event.ports[0].postMessage({ ok: true }); }
+        }));
+    }
+});
 
 self.addEventListener('fetch', function(event) {
     var url = new URL(event.request.url);
@@ -212,6 +272,7 @@ self.addEventListener('fetch', function(event) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         normalizeCrop: normalizeCrop,
+        networkFirstAsk: networkFirstAsk,
         offlineFertilizer: offlineFertilizer,
         shouldCacheFirst: shouldCacheFirst
     };

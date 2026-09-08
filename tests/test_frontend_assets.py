@@ -123,7 +123,7 @@ def test_field_context_local_storage_is_wired():
     assert "case-lead" in js
     assert "function cleanDisplayText" in render_js
     assert "function renderCompactSources" in js
-    assert "À faire" in js
+    assert "Ce que vous pouvez faire maintenant" in js
     assert "case-weather-line" in js
     assert "diagnostic-case-compact" in js
     assert ".case-lead" in css
@@ -156,9 +156,17 @@ def test_text_field_context_panel_is_wired():
     assert "location: getFieldLocationValue()" in js
     assert "Météo" in js
     assert "weather_signals" in js
-    assert "<code>/ops</code>" in html
+    assert "<code>/ops</code>" not in html
     # Field context appears before the chat panel in the field workflow layout.
     assert html.find('id="fieldContextPanel"') < html.find('id="chatPanel"')
+
+
+def test_simple_french_does_not_replace_collapsed_context_label():
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    update = js.split("function updateFieldContextToggleLabel", 1)[1].split(
+        "function setExamplesOpen", 1
+    )[0]
+    assert "ctx.simple_french = false" in update
 
 
 def test_phase_zero_frontend_regressions_are_fixed():
@@ -172,7 +180,8 @@ def test_phase_zero_frontend_regressions_are_fixed():
 
     type_body = render_js.split("function typeMessage", 1)[1].split("return {", 1)[0]
     assert ".html(" not in type_body
-    assert "element.text(rendered)" in type_body
+    assert "element.text(" in type_body
+    assert "setInterval" not in type_body
 
     assert "function uploadImageForScreening(file, crop, growthStage, location, simpleFrench, question)" in api_js
     assert 'context.question || "Photo maladie"' in index_js

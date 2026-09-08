@@ -23,7 +23,7 @@ def test_export_feedback_eval_writes_csv(tmp_path):
     )
     fid = record_feedback(
         str(db),
-        rating="up",
+        rating="up", research_consent=True,
         question="Q",
         answer="A",
         before_image_ref=str(tmp_path / "missing_before.jpg"),
@@ -59,7 +59,7 @@ def test_export_feedback_eval_writes_csv(tmp_path):
 def test_export_feedback_eval_jsonl(tmp_path):
     db = tmp_path / "case_log.sqlite3"
     out = tmp_path / "out.jsonl"
-    record_feedback(str(db), rating="down", question="Quand semer le mil ?", answer="A")
+    record_feedback(str(db), research_consent=True, rating="down", question="Quand semer le mil ?", answer="A")
     code = main(["--db", str(db), "--output", str(out), "--format", "jsonl"])
     assert code == 0
     lines = [line for line in out.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -72,11 +72,11 @@ def test_load_feedback_eval_cases_from_export(tmp_path):
     out = tmp_path / "out.csv"
     record_feedback(
         str(db),
-        rating="up",
+        rating="up", research_consent=True,
         question="Comment stocker le niébé ?",
         answer="Réponse test",
     )
-    record_feedback(str(db), rating="up", question="x", answer="too short question skip")
+    record_feedback(str(db), research_consent=True, rating="up", question="x", answer="too short question skip")
     assert main(["--db", str(db), "--output", str(out), "--no-privacy-note"]) == 0
     cases = load_feedback_eval_cases(str(out), limit=5)
     assert len(cases) == 1

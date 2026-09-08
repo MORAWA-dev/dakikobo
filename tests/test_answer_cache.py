@@ -86,7 +86,7 @@ def test_ask_cache_hit_skips_router_rag_weather_and_tts(monkeypatch, tmp_path):
         20,
         db_path=str(tmp_path / "route-metrics.sqlite3"),
     )
-    key = build_answer_cache_key(
+    key = "farmer-v1:" + build_answer_cache_key(
         resolved.retrieval_query,
         crop_id=resolved.crop_id,
         growth_stage=resolved.growth_stage,
@@ -210,7 +210,7 @@ def test_repeat_rag_question_is_stored_then_served_without_groq(monkeypatch, tmp
     feedback = client.post(
         "/feedback",
         data={
-            "rating": "up",
+            "rating": "up", "consent": "1",
             "question": normalized_variant.strip(),
             "answer": second.get_json()["answer"],
             "answer_path": "cache",

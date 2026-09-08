@@ -38,10 +38,14 @@ SRC_RSTB_LEG = {
     "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate.",
 }
 
+for _source in (SRC_IJBCS, SRC_RSTB_MAIS, SRC_RSTB_LEG):
+    _source["review_status"] = "Référence précise en attente de vérification agronomique"
+
 DISCLAIMER = (
     "⚠️ Ce sont des recommandations générales issues de la recherche (INERA). "
     "Confirmez toujours avec votre agent agricole : la bonne dose dépend de votre "
-    "sol, de la pluie et de vos moyens."
+    "sol, de la pluie et de vos moyens. Les références détaillées des doses restent "
+    "à vérifier : ces repères ne sont pas une prescription pour votre parcelle."
 )
 
 # Canonical crop id -> grounded recommendation text + sources.
@@ -59,8 +63,8 @@ _RECOMMENDATIONS = {
         "lines": [
             "Dose vulgarisée : 100 kg/ha de NPK (14-23-14) au semis + 50 kg/ha "
             "d'urée (46 %) à la montaison.",
-            "Microdose (plus économique) : 3 g de NPK par poquet (~62,5 kg/ha) au "
-            "semis + 1,5 g d'urée par poquet (~46,88 kg/ha) à la montaison.",
+            "Microdose du mil : chiffres temporairement retirés, car les équivalences "
+            "par poquet et par hectare doivent être vérifiées avec un agronome.",
         ],
         "sources": [SRC_IJBCS],
     },
@@ -126,7 +130,10 @@ def build_offline_fertilizer_payload() -> dict:
     doses, sources, aliases, labels, and intent keywords.
     """
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "updated_at": "2026-09-06T00:00:00Z",
+        "review_expires_at": "2026-12-05T00:00:00Z",
+        "registry": [{"id": crop.id, "aliases": list(crop.aliases)} for crop in CROPS.values()],
         "disclaimer": DISCLAIMER,
         "keywords": list(_FERTILIZER_KEYWORDS),
         "crops": {

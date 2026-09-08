@@ -21,18 +21,18 @@ After every major step (or end of a 60–90 min session), **append** a new dated
 
 ## Project anchors (stable)
 
-| Item | Value |
-|------|--------|
-| App | French field advisor for Burkina Faso (Flask + RAG) |
-| Live Space | https://kimcomehome-dakikobo.hf.space/ |
-| HF Space repo | https://huggingface.co/spaces/kimcomehome/dakikobo |
-| GitHub | `origin/main` (primary history) |
-| HF deploy | Separate history via worktree + rsync; commit message `Deploy GitHub main <sha> to Space` |
-| Entry | `app.py` |
-| Product rules | French UI; no invented fertilizer doses; cautious/source-grounded; secrets in `.env` only |
-| Offline tests | `.venv/bin/pytest -q tests/test_disease.py tests/test_fertilizer.py tests/test_ingestion.py tests/test_router.py` (+ route/eval tests as needed) |
-| Live smoke | `.venv/bin/python scripts/evaluate_rag.py --strict --min-pass-rate 0.75` |
-| Longer roadmap | `TODO.md`, `PROJECT_STATE.md`, `Agents.md` |
+| Item           | Value                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App            | French field advisor for Burkina Faso (Flask + RAG)                                                                                              |
+| Live Space     | https://kimcomehome-dakikobo.hf.space/                                                                                                           |
+| HF Space repo  | https://huggingface.co/spaces/kimcomehome/dakikobo                                                                                               |
+| GitHub         | `origin/main` (primary history)                                                                                                                  |
+| HF deploy      | Separate history via worktree + rsync; commit message `Deploy GitHub main <sha> to Space`                                                        |
+| Entry          | `app.py`                                                                                                                                         |
+| Product rules  | French UI; no invented fertilizer doses; cautious/source-grounded; secrets in `.env` only                                                        |
+| Offline tests  | `.venv/bin/pytest -q tests/test_disease.py tests/test_fertilizer.py tests/test_ingestion.py tests/test_router.py` (+ route/eval tests as needed) |
+| Live smoke     | `.venv/bin/python scripts/evaluate_rag.py --strict --min-pass-rate 0.75`                                                                         |
+| Longer roadmap | `TODO.md`, `PROJECT_STATE.md`, `Agents.md`                                                                                                       |
 
 ### HF deploy recipe (worktree; do not rsync-delete `.git` file)
 
@@ -507,19 +507,24 @@ cd - && git worktree remove "$WT" --force
 ### YYYY-MM-DD — short title
 
 **Decided**
+
 - …
 
 **Files changed**
+
 - `path` — why
 
 **Git / deploy**
+
 - GitHub: `sha`
 - HF: `sha` (eval result if run)
 
 **Still open**
+
 - …
 
 **Next action for the following session**
+
 - …
 ```
 
@@ -750,3 +755,136 @@ cd - && git worktree remove "$WT" --force
 - GitHub audited code: `571d182876c0cb8ff93f8c21f961c2ed00bbb82e`.
 - Hugging Face Space: `f2ef78280d493e2f08bfd8054b4252324d7301cd`.
 - No implementation phases or confirmed audit issues remain.
+
+---
+
+### 2026-09-06 — New farmer-focused assessment and plan (review only)
+
+**Scope and decision**
+
+- Owner requested a fresh project assessment and a new Markdown plan before any implementation.
+- Added `plans/FARMER_IMPROVEMENT_PLAN_2026-09-06.md` as a draft for owner review; previous Phase 0–5 plan remains historical.
+- No application code, configuration, corpus, dependencies or deployment changed. Pre-existing untracked `.agents/`, `.gitattributes` and `skills-lock.json` left untouched.
+
+**Findings**
+
+- Prioritized journal ownership, online/offline crop parity, cached-advice freshness, conversation reset, ingestion eligibility, exact fertilizer provenance and stronger semantic evaluation.
+- Reproduced offline mismatch: selected sorgho plus a question explicitly asking for maize fertilizer returns sorgho.
+- Proposed simpler farmer task entry, accessible concise answers, durable private follow-up and a farmer/extension-agent pilot, with dependencies and acceptance gates.
+
+**Verification**
+
+- Current offline Python suite: **275 passed**, one existing PyPDF2 deprecation warning, 93.11 seconds.
+- Current JavaScript suite: **6 passed** using the bundled Node runtime.
+- Public health probe failed DNS resolution in this environment; no current production availability or live model-quality claim made.
+- No new agronomist review, real-phone usability study or visual browser audit performed.
+
+**Next action**
+
+- Wait for owner review and explicit authorization of the new plan or a selected phase before implementation.
+
+---
+
+### 2026-09-07 — Farmer-safety implementation resumed and locally verified
+
+**Decided**
+
+- Continued the owner-authorized September 6 improvement work already present in the interrupted
+  worktree; preserved all prior changes and made only a targeted offline-install resilience fix.
+- Treat the implementation as a local engineering baseline, not field validation or deployment.
+- Keep release blocked until expert source/dose review, real-phone checks, the farmer/extension-agent
+  pilot, production persistence confirmation, and live RAG evaluation after the stricter source rebuild.
+
+**Implemented**
+
+- Journal schema v5: anonymous browser ownership, explicit consent, 90-day retention, idempotence,
+  owned read/outcome/delete operations, re-encoded follow-up photos, and research-export consent.
+- Offline/cache safety: crop precedence parity, ambiguous/unsupported refusal, 24-hour and corpus
+  invalidation, dynamic-answer exclusion, clear-chat memory reset, and graceful missing-table refusal.
+- Evidence/product baseline: fail-closed source eligibility, no startup web ingestion, source audit,
+  restricted fertilizer provenance claims, stronger mandatory evaluation contracts, 60-case draft
+  scorecard, farmer task starters, default simple French, immediate rendering, transcript review,
+  image resizing, local jQuery, shared budgets, and complete PR gates.
+- Updated `.env.example`, `README.md`, `IMPLEMENTATION_PLAN.md`, and the September 6 plan to match the
+  implemented configuration and remaining external gates.
+
+**Verification**
+
+- Offline Python suite: **288 passed**, one existing PyPDF2 deprecation warning.
+- JavaScript suite: **12 passed** with the bundled Node runtime.
+- Python compilation, `git diff --check`, generated fertilizer/source-audit stability: passed.
+- Blank human scorecard correctly failed; no evaluation result was fabricated.
+- Isolated local runtime: `/healthz`, `/version`, `/sw.js`, journal session, save, and owned read passed;
+  schema v5 and root service-worker headers were reported correctly.
+
+**Next action**
+
+- Review the worktree, then commit if desired. Do not deploy until the blocked evidence and live
+  post-rebuild checks above are deliberately accepted or completed.
+
+---
+
+### 2026-09-07 — Offline crop clarification completed
+
+**Decided**
+
+- Continued the next safe code-only gap from the farmer improvement plan while leaving agronomist-only
+  source promotion and fertilizer provenance decisions untouched.
+- Treat ambiguous, unsupported, and unresolved fertilizer crop context as a clarification request,
+  not as permission to reuse a stale selected crop and not as a generic connectivity failure.
+
+**Implemented**
+
+- `static/sw.js` now returns explicit French offline clarification responses for multiple named crops,
+  recognized unsupported crops, and fertilizer follow-ups whose crop cannot be resolved safely.
+- Clarification responses contain no fertilizer case or dose. Missing offline data and non-fertilizer
+  requests still fall through to the existing honest generic reconnect response.
+- Updated the existing service-worker tests in `tests/js/frontend.test.js` to cover these responses and
+  preserve explicit-current-question precedence over an old selected crop.
+
+**Verification**
+
+- Static inspection confirmed all three clarification branches return `clarification_required: true`,
+  no `case`, and no numeric guidance; supported explicit crops still select the current question crop.
+- The IDE command runner hung before producing test output for both the JavaScript suite and targeted
+  Python checks, including retries with absolute Node and Python paths. Automated pass counts are
+  therefore not claimed in this entry. Run the commands below in a normal terminal before commit:
+  `/Users/albarka/.nvm/versions/node/v24.20.0/bin/node --test tests/js/frontend.test.js` and
+  `.venv/bin/python -m pytest -q tests/test_frontend_assets.py tests/test_answer_cache.py`.
+
+**Next action**
+
+- Review and commit the accumulated worktree if the local commands pass. Keep deployment blocked on
+  agronomist provenance review, approved corpus inventory, post-rebuild live RAG checks, production
+  persistence checks, and the real-phone farmer pilot.
+
+---
+
+### 2026-09-07 — Farmer improvement validation completed
+
+**Validated**
+
+- Targeted frontend/cache Python checks: **21 passed** in 3.80 seconds, with the existing PyPDF2
+  deprecation warning.
+- Service-worker-focused JavaScript checks: **9 passed**; complete JavaScript suite: **13 passed** in
+  1.84 seconds.
+- Full offline Python suite: **289 passed** in 9.35 seconds, with the existing PyPDF2 deprecation
+  warning.
+- Live synthetic RAG smoke: **1 passed** in 17.49 seconds. It used the test's synthetic crop documents
+  and did not rebuild or validate the project corpus. One upstream LangChain/Pydantic deprecation
+  warning was reported.
+- `scripts/export_offline_fertilizer.py` and `scripts/audit_source_eligibility.py` reproduced their
+  current outputs byte-for-byte. Python compilation and `git diff --check` passed.
+- The earlier apparent command hangs were a Kiro interactive-PTY completion-detection issue. Managed
+  execution confirmed that Node and pytest exited normally; no test-harness correction was needed.
+
+**Status**
+
+- The safe local engineering validation gate is complete. No commit or deployment was performed.
+- Deployment/pilot readiness is still blocked by work that cannot be truthfully automated here:
+  agronomist approval of exact fertilizer provenance and intended corpus sources, approved benchmark
+  expectations, production secret/database/image persistence checks, real-phone accessibility and
+  offline-update checks, participant comprehension sessions, and a post-approval corpus rebuild plus
+  live deployed RAG evaluation.
+- The current fail-closed source inventory remains intentionally narrow. Do not self-promote sources or
+  rebuild/deploy it merely to increase coverage before the documented expert review.

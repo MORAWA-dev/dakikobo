@@ -85,16 +85,24 @@ $(function() {
         });
     }
 
-    function renderAudioReplay(bubble, audioUrl) {
-        if (!audioUrl) {
+    function renderAudioReplay(bubble, audioUrl, text) {
+        if (!audioUrl && !(window.speechSynthesis && text)) {
             return;
         }
         var $actions = $('<div class="audio-actions"></div>');
         var $button = $('<button type="button" class="audio-replay" aria-label="Réécouter la réponse" title="Réécouter la réponse"></button>');
         $button.append($('<i class="fas fa-volume-up" aria-hidden="true"></i>'));
-        $button.append($('<span></span>').text('Réécouter'));
+        $button.append($('<span></span>').text('Écouter / arrêter'));
         $button.on('click', function() {
-            playAudio(audioUrl);
+            if (currentAudio && !currentAudio.paused) { currentAudio.pause(); return; }
+            if (window.speechSynthesis && window.speechSynthesis.speaking) { stopCurrentAudio(); return; }
+            if (audioUrl) { playAudio(audioUrl); }
+            else {
+                stopCurrentAudio();
+                var utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fr-FR';
+                window.speechSynthesis.speak(utterance);
+            }
         });
         $actions.append($button);
         bubble.append($actions);
@@ -121,7 +129,7 @@ $(function() {
             typeMessage(message, bubble, 15, function() {
                 renderConfidence(bubble, confidence);
                 renderSources(bubble, sources);
-                renderAudioReplay(bubble, audioUrl);
+                renderAudioReplay(bubble, audioUrl, message);
                 if (question) {
                     renderFeedback(bubble, question, message, journal);
                 }
@@ -305,9 +313,9 @@ $(function() {
                 renderCaseSection($case, 'Problèmes possibles', caseData.possible_causes, 2);
             }
             // Text advice: actions first; optional single "Pourquoi" only if clean.
-            renderCaseSection($case, 'À faire', caseData.actions, 3);
+            renderCaseSection($case, 'Ce que vous pouvez faire maintenant', caseData.actions, 3);
             if (!isImage) {
-                renderCaseSection($case, 'Pourquoi', caseData.evidence, 1);
+                renderCaseSection($case, 'Ce qu’il faut vérifier', caseData.evidence, 1);
             }
             renderCaseSection($case, 'À éviter', caseData.do_not, 1);
 
@@ -335,7 +343,7 @@ $(function() {
                 ? caseData.sources
                 : sources
         );
-        renderAudioReplay(bubble, audioUrl);
+        renderAudioReplay(bubble, audioUrl, answerText);
         if (question) {
             renderFeedback(bubble, question, answerText, journal);
         }
@@ -622,7 +630,8 @@ $(function() {
             var speechResult = event.results[0][0].transcript;
             $('#messageText').val(speechResult);
             setVoiceRecording(false);
-            submitMessage();
+            $('#messageText').focus();
+            $('#inputHint').text('Vérifiez la dictée, puis appuyez sur Envoyer.');
         };
 
         recognition.onerror = function(event) {
@@ -674,7 +683,8 @@ $(function() {
                 $('#messageText').val(transcript);
                 isProcessing = false;
                 enableInput();
-                submitMessage();
+                $('#messageText').focus();
+                $('#inputHint').text('Vérifiez la dictée, puis appuyez sur Envoyer.');
             },
             error: function(jqXHR) {
                 removeTypingIndicator();
@@ -779,6 +789,7 @@ $(function() {
     });
 
     function disableInput() {
+        $('#chatbot-form-btn-clear, .farmer-task').prop('disabled', true);
         $('#messageText').prop('disabled', true);
         $('#chatbot-form-btn').prop('disabled', true);
         $('#chatbot-form-btn-voice').prop('disabled', true);
@@ -793,6 +804,7 @@ $(function() {
     }
 
     function enableInput() {
+        $('#chatbot-form-btn-clear, .farmer-task').prop('disabled', false);
         $('#messageText').prop('disabled', false);
         $('#chatbot-form-btn').prop('disabled', false);
         $('#chatbot-form-btn-voice').prop('disabled', false);
@@ -977,6 +989,7 @@ $(function() {
     function populateRegistrySelects(crops, places) {
         if (crops.length && $('#fieldCrop').length) {
             var $crop = $('#fieldCrop');
+            var selectedCrop = $crop.val() || '';
             var $blank = $crop.find('option[value=""]').detach();
             var $autre = $crop.find('option[value="autre"]').detach();
             $crop.empty();
@@ -985,6 +998,7 @@ $(function() {
                 $crop.append($('<option>', { value: crop.id, text: crop.label_fr }));
             });
             if ($autre.length) { $crop.append($autre); }
+            $crop.val(selectedCrop);
             // Re-apply cached labels in case /crop-labels resolved first.
             if (_cropLabelCache && _cropLabelCache.length) {
                 applyCropLabels(_cropLabelCache);
@@ -1126,6 +1140,9 @@ $(function() {
             return;
         }
         var ctx = getFieldContext();
+        // Simple French is a separate, always-visible control. Do not make the
+        // collapsed field-context button look like it controls that setting.
+        ctx.simple_french = false;
         var summary = fieldContextLabel(ctx);
         if (summary) {
             $label.text(summary.length > 42 ? summary.slice(0, 40) + '…' : summary);
@@ -1501,10 +1518,52 @@ $(function() {
             // Registry labels remain the default when this optional glossary fails.
         });
 
-    var welcomeMessage = "🌾 Bienvenue. Écrivez votre question ci-dessous, ou utilisez 📷 pour une feuille. Ouvrez « Contexte parcelle » ou « Exemples » seulement si besoin. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
+        $('.farmer-task').on('click', function() {
+            $('#messageText').val($(this).attr('data-question')).focus();
+            $('#inputHint').text('Précisez la culture et votre question, puis envoyez.');
+        });
+        function showJournal() {
+            var $panel = $('#journalPanel').prop('hidden', false);
+            $('#journalClose').focus();
+            $panel.find('.journal-content').text('Chargement de vos conseils…');
+            DakiKoboApi.loadJournal().then(function(payload) {
+                var $content = $panel.find('.journal-content').empty();
+                if (!payload.cases.length) { $content.text('Aucun conseil enregistré sur ce navigateur.'); }
+                payload.cases.forEach(function(item) {
+                    var $item = $('<article class="journal-entry"></article>');
+                    $item.append($('<h3></h3>').text(item.question));
+                    $item.append($('<p></p>').text('Enregistré le ' + new Date(item.created_at).toLocaleDateString('fr-FR') + '. Conseil historique : vérifiez les conditions actuelles.'));
+                    $item.append($('<p class="journal-answer"></p>').text(item.answer));
+                    if (item.outcome) { $item.append($('<p></p>').text('Suivi enregistré.')); }
+                    else {
+                        if (item.follow_up_due_at * 1000 <= Date.now()) { $item.append($('<p></p>').text('C’est le moment de noter le résultat.')); }
+                        DakiKoboRender.create($, DakiKoboApi).renderFollowupPrompt($item, item.feedback_id);
+                    }
+                    $('<button type="button">Supprimer ce conseil</button>').on('click', function() {
+                        if (!window.confirm('Supprimer ce conseil et ses photos de votre journal ?')) { return; }
+                        DakiKoboApi.deleteJournal(item.feedback_id).then(showJournal).catch(function() { $('#journalStatus').text('Suppression impossible. Réessayez avec une connexion.'); });
+                    }).appendTo($item);
+                    $content.append($item);
+                });
+            }).catch(function() { $panel.find('.journal-content').text('Le journal privé demande une connexion. Vos réponses récentes restent disponibles hors ligne en reposant la même question.'); });
+        }
+        $('#journalToggle').on('click', showJournal);
+        $('#journalClose').on('click', function() { $('#journalPanel').prop('hidden', true); $('#journalToggle').focus(); });
+        $('#clearDeviceData').on('click', function() {
+            if (!window.confirm('Effacer les réponses et préférences enregistrées sur cet appareil ? Le journal privé sur le serveur reste disponible.')) { return; }
+            DakiKoboApi.clearDeviceData().then(function() { window.location.reload(); }).catch(function() { $('#journalStatus').text('Impossible d’effacer les données locales. Réessayez.'); });
+        });
+        $('#deleteJournal').on('click', function() {
+            if (!window.confirm('Supprimer tous vos conseils et leurs photos du serveur ?')) { return; }
+            DakiKoboApi.deleteJournal().then(showJournal).catch(function() { $('#journalStatus').text('Suppression impossible. Reconnectez-vous.'); });
+        });
+        var welcomeMessage = "🌾 Bienvenue. Écrivez votre question ci-dessous, ou utilisez 📷 pour une feuille. Ouvrez « Contexte parcelle » ou « Exemples » seulement si besoin. Conseils prudents, sourcés, à confirmer avec un agent agricole.";
 
     $('#chatbot-form-btn-clear').click(function(e) {
         e.preventDefault();
+        if (isProcessing || isRecordingVoice) { return; }
+        lastUserQuestion = '';
+        stopCurrentAudio();
         $('.chat-messages').empty();
         appendMessage(welcomeMessage, false);
     });
@@ -1542,7 +1601,10 @@ $(function() {
     window.addEventListener('dakikobo:offline-fallback', function() { setOfflineBanner(true); });
 
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(error) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function() {
+            return navigator.serviceWorker.ready;
+        }).then(function() { $('#offlineReady').text('Application préparée pour une utilisation hors ligne.'); }).catch(function(error) {
+            $('#offlineReady').text('Préparation hors ligne indisponible. Réessayez avec une connexion.');
             console.warn("Le mode hors ligne n'a pas pu être activé.", error);
         });
     }

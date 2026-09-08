@@ -102,7 +102,7 @@ def _row_dict(row: dict) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
-    rows = list_feedback_with_evidence(args.db)
+    rows = [row for row in list_feedback_with_evidence(args.db) if row.get("research_consent")]
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
 

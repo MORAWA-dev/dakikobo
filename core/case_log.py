@@ -12,7 +12,7 @@ from config import FOLLOW_UP_DELAY_DAYS
 from core.cache import sqlite_connection
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _CASE_LOG_INITIALIZED = False
 _CASE_LOG_INITIALIZED_PATH = ""
 _CASE_LOG_INIT_LOCK = Lock()
@@ -140,6 +140,11 @@ def init_case_log(db_path: str) -> None:
             _migrate_to_v2(conn)
             _migrate_to_v3(conn)
             _migrate_to_v4(conn)
+            for column, kind in {"owner_hash": "TEXT", "expires_at": "REAL", "research_consent": "INTEGER NOT NULL DEFAULT 0", "request_id": "TEXT"}.items():
+                if not _column_exists(conn, "feedback_events", column):
+                    conn.execute(f"ALTER TABLE feedback_events ADD COLUMN {column} {kind}")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_feedback_owner ON feedback_events(owner_hash, expires_at)")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_request ON feedback_events(owner_hash, request_id)")
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         _CASE_LOG_INITIALIZED = True
         _CASE_LOG_INITIALIZED_PATH = normalized_path
@@ -159,6 +164,10 @@ def record_feedback(
     follow_up_due_at: float | None = None,
     question_hash_value: str = "",
     ledger_created_at: float | None = None,
+    owner_hash: str | None = None,
+    expires_at: float | None = None,
+    research_consent: bool = False,
+    request_id: str | None = None,
 ) -> int:
     """Persist one answer rating, link its evidence rows, and return its id."""
     if rating not in {"up", "down"}:
@@ -178,9 +187,10 @@ def record_feedback(
             """
             INSERT INTO feedback_events (
                 created_at, rating, question, answer, before_image_ref,
-                place_id, crop_id, answer_path, follow_up_due_at
+                place_id, crop_id, answer_path, follow_up_due_at,
+                owner_hash, expires_at, research_consent, request_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 created_at or _now_iso(),
@@ -191,7 +201,7 @@ def record_feedback(
                 (place_id or "").strip() or None,
                 (crop_id or "").strip() or None,
                 clean_path or None,
-                due_at,
+                due_at, owner_hash, expires_at, int(research_consent), request_id,
             ),
         )
         feedback_id = int(cursor.lastrowid)
@@ -357,7 +367,7 @@ def list_feedback_events(db_path: str) -> list[dict]:
             """
             SELECT id, created_at, rating, question, answer,
                    outcome, outcome_at, before_image_ref, after_image_ref,
-                   place_id, crop_id, answer_path, follow_up_due_at
+                   place_id, crop_id, answer_path, follow_up_due_at, research_consent
             FROM feedback_events
             ORDER BY id
             """

@@ -952,7 +952,7 @@ def test_rag_ledger_links_to_feedback_in_two_steps(tmp_path, monkeypatch):
     assert all(row["feedback_id"] is None for row in list_evidence(str(case_log)))
 
     feedback_data = {
-        "rating": "up",
+        "rating": "up", "consent": "1",
         "question": "Quand semer le mil ?",
         "answer": payload["answer"],
         **payload["journal"],
@@ -1588,7 +1588,7 @@ def test_feedback_writes_sqlite_case_log(tmp_path, monkeypatch):
 
     response = client.post(
         "/feedback",
-        data={"rating": "up", "question": "Q", "answer": "A"},
+        data={"rating": "up", "consent": "1", "question": "Q", "answer": "A"},
     )
 
     assert response.status_code == 200
@@ -1614,27 +1614,14 @@ def test_feedback_validation_error_is_in_french():
     )
 
 
-def test_journal_due_route_returns_only_due_metadata(tmp_path, monkeypatch):
+def test_journal_due_route_hides_legacy_unowned_metadata(tmp_path, monkeypatch):
     case_log = str(tmp_path / "case_log.sqlite3")
     monkeypatch.setattr(app_module, "CASE_LOG_DB", case_log)
-    record_feedback(
-        case_log,
-        rating="down",
-        question="Question privée",
-        answer="Réponse privée",
-        crop_id="mil",
-        answer_path="rag",
-        follow_up_due_at=1.0,
-    )
-
+    record_feedback(case_log, rating="down", question="Question privée", answer="Réponse privée", follow_up_due_at=1.0)
     response = app_module.app.test_client().get("/journal/due")
-    payload = response.get_json()
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
-    assert payload["count"] == 1
-    assert payload["due"][0]["crop_id"] == "mil"
-    assert "question" not in payload["due"][0]
-    assert "answer" not in payload["due"][0]
+    assert response.get_json()["count"] == 0
 
 
 def test_feedback_outcome_route_updates_row(tmp_path, monkeypatch):
@@ -1644,7 +1631,7 @@ def test_feedback_outcome_route_updates_row(tmp_path, monkeypatch):
 
     fb = client.post(
         "/feedback",
-        data={"rating": "down", "question": "Q", "answer": "A"},
+        data={"rating": "down", "consent": "1", "question": "Q", "answer": "A"},
     )
     feedback_id = fb.get_json()["feedback_id"]
 
@@ -1667,7 +1654,7 @@ def test_feedback_outcome_rejects_invalid_outcome(tmp_path, monkeypatch):
 
     fb = client.post(
         "/feedback",
-        data={"rating": "up", "question": "Q", "answer": "A"},
+        data={"rating": "up", "consent": "1", "question": "Q", "answer": "A"},
     )
     feedback_id = fb.get_json()["feedback_id"]
 
@@ -1704,23 +1691,28 @@ def test_feedback_outcome_stores_after_image(tmp_path, monkeypatch):
 
     created = client.post(
         "/feedback",
-        data={"rating": "up", "question": "Q", "answer": "A"},
+        data={"rating": "up", "consent": "1", "question": "Q", "answer": "A"},
     )
     feedback_id = created.get_json()["feedback_id"]
 
+    import io
+    from PIL import Image
+    photo = io.BytesIO()
+    Image.new("RGB", (20, 20), "green").save(photo, format="PNG")
+    photo.seek(0)
     response = client.post(
         "/feedback/outcome",
         data={
             "feedback_id": str(feedback_id),
             "outcome": "applied_improved",
-            "after_image": (__import__("io").BytesIO(b"fakepng"), "after.jpg"),
+            "after_image": (photo, "after.png"),
         },
         content_type="multipart/form-data",
     )
     payload = response.get_json()
     assert response.status_code == 200
     assert payload["ok"] is True
-    assert payload["after_image_ref"]
+    assert "after_image_ref" not in payload
     rows = list_feedback_events(str(case_log))
     assert rows[0]["after_image_ref"]
     assert Path(rows[0]["after_image_ref"]).is_file()

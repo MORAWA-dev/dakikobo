@@ -1,6 +1,85 @@
 {
-  "schema_version": 1,
-  "disclaimer": "⚠️ Ce sont des recommandations générales issues de la recherche (INERA). Confirmez toujours avec votre agent agricole : la bonne dose dépend de votre sol, de la pluie et de vos moyens.",
+  "schema_version": 2,
+  "updated_at": "2026-09-06T00:00:00Z",
+  "review_expires_at": "2026-12-05T00:00:00Z",
+  "registry": [
+    {
+      "id": "sorgho",
+      "aliases": [
+        "sorgho",
+        "sorghum"
+      ]
+    },
+    {
+      "id": "mil",
+      "aliases": [
+        "mil",
+        "millet",
+        "petit mil"
+      ]
+    },
+    {
+      "id": "mais",
+      "aliases": [
+        "maïs",
+        "mais",
+        "maize"
+      ]
+    },
+    {
+      "id": "niebe",
+      "aliases": [
+        "niébé",
+        "niebe",
+        "cowpea",
+        "haricot"
+      ]
+    },
+    {
+      "id": "arachide",
+      "aliases": [
+        "arachide",
+        "arachides",
+        "groundnut",
+        "cacahuète",
+        "cacahuete"
+      ]
+    },
+    {
+      "id": "soja",
+      "aliases": [
+        "soja",
+        "soya",
+        "soybean"
+      ]
+    },
+    {
+      "id": "coton",
+      "aliases": [
+        "coton"
+      ]
+    },
+    {
+      "id": "riz",
+      "aliases": [
+        "riz"
+      ]
+    },
+    {
+      "id": "sesame",
+      "aliases": [
+        "sésame",
+        "sesame"
+      ]
+    },
+    {
+      "id": "fonio",
+      "aliases": [
+        "fonio"
+      ]
+    }
+  ],
+  "disclaimer": "⚠️ Ce sont des recommandations générales issues de la recherche (INERA). Confirmez toujours avec votre agent agricole : la bonne dose dépend de votre sol, de la pluie et de vos moyens. Les références détaillées des doses restent à vérifier : ces repères ne sont pas une prescription pour votre parcelle.",
   "keywords": [
     "engrais",
     "fumure",
@@ -29,7 +108,8 @@
         {
           "title": "Recherche INERA - microdose Burkina",
           "type": "Outil engrais",
-          "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose."
+          "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose.",
+          "review_status": "Référence précise en attente de vérification agronomique"
         }
       ]
     },
@@ -42,13 +122,14 @@
       ],
       "lines": [
         "Dose vulgarisée : 100 kg/ha de NPK (14-23-14) au semis + 50 kg/ha d'urée (46 %) à la montaison.",
-        "Microdose (plus économique) : 3 g de NPK par poquet (~62,5 kg/ha) au semis + 1,5 g d'urée par poquet (~46,88 kg/ha) à la montaison."
+        "Microdose du mil : chiffres temporairement retirés, car les équivalences par poquet et par hectare doivent être vérifiées avec un agronome."
       ],
       "sources": [
         {
           "title": "Recherche INERA - microdose Burkina",
           "type": "Outil engrais",
-          "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose."
+          "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose.",
+          "review_status": "Référence précise en attente de vérification agronomique"
         }
       ]
     },
@@ -67,7 +148,8 @@
         {
           "title": "Sciences et Techniques du Burkina - maïs",
           "type": "Outil engrais",
-          "snippet": "Dose vulgarisée du maïs: NPK au semis et urée en couverture."
+          "snippet": "Dose vulgarisée du maïs: NPK au semis et urée en couverture.",
+          "review_status": "Référence précise en attente de vérification agronomique"
         }
       ]
     },
@@ -87,12 +169,14 @@
         {
           "title": "Recherche INERA - microdose Burkina",
           "type": "Outil engrais",
-          "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose."
+          "snippet": "Essais sur sorgho, mil et niébé: doses vulgarisées NPK/urée et options microdose.",
+          "review_status": "Référence précise en attente de vérification agronomique"
         },
         {
           "title": "Sciences et Techniques du Burkina - légumineuses",
           "type": "Outil engrais",
-          "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate."
+          "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate.",
+          "review_status": "Référence précise en attente de vérification agronomique"
         }
       ]
     },
@@ -113,7 +197,8 @@
         {
           "title": "Sciences et Techniques du Burkina - légumineuses",
           "type": "Outil engrais",
-          "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate."
+          "snippet": "Fertilisation prudente des légumineuses: faible azote, fumure organique et phosphate.",
+          "review_status": "Référence précise en attente de vérification agronomique"
         }
       ]
     }

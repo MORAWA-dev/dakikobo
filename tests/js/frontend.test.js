@@ -60,7 +60,7 @@ test('uploadImageForScreening conserve ses six arguments', async function() {
         request = { url: url, options: options };
         return new Response(JSON.stringify({ answer: 'ok' }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Corpus':'test-corpus', 'X-DakiKobo-Saved-At':String(Date.now()/1000) }
         });
     };
     try {
@@ -81,7 +81,7 @@ test('uploadImageForScreening conserve ses six arguments', async function() {
     }
 });
 
-function loadServiceWorker(fertilizerTable, fetchImpl) {
+function loadServiceWorker(fertilizerTable, fetchImpl, clock) {
     const handlers = {};
     const buckets = new Map();
     const externalFetches = [];
@@ -94,6 +94,8 @@ function loadServiceWorker(fertilizerTable, fetchImpl) {
             const entries = new Map();
             buckets.set(name, {
                 entries: entries,
+                keys: async function() { return Array.from(entries.keys()).map(function(url) { return new Request(url); }); },
+                delete: async function(request) { return entries.delete(absoluteUrl(request)); },
                 addAll: async function(urls) {
                     urls.forEach(function(url) {
                         entries.set(absoluteUrl(url), new Response('précaché:' + url));
@@ -137,6 +139,7 @@ function loadServiceWorker(fertilizerTable, fetchImpl) {
         return new Response('réseau');
     });
     const context = {
+        Date: clock || Date,
         URL,
         Request: ScopedRequest,
         Response,
@@ -174,7 +177,7 @@ test('le service worker ne met en cache que le shell explicite', function() {
     assert.equal(worker.shouldCacheFirst(new URL('https://dakikobo.test/healthz')), false);
     assert.equal(
         worker.shouldCacheFirst(new URL('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css')),
-        true
+        false
     );
 });
 
@@ -208,7 +211,7 @@ test('installation, navigation et réponses enregistrées fonctionnent sans rés
             }
             return new Response(JSON.stringify({ answer: 'Réponse sourcée enregistrée', sources: [] }), {
                 status: 200,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json', 'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Corpus':'test-corpus', 'X-DakiKobo-Saved-At':String(Date.now()/1000) }
             });
         }
         return new Response('ressource externe');
@@ -217,7 +220,7 @@ test('installation, navigation et réponses enregistrées fonctionnent sans rés
     let installPromise;
     runtime.handlers.install({ waitUntil: function(promise) { installPromise = promise; } });
     await installPromise;
-    const shell = runtime.buckets.get('dakikobo-phase5-v2-shell');
+    const shell = Array.from(runtime.buckets.entries()).find(function(entry) { return entry[0].endsWith('-shell'); })[1];
     assert.ok(shell.entries.has('https://dakikobo.test/'));
     assert.ok(shell.entries.has('https://dakikobo.test/registry'));
     assert.ok(shell.entries.has('https://dakikobo.test/static/data/fertilizer.json'));
@@ -259,4 +262,95 @@ test('installation, navigation et réponses enregistrées fonctionnent sans rés
         respondWith: function() { journalIntercepted = true; }
     });
     assert.equal(journalIntercepted, false);
+});
+
+test('la culture explicite prime sur une ancienne sélection hors ligne', async function() {
+    const { worker } = loadServiceWorker(require('../../static/data/fertilizer.json'));
+    const form = new FormData();
+    form.set('crop', 'sorgho');
+    form.set('messageText', 'Quel engrais pour le maïs ?');
+    assert.equal((await (await worker.offlineFertilizer(form)).json()).case.crop, 'maïs');
+});
+
+test('hors ligne demande une clarification pour une culture ambiguë ou non prise en charge', async function() {
+    const { worker } = loadServiceWorker(require('../../static/data/fertilizer.json'));
+    const cases = [
+        ['Engrais pour le soja ?', /pas disponible/],
+        ['Engrais pour le mil et le maïs ?', /plusieurs cultures/]
+    ];
+    for (const [question, expected] of cases) {
+        const form = new FormData(); form.set('crop','sorgho'); form.set('messageText',question);
+        const response = await worker.offlineFertilizer(form);
+        const payload = await response.json();
+        assert.equal(response.status, 200);
+        assert.equal(payload.clarification_required, true);
+        assert.match(payload.answer, expected);
+        assert.equal(payload.case, undefined);
+    }
+});
+
+test("hors ligne demande la culture d'un suivi sans contexte sûr", async function() {
+    const { worker } = loadServiceWorker(require('../../static/data/fertilizer.json'));
+    const form = new FormData();
+    form.set('crop', 'sorgho');
+    form.set('prior_question', 'Quel engrais pour le maïs ?');
+    form.set('messageText', 'Quel engrais utiliser ?');
+    const payload = await (await worker.offlineFertilizer(form)).json();
+    assert.equal(payload.clarification_required, true);
+    assert.match(payload.answer, /précisez la culture/);
+    assert.equal(payload.case, undefined);
+});
+
+test("une installation hors ligne incomplète refuse sans planter", async function() {
+    const { worker } = loadServiceWorker(null);
+    const form = new FormData();
+    form.set('crop', 'sorgho');
+    form.set('messageText', 'Quel engrais utiliser ?');
+    assert.equal(await worker.offlineFertilizer(form), null);
+});
+
+test('les réponses expirées et la météo ne sont pas rejouées', async function() {
+    let now = Date.now();
+    let online = true;
+    class Clock extends Date { static now() { return now; } }
+    const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
+        if (!online) { throw new Error('offline'); }
+        return new Response(JSON.stringify({answer:'Ancien conseil météo'}), { headers: {
+            'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Corpus':'v1', 'X-DakiKobo-Saved-At':String(now/1000)
+        }});
+    }, Clock);
+    function request() {
+        const form = new FormData(); form.set('messageText','Quand semer ?');
+        return new runtime.Request('/ask', {method:'POST',body:form});
+    }
+    await runtime.worker.networkFirstAsk(request());
+    online = false; now += 25*3600*1000;
+    assert.equal((await runtime.worker.networkFirstAsk(request())).status, 503);
+});
+
+test('une nouvelle version du corpus invalide les anciennes réponses', async function() {
+    let corpus = 'v1'; let online = true;
+    const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
+        if (!online) { throw new Error('offline'); }
+        return new Response(JSON.stringify({answer:'Conseil'}), {headers:{'X-DakiKobo-Cacheable':'1','X-DakiKobo-Corpus':corpus,'X-DakiKobo-Saved-At':String(Date.now()/1000)}});
+    });
+    function request(text) { const form = new FormData(); form.set('messageText',text); return new runtime.Request('/ask',{method:'POST',body:form}); }
+    await runtime.worker.networkFirstAsk(request('Question un'));
+    corpus = 'v2'; await runtime.worker.networkFirstAsk(request('Question deux'));
+    online = false;
+    assert.equal((await runtime.worker.networkFirstAsk(request('Question un'))).status,503);
+    assert.equal((await runtime.worker.networkFirstAsk(request('Question deux'))).status,200);
+});
+
+test('clearDeviceData conserve les autres applications', async function() {
+    const storage = {dakikobo_field_context_v1:'private', other_app:'keep'};
+    storage.removeItem = function(key) { delete storage[key]; };
+    global.localStorage = storage;
+    const deleted = [];
+    global.caches = {keys:async()=>['dakikobo-v1-answers','dakikobo-v1-shell','other'],delete:async(key)=>deleted.push(key)};
+    await api.clearDeviceData();
+    assert.equal(storage.dakikobo_field_context_v1,undefined);
+    assert.equal(storage.other_app,'keep');
+    assert.deepEqual(deleted,['dakikobo-v1-answers']);
+    delete global.localStorage; delete global.caches;
 });

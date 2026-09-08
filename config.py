@@ -133,7 +133,8 @@ SOIL_TIMEOUT_SECONDS = float(os.getenv("SOIL_TIMEOUT_SECONDS", "18.0"))
 
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
+from core.session_secret import load_session_secret
+SECRET_KEY = load_session_secret(os.getenv("FLASK_SECRET_KEY"), os.path.dirname(STATE_DB_PATH) or ".")
 # Phase 3/4 privacy contract: question hashes are salted with the existing
 # Flask secret rather than stored or hashed unsalted.
 QUESTION_HASH_SALT = SECRET_KEY
@@ -151,3 +152,8 @@ OPS_METRICS_ENABLED = os.getenv("OPS_METRICS_ENABLED", "true").lower() == "true"
 # --- Bot Identity ---
 BOT_NAME = "DakiKobo"
 BOT_CREATOR = "a Geomatics MSc expert"
+
+# Shared resource budgets (no raw client IP retained).
+BUDGET_CLIENT_PER_MINUTE = int(os.getenv("BUDGET_CLIENT_PER_MINUTE", "60"))
+BUDGET_GLOBAL_PER_MINUTE = int(os.getenv("BUDGET_GLOBAL_PER_MINUTE", "120"))
+BUDGET_GLOBAL_PER_DAY = int(os.getenv("BUDGET_GLOBAL_PER_DAY", "2000"))

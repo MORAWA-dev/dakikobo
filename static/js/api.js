@@ -18,6 +18,11 @@
                     error.payload = payload;
                     throw error;
                 }
+                if (payload.offline && payload.saved_at) {
+                    var label = 'Conseil enregistré le ' + new Date(payload.saved_at).toLocaleDateString('fr-FR') + ' — vérifiez les conditions actuelles.';
+                    payload.answer = label + '\n\n' + (payload.answer || '');
+                    if (payload.case) { payload.case.summary = label + ' ' + (payload.case.summary || ''); }
+                }
                 return payload;
             });
         });
@@ -43,8 +48,10 @@
             simple_french: simpleFrench ? '1' : '0',
             question: question || 'Photo maladie'
         });
-        data.append('image', file);
-        return fetchJson('/screen', { method: 'POST', body: data });
+        return prepareImage(file).then(function(image) {
+            data.append('image', image);
+            return fetchJson('/screen', { method: 'POST', body: data });
+        });
     }
 
     function loadWeatherContext(locationId) {
@@ -67,8 +74,49 @@
         return fetchJson('/crop-labels');
     }
 
+    var journalReady;
+    function ensureJournal() {
+        if (!journalReady) {
+            journalReady = fetchJson('/journal/session', { cache: 'no-store' }).catch(function(error) {
+                journalReady = null;
+                throw error;
+            });
+        }
+        return journalReady;
+    }
     function submitFeedback(values) {
-        return fetchJson('/feedback', { method: 'POST', body: formBody(values) });
+        return ensureJournal().then(function() {
+            return fetchJson('/feedback', { method: 'POST', body: formBody(values) });
+        });
+    }
+    function loadJournal() {
+        return ensureJournal().then(function() { return fetchJson('/journal', { cache: 'no-store' }); });
+    }
+    function deleteJournal(id) {
+        return fetchJson('/journal' + (id ? '/' + id : ''), { method: 'DELETE' });
+    }
+    function clearDeviceData() {
+        Object.keys(root.localStorage).forEach(function(key) {
+            if (/^dakikobo/i.test(key)) { root.localStorage.removeItem(key); }
+        });
+        if (!root.caches) { return Promise.resolve(); }
+        return root.caches.keys().then(function(keys) {
+            return Promise.all(keys.filter(function(key) { return /^dakikobo-.*-answers$/.test(key); }).map(function(key) { return root.caches.delete(key); }));
+        });
+    }
+    function prepareImage(file) {
+        if (!root.createImageBitmap || !root.document) { return Promise.resolve(file); }
+        return root.createImageBitmap(file).then(function(bitmap) {
+            var canvas = root.document.createElement('canvas');
+            var scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            bitmap.close();
+            return new Promise(function(resolve) {
+                canvas.toBlob(function(blob) { resolve(blob ? new File([blob], 'feuille.jpg', { type: 'image/jpeg' }) : file); }, 'image/jpeg', 0.85);
+            });
+        }).catch(function() { return file; });
     }
 
     function submitOutcome(feedbackId, outcome, file) {
@@ -81,6 +129,10 @@
 
     var exported = {
         fetchJson: fetchJson,
+        loadJournal: loadJournal,
+        deleteJournal: deleteJournal,
+        clearDeviceData: clearDeviceData,
+        prepareImage: prepareImage,
         loadCropLabels: loadCropLabels,
         loadDemoExample: loadDemoExample,
         loadRegistry: loadRegistry,

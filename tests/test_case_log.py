@@ -48,6 +48,7 @@ def test_record_feedback_creates_sqlite_case_log(tmp_path):
             "crop_id": None,
             "answer_path": None,
             "follow_up_due_at": 123.0,
+            "research_consent": 0,
         }
     ]
 

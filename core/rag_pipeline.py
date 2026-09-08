@@ -1,6 +1,7 @@
 # core/rag_pipeline.py — RAG data ingestion, vector store, and TTS utilities
 
 import os
+from core.source_policy import eligible_source, source_review
 import glob
 import hashlib
 import json
@@ -130,13 +131,13 @@ def list_markdown_files(folder_path: str) -> list[str]:
         f for f in sorted(
             glob.glob(os.path.join(folder_path, "**", "*.md"), recursive=True)
         )
-        if not os.path.basename(f).startswith("_")
+        if not os.path.basename(f).startswith("_") and eligible_source(f)
     ]
 
 
 def list_pdf_files(folder_path: str) -> list[str]:
     """Return PDF files under folder_path."""
-    return sorted(glob.glob(os.path.join(folder_path, "**", "*.pdf"), recursive=True))
+    return [f for f in sorted(glob.glob(os.path.join(folder_path, "**", "*.pdf"), recursive=True)) if eligible_source(f)]
 
 
 def _file_sha256(path: str) -> str:
@@ -282,7 +283,7 @@ def load_pdfs_from_folder(folder_path: str) -> list[Document]:
         text = extract_pdf_text(f)
         if text.strip():
             docs.append(
-                Document(page_content=text, metadata={"source": os.path.basename(f)})
+                Document(page_content=text, metadata={"source": os.path.basename(f), **{k: v for k, v in source_review(f).items() if isinstance(v, (str, int, float, bool))}})
             )
             status = "ok"
         else:
