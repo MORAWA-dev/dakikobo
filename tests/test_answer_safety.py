@@ -27,6 +27,75 @@ from core.answer_safety import (
     with_redaction_notice,
 )
 
+
+def test_reviewed_passive_definitive_diagnoses_are_blocked():
+    for text in (
+        "Votre maïs est atteint de la rouille.",
+        "La rouille est confirmée.",
+    ):
+        review = redact_unsafe_text(text)
+        assert review.blocked is True
+        assert DEFINITIVE_DIAGNOSIS in review.reasons
+
+
+def test_reviewed_negated_agent_referral_uses_fallback():
+    fallback = "Montrez la plante à votre agent agricole pour confirmer."
+    for text in (
+        "Vous n'avez pas besoin de consulter un agent agricole.",
+        "Évitez de consulter un agent agricole.",
+        "Sans consulter un agent agricole.",
+    ):
+        assert safe_confirmation(text, fallback=fallback) == fallback
+
+
+def test_reviewed_seed_and_irrigation_rates_survive_chemical_block_context():
+    context = "L'urée convient. Semez 20 kg/ha. Arrosez avec 20 litres par pied."
+    safe, reasons = filter_safe_items(
+        ["Semez 20 kg/ha.", "Arrosez avec 20 litres par pied."],
+        block_context=context,
+    )
+    assert safe == ["Semez 20 kg/ha.", "Arrosez avec 20 litres par pied."]
+    assert reasons == ()
+
+
+@pytest.mark.parametrize(
+    "dose",
+    [
+        "Appliquez 100 kg/ha.",
+        "Appliquez cent kilogrammes par hectare.",
+        "Utilisez une solution à 2 %.",
+        "Utilisez une solution à deux pour cent.",
+    ],
+)
+def test_reviewed_cross_field_dose_forms_are_blocked(dose):
+    safe, reasons = filter_safe_items(
+        [dose],
+        block_context=f"L'urée est recommandée. {dose}",
+    )
+    assert safe == []
+    assert CHEMICAL_DOSE in reasons
+
+
+def test_pesticide_identity_provides_cross_field_dose_context():
+    for dose in ("Deux pour cent.", "Cent kilogrammes par hectare."):
+        safe, reasons = filter_safe_items(
+            [dose],
+            block_context=f"Le mancozèbe convient. {dose}",
+        )
+        assert safe == []
+        assert CHEMICAL_DOSE in reasons
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Le maïs est infecté par la rouille.",
+        "Les feuilles sont contaminées par le mildiou.",
+    ],
+)
+def test_passive_infection_and_contamination_are_diagnoses(text):
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(text)
+
 _AGENT_FALLBACK = "Montrez la plante à un agent agricole pour confirmer."
 
 

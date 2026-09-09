@@ -161,7 +161,7 @@ def _with_case(answer: str, *, service_status: str = STATUS_OK, **case_kwargs) -
     }
 
 
-def _safe_screening_answer(text: str) -> str:
+def _safe_screening_answer(text: str, *, block_context: str = "") -> str:
     """Strip unsafe model claims and guarantee the mandatory French messages.
 
     A screening answer may not name a treatment product, state a chemical dose,
@@ -169,7 +169,11 @@ def _safe_screening_answer(text: str) -> str:
     is used instead of an empty answer. The non-diagnosis disclaimer and the
     agent-confirmation sentence are appended in both cases.
     """
-    review = redact_unsafe_text(text, check_diagnosis=True)
+    review = redact_unsafe_text(
+        text,
+        check_diagnosis=True,
+        block_context=block_context,
+    )
     body = BLOCKED_ADVICE_ANSWER if review.blocked else review.text
     body = with_redaction_notice(body, review.reasons)
     if not body.strip():
@@ -304,13 +308,30 @@ def screen_leaf_image(
     if structured is not None:
         # An object with no usable field yields the deterministic safe refusal
         # rather than an empty answer or a dump of the raw JSON.
+        structured_context = " ".join(
+            [
+                *structured["observations"],
+                *structured["problemes_possibles"],
+                *structured["actions_immediates"],
+                structured["a_confirmer_par"],
+                structured["reponse_courte"],
+            ]
+        )
         raw_answer = structured["reponse_courte"] or " ".join(
             structured["observations"]
         )
-        observations, obs_reasons = filter_safe_items(structured["observations"])
-        causes, cause_reasons = filter_safe_items(structured["problemes_possibles"])
-        actions, action_reasons = filter_safe_items(structured["actions_immediates"])
-        answer = _safe_screening_answer(raw_answer)
+        observations, obs_reasons = filter_safe_items(
+            structured["observations"], block_context=structured_context
+        )
+        causes, cause_reasons = filter_safe_items(
+            structured["problemes_possibles"], block_context=structured_context
+        )
+        actions, action_reasons = filter_safe_items(
+            structured["actions_immediates"], block_context=structured_context
+        )
+        answer = _safe_screening_answer(
+            raw_answer, block_context=structured_context
+        )
         # A dropped list entry is also a redaction the farmer should be told about.
         answer = with_redaction_notice(
             answer, obs_reasons + cause_reasons + action_reasons
@@ -319,7 +340,9 @@ def screen_leaf_image(
         # fallback if the model made it unsafe, malformed, empty, or if it does
         # not actually send the farmer to an agent who can confirm.
         confirmation = safe_confirmation(
-            structured["a_confirmer_par"], fallback=CONFIRMATION_FALLBACK
+            structured["a_confirmer_par"],
+            fallback=CONFIRMATION_FALLBACK,
+            block_context=structured_context,
         )
         return _with_case(
             answer,

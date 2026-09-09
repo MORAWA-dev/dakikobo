@@ -109,6 +109,35 @@ def test_structured_json_response_builds_case(monkeypatch):
     assert out["case"]["actions"] == payload["actions_immediates"]
 
 
+@__import__("pytest").mark.parametrize(
+    "dose",
+    [
+        "Appliquez 100 kg/ha.",
+        "Appliquez cent kilogrammes par hectare.",
+        "Utilisez une solution à 2 %.",
+    ],
+)
+def test_structured_fields_share_context_when_product_and_dose_are_split(
+    monkeypatch, dose
+):
+    payload = {
+        "observations": ["Le mancozèbe semble indiqué."],
+        "problemes_possibles": ["Stress nutritif possible."],
+        "actions_immediates": [dose],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": "Vous n'avez pas besoin de consulter un agent agricole.",
+        "reponse_courte": "Surveillez la parcelle.",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(__import__("json").dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg")
+
+    assert dose not in out["answer"]
+    assert dose not in " ".join(out["case"]["actions"])
+    assert "mancozèbe" not in __import__("json").dumps(out, ensure_ascii=False).lower()
+    assert out["case"]["confirmation"] == disease.CONFIRMATION_FALLBACK
+
+
 def test_context_is_added_to_gemini_prompt(monkeypatch):
     seen = {}
 

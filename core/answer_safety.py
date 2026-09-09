@@ -352,11 +352,19 @@ _PRODUCT_CLASS_RECOMMENDATION = re.compile(
 # A number + unit that could be read as an application rate. The match includes
 # its denominator so ``par plant`` is classified as rate structure, never as
 # evidence that the numerator measures a benign plant quantity.
-_NUMBER = r"\d+(?:[ \u202f]\d{3})*(?:[.,]\d+)?"
+_NUMBER_WORD = (
+    r"(?:un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|"
+    r"treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|"
+    r"cent|mille)(?:[-\s](?:et[-\s])?(?:un|deux|trois|quatre|cinq|six|sept|"
+    r"huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|"
+    r"quarante|cinquante|soixante|cent|mille))*"
+)
+_NUMBER = rf"(?:\d+(?:[ \u202f]\d{{3}})*(?:[.,]\d+)?|{_NUMBER_WORD})"
 _MEASURE_UNIT = (
     r"(?:tonnes?|t|kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
     r"unites?|sachets?|bouchons?|cuilleres?|capsules?|doses?|cm|metres?)"
 )
+_PERCENTAGE = rf"(?:{_NUMBER}\s*(?:%|pour\s+cent))"
 _RATE_TARGET = r"(?:ha|hectares?|m2|m²|l|litres?|pieds?|plants?|poquets?)"
 _NUTRIENT_SYMBOL = r"(?:n|p2o5|k2o|p|k)"
 _NUTRIENT_RATE_SUFFIX = (
@@ -364,9 +372,10 @@ _NUTRIENT_RATE_SUFFIX = (
     rf"(?:/\s*{_RATE_TARGET}|par\s+{_RATE_TARGET})"
 )
 _QUANTITY = re.compile(
-    rf"\b{_NUMBER}\s*{_MEASURE_UNIT}\b"
+    rf"(?:\b{_NUMBER}\s*{_MEASURE_UNIT}\b"
     rf"(?:{_NUTRIENT_RATE_SUFFIX}|\s*/\s*{_RATE_TARGET}|"
-    rf"\s+par\s+{_RATE_TARGET})?"
+    rf"\s+par\s+{_RATE_TARGET})?|"
+    rf"\b{_PERCENTAGE}(?=$|[^a-z0-9]))"
 )
 # A fertilizer formulation such as 14-23-14 is itself a dose statement.
 _NPK_FORMULA = re.compile(r"\b\d{1,2}\s*-\s*\d{1,2}\s*-\s*\d{1,2}\b")
@@ -394,7 +403,7 @@ _BENIGN_QUANTITY_AFTER = re.compile(
 )
 _BENIGN_QUANTITY_BEFORE = re.compile(
     r"\b(?:rendement|recolte|production|distance|espacement|ecartement|"
-    r"profondeur|longueur|largeur|hauteur)\b"
+    r"profondeur|longueur|largeur|hauteur|sem\w*|irrigu\w*|arros\w*)\b"
     r"(?:(?!\b(?:et|mais|puis|ensuite|tandis\s+que|alors\s+que)\b)"
     r"[^.!?;:]){0,45}$"
 )
@@ -449,7 +458,10 @@ def _quantity_occurrence_is_dose(
     # Bare application quantities inherit chemical context from the answer
     # block so split statements (``L'urée convient. Appliquez 100 kg/ha.``) are
     # still caught. This decision applies only to the current occurrence.
-    return bool(_CHEMICAL_CONTEXT.search(folded_block))
+    return bool(
+        _CHEMICAL_CONTEXT.search(folded_block)
+        or _PESTICIDE_PATTERN.search(folded_block)
+    )
 
 
 def _quantity_is_dose(sentence: str, block: str) -> bool:
@@ -489,6 +501,17 @@ _DIAGNOSIS_UNCONDITIONAL = (
     re.compile(r"\bdiagnostic\s*[:=]"),
     re.compile(r"\bje (?:confirme|diagnostique)\b"),
     re.compile(r"\bmaladie (?:identifi[eé]e|confirm[eé]e|certaine)\b"),
+    re.compile(
+        rf"\b{_DISEASE_TERMS}\s+(?:est|sont)\s+"
+        r"(?:bien\s+|clairement\s+|d[eé]finitivement\s+)?confirm[eé]e?s?\b"
+    ),
+    re.compile(
+        r"\b(?:votre|vos|la|le|les|cette|ce|ces)\s+"
+        r"(?:plante|culture|champ|parcelle|feuille|tige|racine|fruit|"
+        r"ma[iï]s|mil|sorgho|riz|ni[eé]b[eé]|arachide|soja|coton|s[eé]same|"
+        r"fonio)s?\s+(?:est|sont)\s+"
+        r"(?:infect[eé]e?s?|contamin[eé]e?s?|atteinte?s?|infest[eé]e?s?|malades?)\b"
+    ),
 )
 
 # Firm assertion frames default to unsafe. Disease vocabulary is deliberately
@@ -586,7 +609,12 @@ _CERTAINTY_WITH_CONTEXT = (
         r"avec certitude|sans aucun doute)\b"
     ),
     re.compile(r"\b100\s*%\s*(?:s[uû]r|certain)\b"),
-    re.compile(r"\b(?:votre|la|cette)\s+plante\s+(?:a\s|souffre|est atteinte)"),
+    re.compile(
+        r"\b(?:votre|vos|la|le|les|cette|ce|ces)\s+"
+        r"(?:plante|culture|champ|parcelle|ma[iï]s|mil|sorgho|riz|ni[eé]b[eé]|"
+        r"arachide|soja|coton|s[eé]same|fonio)s?\s+"
+        r"(?:a\s|ont\s|souffre\w*|est atteinte?|sont atteints?)"
+    ),
 )
 
 
@@ -674,7 +702,12 @@ def _line_prefix(line: str) -> str:
     return match.group(0) if match else ""
 
 
-def redact_unsafe_text(text, *, check_diagnosis: bool = True) -> SafetyReview:
+def redact_unsafe_text(
+    text,
+    *,
+    check_diagnosis: bool = True,
+    block_context: str = "",
+) -> SafetyReview:
     """Drop unsafe sentences from generated text, preserving line structure.
 
     ``blocked`` is True when the text had content but nothing safe survived; the
@@ -693,7 +726,7 @@ def redact_unsafe_text(text, *, check_diagnosis: bool = True) -> SafetyReview:
 
     # The whole block is the context for judging a bare quantity, so a chemical
     # noun any number of sentences away still marks it as a dose.
-    block_text = " ".join(original.split())
+    block_text = " ".join((block_context or original).split())
 
     reasons: list[str] = []
     kept_lines: list[str] = []
@@ -732,12 +765,23 @@ def redact_unsafe_text(text, *, check_diagnosis: bool = True) -> SafetyReview:
     return SafetyReview(text=cleaned, reasons=tuple(reasons), blocked=False)
 
 
-def filter_safe_items(items, *, check_diagnosis: bool = True) -> tuple[list[str], tuple[str, ...]]:
-    """Keep only the safe entries of a normalised list field."""
+def filter_safe_items(
+    items,
+    *,
+    check_diagnosis: bool = True,
+    block_context: str = "",
+) -> tuple[list[str], tuple[str, ...]]:
+    """Keep safe entries while retaining cross-field dose context."""
     reasons: list[str] = []
     safe: list[str] = []
     for item in normalize_string_list(items, limit=12):
-        found = unsafe_reasons(item, check_diagnosis=check_diagnosis)
+        found = list(unsafe_reasons(item, check_diagnosis=check_diagnosis))
+        if (
+            CHEMICAL_DOSE not in found
+            and block_context
+            and _quantity_is_dose(item, block_context)
+        ):
+            found.append(CHEMICAL_DOSE)
         if found:
             for reason in found:
                 if reason not in reasons:
@@ -779,9 +823,45 @@ _AGENT_DIRECTION_PATTERN = re.compile(
     + "|".join(re.escape(stem) for stem in _AGENT_DIRECTION_STEMS)
     + r")[a-z]*"
 )
+_REFERRAL_ACTION = (
+    r"(?:consult\w*|contact\w*|demand\w*|voir|voy\w*|montr\w*|"
+    r"confirm\w*|signal\w*|appel\w*|analy\w*)"
+)
+_NON_AFFIRMATIVE_AGENT_DIRECTION = re.compile(
+    r"(?:"
+    r"\bn'(?:avez|a|aur\w*)\s+(?:jamais\s+|plus\s+)?pas\s+besoin\s+de\s+"
+    + _REFERRAL_ACTION
+    + r"[^.!?]{0,60}"
+    + _AGENT_DIRECTION_PATTERN.pattern
+    + r"|"
+    r"\bne\s+(?:devez|doit|faut|faudrait|"
+    + _REFERRAL_ACTION
+    + r")[^.!?]{0,35}\b(?:pas|jamais|plus)\b[^.!?]{0,60}"
+    + _AGENT_DIRECTION_PATTERN.pattern
+    + r"|"
+    r"\b(?:inutile|pas n[eé]cessaire|aucun besoin)\s+de\s+"
+    + _REFERRAL_ACTION
+    + r"[^.!?]{0,60}"
+    + _AGENT_DIRECTION_PATTERN.pattern
+    + r"|"
+    r"\b(?:evit\w*\s+de|sans)\s+"
+    + _REFERRAL_ACTION
+    + r"[^.!?]{0,60}"
+    + _AGENT_DIRECTION_PATTERN.pattern
+    + r")"
+)
+_NOMINAL_AGENT_DIRECTION = re.compile(
+    r"^\s*(?:par\s+|aupr[eè]s\s+d(?:e|u|es)\s+)?"
+    + _AGENT_DIRECTION_PATTERN.pattern
+)
+_AFFIRMATIVE_AGENT_DIRECTION = re.compile(
+    _REFERRAL_ACTION
+    + r"[^.!?]{0,90}"
+    + _AGENT_DIRECTION_PATTERN.pattern
+)
 
 
-def safe_confirmation(value, *, fallback: str) -> str:
+def safe_confirmation(value, *, fallback: str, block_context: str = "") -> str:
     """Return a trustworthy agent-confirmation line, or the deterministic fallback.
 
     The model's ``a_confirmer_par`` is replaced by ``fallback`` when it is
@@ -798,6 +878,16 @@ def safe_confirmation(value, *, fallback: str) -> str:
         return fallback
     if unsafe_reasons(text):
         return fallback
-    if not _AGENT_DIRECTION_PATTERN.search(_fold(text)):
+    if block_context and _quantity_is_dose(text, block_context):
+        return fallback
+    folded = _fold(text)
+    if (
+        not _AGENT_DIRECTION_PATTERN.search(folded)
+        or _NON_AFFIRMATIVE_AGENT_DIRECTION.search(folded)
+        or not (
+            _AFFIRMATIVE_AGENT_DIRECTION.search(folded)
+            or _NOMINAL_AGENT_DIRECTION.search(folded)
+        )
+    ):
         return fallback
     return text

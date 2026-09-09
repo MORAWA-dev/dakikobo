@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import app as app_module
+import core.disease as disease
 from core.answer_safety import REDACTION_NOTICE
 from core.case_log import list_evidence, list_feedback_events, record_feedback
 from core.retrieval import chunk_id, get_active_manifest_hash, manifest_hash
@@ -1992,6 +1993,42 @@ def test_ask_blocks_firm_diagnosis_forms(monkeypatch, diagnosis):
 
 
 @pytest.mark.parametrize(
+    "diagnosis",
+    [
+        "Votre maïs est atteint de la rouille.",
+        "La rouille est confirmée.",
+    ],
+)
+def test_ask_blocks_reviewed_passive_diagnoses(monkeypatch, diagnosis):
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        f"Observez les feuilles.\n{diagnosis}\nSurveillez la parcelle.",
+        question="Que montrent ces taches ?",
+    )
+    assert response.status_code == 200
+    assert diagnosis not in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+@pytest.mark.parametrize(
+    "diagnosis",
+    [
+        "Le maïs est infecté par la rouille.",
+        "Les feuilles sont contaminées par le mildiou.",
+    ],
+)
+def test_ask_blocks_passive_infection_and_contamination(monkeypatch, diagnosis):
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        f"Observez les feuilles.\n{diagnosis}\nSurveillez la parcelle.",
+        question="Que montrent ces taches ?",
+    )
+    assert response.status_code == 200
+    assert diagnosis not in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+@pytest.mark.parametrize(
     "sentence",
     [
         "Il s'agit du programme OAPH.",
@@ -2078,6 +2115,70 @@ def test_ask_preserves_irrigation_quantity_next_to_chemical_mention(monkeypatch)
     assert response.status_code == 200
     assert "20 litres d'eau par pied" in payload["answer"]
     assert REDACTION_NOTICE not in payload["answer"]
+
+
+@pytest.mark.parametrize(
+    "quantity",
+    [
+        "Semez 20 kg/ha.",
+        "Arrosez avec 20 litres par pied.",
+    ],
+)
+def test_ask_preserves_reviewed_seed_and_irrigation_rates(monkeypatch, quantity):
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        f"L'urée est disponible en ville. {quantity}",
+        question="Comment conduire la parcelle ?",
+    )
+    assert response.status_code == 200
+    assert quantity in payload["answer"]
+    assert REDACTION_NOTICE not in payload["answer"]
+
+
+def test_screen_route_blocks_split_dose_and_negated_referral(monkeypatch):
+    vision_payload = {
+        "observations": ["Le mancozèbe semble indiqué."],
+        "problemes_possibles": ["Stress nutritif possible."],
+        "actions_immediates": ["Appliquez cent kilogrammes par hectare."],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": "Vous n'avez pas besoin de consulter un agent agricole.",
+        "reponse_courte": "Surveillez la parcelle.",
+    }
+    monkeypatch.setattr(app_module, "disease_configured", lambda: True)
+    monkeypatch.setattr(app_module, "IMAGE_COOLDOWN_SECONDS", 0)
+    monkeypatch.setattr(app_module, "screen_leaf_image", disease.screen_leaf_image)
+    monkeypatch.setattr(disease, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        disease.requests,
+        "post",
+        lambda *args, **kwargs: SimpleNamespace(
+            status_code=200,
+            json=lambda: {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        vision_payload, ensure_ascii=False
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        ),
+    )
+    response = app_module.app.test_client().post(
+        "/screen",
+        data={"image": (__import__("io").BytesIO(b"fake"), "leaf.jpg")},
+    )
+    payload = response.get_json()
+    body = json.dumps(payload, ensure_ascii=False)
+    assert response.status_code == 200
+    assert "cent kilogrammes" not in body
+    assert payload["case"]["confirmation"] == disease.CONFIRMATION_FALLBACK
 
 
 def _screen_client(monkeypatch, service_status, answer="Analyse indisponible."):
