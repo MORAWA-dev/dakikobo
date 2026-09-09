@@ -1041,3 +1041,78 @@ cd - && git worktree remove "$WT" --force
 
 - Review the PR. Before any deploy, run the strict public evaluation with real credentials and confirm
   `/screen` and `/ask` status codes against the live Space.
+
+
+
+### 2026-09-09 — Plan 2026-09-09 execution: Ticket 01 reconciliation
+
+**Scope**
+
+- Began executing `plans/DAKIKOBO_IMPROVEMENT_PLAN_2026-09-09.html` (added on this date).
+- Ticket 01 (fix the working base) is a reconciliation task: identify the real start
+  commit, preserve prior work, and record which later tickets are already satisfied by
+  merged history rather than re-implementing them.
+
+**Reconciled state (local / remote / deploy)**
+
+- Working branch for ticket execution: `chore/plan-2026-09-09-tickets`, cut from
+  `origin/main` at `40bb8a8` (clean tree; no uncommitted work to preserve).
+- `origin/main` history since the plan's assessed base `17e11922`:
+  - PR #1 `fix/audit-safety-and-cache-identity` merged (`fc1d662`): answer-safety audit
+    repairs — Vision payload validation + confidence clamp, output redaction on vision and
+    RAG, safety-policy cache identity, cache-after-routing, zero-doc refusal, honest
+    HTTP statuses, multipart overhead, bounded TTS.
+  - PR #2 `feat/phase-d-followup-journal` merged (`40bb8a8`): offline follow-up outcome
+    retry queue (Phase D).
+- Deploy: not verified here; no live Space check, no real Groq/Gemini call. Deployment
+  state remains a separate, unconfirmed step.
+
+**Ticket status against the current merged code (evidence, not re-implementation)**
+
+- **02 (secure all model outputs): ALREADY SATISFIED.** `core/disease.py` runs
+  `normalize_vision_payload`, `clamp_vision_confidence`, and screens every visible field
+  (`filter_safe_items` on observations/causes/actions, `safe_confirmation`,
+  `_safe_screening_answer`) with cross-field `block_context`. `NUMERIC_GUIDANCE_VERIFIED`
+  stays `False` in `core/fertilizer.py`; RAG doses are redacted. Diagnosis detection is
+  lexicon-independent (default-unsafe frames). Covered by `tests/test_answer_safety.py`,
+  `tests/test_disease.py`, `tests/test_app_routes.py`. The specific journal cases named in
+  the ticket (feu bactérien, pucerons, split urée dose, `2 g par plant`, preserved water
+  quantities) are regression-tested.
+- **03 (invalidate stale answers after a policy change): ALREADY SATISFIED.**
+  `safety_policy_revision()` is mixed into the server answer-cache key and emitted as
+  `X-DakiKobo-Safety`; `static/sw.js` stores a `/__safety__` marker and drops the offline
+  answer cache when it changes. Covered by `tests/test_answer_cache.py` and
+  `tests/js/frontend.test.js`.
+- **04 (reliable refusals/errors): ALREADY SATISFIED.** `/ask` calls the combine chain
+  only when `source_docs` is non-empty; zero accepted documents returns
+  `_no_rag_context_answer()` with `llm_called=False` (no generation). Honest statuses:
+  vision 503/502/429 via `service_status`; RAG failures 502/503; rate limit 429. The SW
+  offline error path returns `offlineJson(..., 503)` and does not cache errors as answers.
+- **06 (photos/audio hardening): ALREADY SATISFIED.** `MULTIPART_OVERHEAD_BYTES` separates
+  the whole-request ceiling from per-file limits; `prune_audio_cache` bounds
+  `static/audio/` by `TTS_CACHE_TTL_SECONDS` then `TTS_CACHE_MAX_BYTES`. Covered by
+  `tests/test_tts.py` and `tests/test_app_routes.py`.
+- **05 (documentary coverage): BLOCKED ON HUMAN REVIEW.** `core/source_policy.py` fail-closed
+  eligibility stands; the inventory (`Data/reviews/SOURCE_ELIGIBILITY_2026-09-06.md`) is the
+  intentionally narrow set. Expanding coverage requires agronomist/owner review — not a code task.
+- **07 (persistence/recovery): PARTLY CODE, BLOCKED ON OPS.** Hardening exists; the durable-volume
+  restart/backup drill is an operator task on a real target.
+- **08 (real-phone pilot), 09 (evaluation as a release gate), 10 (agent hand-off sheet):
+  BLOCKED ON HUMANS.** Pilot recruitment, agronomist claim review, and observed field
+  demand cannot be fabricated. Benchmark tooling (`evaluation/farmer_benchmark.json`,
+  `scripts/farmer_evaluation.py`, `evaluation/PILOT_GUIDE.md`) is present and fails closed.
+
+**Verification (this reconciliation)**
+
+- Full offline Python suite: **626 passed, 1 skipped** (`tests/test_rag.py` self-skips
+  without `GROQ_API_KEY`), one pre-existing PyPDF2 deprecation warning.
+- JavaScript suite: **20 passed**.
+- No code behavior changed in Ticket 01; this entry is the dated state note it requires.
+
+**Next action**
+
+- No code-only ticket remains open: 02/03/04/06 are implemented and green; 05/07/08/09/10
+  depend on human/agronomist/pilot/ops work that cannot be truthfully automated here.
+- Await owner direction: run the live evaluation with real credentials against a chosen
+  target, begin agronomist source review (Ticket 05), or schedule the pilot (Ticket 08).
+  Do not deploy or relax any gate to force a pass.
