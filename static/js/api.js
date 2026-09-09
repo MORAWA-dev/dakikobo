@@ -104,6 +104,93 @@
             return Promise.all(keys.filter(function(key) { return /^dakikobo-.*-answers$/.test(key); }).map(function(key) { return root.caches.delete(key); }));
         });
     }
+
+    // Offline follow-up outcomes: a farmer who records a result without a signal
+    // must not lose it. Text-only outcomes are queued durably in localStorage and
+    // replayed on reconnection. Photo outcomes are never queued — an unsent image
+    // would be silently dropped — so they fail visibly instead.
+    var OUTCOME_QUEUE_KEY = 'dakikobo_outcome_queue_v1';
+
+    function readOutcomeQueue() {
+        try {
+            var raw = root.localStorage && root.localStorage.getItem(OUTCOME_QUEUE_KEY);
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function writeOutcomeQueue(queue) {
+        if (!root.localStorage) { return; }
+        if (queue && queue.length) {
+            root.localStorage.setItem(OUTCOME_QUEUE_KEY, JSON.stringify(queue));
+        } else {
+            root.localStorage.removeItem(OUTCOME_QUEUE_KEY);
+        }
+    }
+
+    function pendingOutcomeCount() {
+        return readOutcomeQueue().length;
+    }
+
+    function enqueueOutcome(feedbackId, outcome) {
+        var queue = readOutcomeQueue().filter(function(item) {
+            return item && item.feedback_id !== feedbackId;
+        });
+        queue.push({ feedback_id: feedbackId, outcome: outcome, queued_at: Date.now() });
+        writeOutcomeQueue(queue);
+    }
+
+    function postOutcome(feedbackId, outcome, file) {
+        var data = formBody({ feedback_id: feedbackId, outcome: outcome });
+        if (file) {
+            data.append('after_image', file);
+        }
+        return fetchJson('/feedback/outcome', { method: 'POST', body: data });
+    }
+
+    function flushOutcomeQueue() {
+        var queue = readOutcomeQueue();
+        if (!queue.length) { return Promise.resolve(0); }
+        var flushed = 0;
+        var remaining = [];
+        return queue.reduce(function(chain, item) {
+            return chain.then(function() {
+                return postOutcome(item.feedback_id, item.outcome).then(function() {
+                    flushed += 1;
+                }).catch(function() {
+                    // Keep unsent items for the next reconnection instead of dropping them.
+                    remaining.push(item);
+                });
+            });
+        }, Promise.resolve()).then(function() {
+            writeOutcomeQueue(remaining);
+            return flushed;
+        });
+    }
+
+    function submitOutcome(feedbackId, outcome, file) {
+        if (file) {
+            // Photo outcomes cannot be queued (an unsent image would be lost), so
+            // surface the failure instead of pretending it was saved.
+            return postOutcome(feedbackId, outcome, file);
+        }
+        return postOutcome(feedbackId, outcome).catch(function(error) {
+            // A server that answered (4xx/5xx via fetchJson) genuinely rejected the
+            // outcome — do not queue it for endless retries. Only a transport
+            // failure (no response, i.e. no payload) means "offline, try later".
+            if (error && error.payload) {
+                throw error;
+            }
+            enqueueOutcome(feedbackId, outcome);
+            return { ok: true, queued: true };
+        });
+    }
+
+    if (root.addEventListener) {
+        root.addEventListener('online', function() { flushOutcomeQueue(); });
+    }
     function prepareImage(file) {
         if (!root.createImageBitmap || !root.document) { return Promise.resolve(file); }
         return root.createImageBitmap(file).then(function(bitmap) {
@@ -119,19 +206,13 @@
         }).catch(function() { return file; });
     }
 
-    function submitOutcome(feedbackId, outcome, file) {
-        var data = formBody({ feedback_id: feedbackId, outcome: outcome });
-        if (file) {
-            data.append('after_image', file);
-        }
-        return fetchJson('/feedback/outcome', { method: 'POST', body: data });
-    }
-
     var exported = {
         fetchJson: fetchJson,
         loadJournal: loadJournal,
         deleteJournal: deleteJournal,
         clearDeviceData: clearDeviceData,
+        flushOutcomeQueue: flushOutcomeQueue,
+        pendingOutcomeCount: pendingOutcomeCount,
         prepareImage: prepareImage,
         loadCropLabels: loadCropLabels,
         loadDemoExample: loadDemoExample,

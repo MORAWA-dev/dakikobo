@@ -227,3 +227,20 @@ def test_followup_supports_optional_after_photo():
     assert "after_image" in api_js
     assert "/feedback/outcome" in api_js
     assert ".followup-after-photo" in css
+
+
+def test_offline_outcome_queue_is_wired_and_flushed():
+    """Phase D: an offline follow-up outcome is queued durably and replayed."""
+    api_js = (ROOT / "static/js/api.js").read_text(encoding="utf-8")
+    index_js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+    render_js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
+
+    # A durable queue, a flush routine, and reconnection replay all exist.
+    assert "dakikobo_outcome_queue_v1" in api_js
+    assert "flushOutcomeQueue" in api_js
+    assert "pendingOutcomeCount" in api_js
+    assert "addEventListener('online'" in api_js
+    # The app replays the queue on load when online.
+    assert "flushOutcomeQueue" in index_js
+    # The farmer is told honestly when an outcome was only queued offline.
+    assert "queued" in render_js and "hors ligne" in render_js

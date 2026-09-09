@@ -1596,6 +1596,10 @@ $(function() {
     }
 
     setOfflineBanner(!navigator.onLine);
+    // Replay any follow-up outcomes recorded while offline in a previous session.
+    if (navigator.onLine && api.flushOutcomeQueue) {
+        api.flushOutcomeQueue().catch(function() { /* stays queued for the next reconnection */ });
+    }
     window.addEventListener('offline', function() { setOfflineBanner(true); });
     window.addEventListener('online', function() { setOfflineBanner(false); });
     window.addEventListener('dakikobo:offline-fallback', function() { setOfflineBanner(true); });
