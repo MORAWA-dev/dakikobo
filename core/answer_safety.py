@@ -377,29 +377,62 @@ _DISEASE_TERMS = (
     r"l[eé]gionnaire|foreur|borer|mineuse|charan[cç]ons?|bruches?)"
 )
 
-_DEFINITIVE_DIAGNOSIS_PATTERNS = (
+# Marker that a sentence is actually about a disease, pest, symptom, or plant
+# damage. Generic certainty ("il s'agit de…", "c'est certainement…") is only a
+# diagnosis when it appears alongside this context, so ordinary confident
+# statements about programmes, techniques, or timing are left untouched.
+_DIAGNOSIS_CONTEXT = re.compile(
+    _DISEASE_TERMS
+    + r"|\b(?:sympt[oô]mes?|tach(?:e|es)|l[eé]sions?|jaunissement|"
+    r"fl[eé]trit|attaqu[eé]e?s?|infest\w*|infect\w*|contamin\w*|"
+    r"d[eé]g[aâ]ts?|pourri\w*|moisiss\w*|d[eé]p[eé]riss\w*)\b"
+)
+
+# Sentence-level assertions that state a firm diagnosis when disease context is
+# present. Each is applied only after ``_DIAGNOSIS_CONTEXT`` matches the
+# sentence, so it never fires on a confident non-agronomic statement.
+_DIAGNOSIS_ASSERTIONS = (
     # The prompt mandates the hedged "il pourrait s'agir de"; the indicative
-    # "il s'agit de" is an assertion.
-    re.compile(r"\bil s'agit\b"),
-    re.compile(r"\bdiagnostic\s*[:=]"),
-    re.compile(r"\bje (?:confirme|diagnostique)\b"),
-    re.compile(r"\bmaladie (?:identifi[eé]e|confirm[eé]e|certaine)\b"),
+    # "il s'agit de" is an assertion. "il s'agit peut-être" stays hedged.
+    re.compile(r"\bil s'agit\b(?!\s+(?:peut-[eê]tre|probablement|sans doute\b))"),
+    re.compile(r"\bc'est\s+(?:bien|clairement|certainement|s[uû]rement)?\s*"
+               r"(?:un|une|le|la|l'|du|de la|des)?\s*" + _DISEASE_TERMS),
+    # "La cause est la rouille", "le problème est une carence".
+    re.compile(r"\b(?:la cause|le probl[eè]me|le souci|l'origine)\s+"
+               r"(?:en\s+)?est\b"),
+    # "Ces signes confirment une rouille", "cela confirme le mildiou".
+    re.compile(r"\bconfirm(?:e|ent|ons)\b"),
+    re.compile(r"\bsignes?\s+(?:confirm\w+|indiquent|montrent|r[eé]v[eè]lent)\b"),
+    # Certainty adverbs — only counted when the sentence has disease context.
     re.compile(
         r"\b(?:certainement|assur[eé]ment|indubitablement|à coup s[uû]r|"
         r"avec certitude|sans aucun doute)\b"
     ),
     re.compile(r"\b100\s*%\s*(?:s[uû]r|certain)\b"),
-    # "C'est la rouille" asserts; "c'est le moment de semer" does not, so the
-    # pattern is anchored on a disease/pest term.
-    re.compile(
-        r"\bc'est\s+(?:bien\s+|clairement\s+|certainement\s+|s[uû]rement\s+)?"
-        r"(?:un|une|le|la|l'|du|de la|des)?\s*" + _DISEASE_TERMS
-    ),
-    re.compile(
-        r"\b(?:votre|la|cette)\s+plante\s+(?:a\s|souffre|est atteinte)"
-        r"[^.!?]*" + _DISEASE_TERMS
-    ),
+    re.compile(r"\b(?:votre|la|cette)\s+plante\s+(?:a\s|souffre|est atteinte)"),
 )
+
+# Assertions that are firm diagnoses on their own, regardless of extra context
+# (they already name the clinical act or a confirmed disease).
+_DIAGNOSIS_UNCONDITIONAL = (
+    re.compile(r"\bdiagnostic\s*[:=]"),
+    re.compile(r"\bje (?:confirme|diagnostique)\b"),
+    re.compile(r"\bmaladie (?:identifi[eé]e|confirm[eé]e|certaine)\b"),
+)
+
+
+def _is_definitive_diagnosis(lowered: str) -> bool:
+    """True when the sentence states a firm diagnosis.
+
+    A generic certainty phrase counts only when the sentence also carries
+    disease/pest/symptom/plant-damage context, so confident statements about
+    programmes, techniques, or timing are not treated as diagnoses.
+    """
+    if any(pattern.search(lowered) for pattern in _DIAGNOSIS_UNCONDITIONAL):
+        return True
+    if not _DIAGNOSIS_CONTEXT.search(lowered):
+        return False
+    return any(pattern.search(lowered) for pattern in _DIAGNOSIS_ASSERTIONS)
 
 
 def unsafe_reasons(sentence: str, *, check_diagnosis: bool = True) -> tuple[str, ...]:
@@ -428,9 +461,7 @@ def unsafe_reasons(sentence: str, *, check_diagnosis: bool = True) -> tuple[str,
     ):
         reasons.append(CHEMICAL_DOSE)
 
-    if check_diagnosis and any(
-        pattern.search(lowered) for pattern in _DEFINITIVE_DIAGNOSIS_PATTERNS
-    ):
+    if check_diagnosis and _is_definitive_diagnosis(lowered):
         reasons.append(DEFINITIVE_DIAGNOSIS)
 
     return tuple(reasons)
@@ -463,39 +494,79 @@ def _line_prefix(line: str) -> str:
     return match.group(0) if match else ""
 
 
+# A quantity in one sentence and its chemical noun in a neighbour ("L'urée
+# convient. Appliquez 100 kg/ha.") together form a dose. Evaluation therefore
+# uses a small window of surrounding sentences, not the sentence alone.
+_CONTEXT_WINDOW = 1
+
+
+def _dose_context_in_window(sentences, index) -> bool:
+    """True when a quantity sentence has chemical context in a nearby sentence."""
+    start = max(0, index - _CONTEXT_WINDOW)
+    end = min(len(sentences), index + _CONTEXT_WINDOW + 1)
+    window = " ".join(sentences[start:end])
+    return bool(_CHEMICAL_CONTEXT.search(_fold(window)))
+
+
 def redact_unsafe_text(text, *, check_diagnosis: bool = True) -> SafetyReview:
     """Drop unsafe sentences from generated text, preserving line structure.
 
     ``blocked`` is True when the text had content but nothing safe survived; the
     caller must then substitute a deterministic refusal rather than show an
     empty answer.
+
+    A bare quantity is judged against a short window of neighbouring sentences,
+    so a dose split across sentences ("L'urée convient. Appliquez 100 kg/ha.")
+    is still removed even though neither sentence names both parts alone.
     """
     original = normalize_scalar(text)
     if not original:
         return SafetyReview(text="", reasons=(), blocked=False)
 
-    reasons: list[str] = []
-    kept_lines: list[str] = []
-    had_content = False
-
+    # Sentence positions are tracked across the whole block so the dose window
+    # can look past a line break, while line structure is still rebuilt below.
+    block_sentences: list[str] = []
+    line_plan: list[tuple[str, list[int]]] = []  # (prefix, sentence indices)
     for line in original.splitlines():
         if not line.strip():
-            kept_lines.append("")
+            line_plan.append(("", []))
             continue
-        had_content = True
         prefix = _line_prefix(line)
         body = line[len(prefix):]
-        safe_parts = []
+        indices = []
         for sentence in _SENTENCE_SPLIT.split(body):
             if not sentence.strip():
                 continue
-            found = unsafe_reasons(sentence, check_diagnosis=check_diagnosis)
+            indices.append(len(block_sentences))
+            block_sentences.append(sentence.strip())
+        line_plan.append((prefix, indices))
+
+    had_content = any(indices for _, indices in line_plan)
+
+    reasons: list[str] = []
+    kept_lines: list[str] = []
+    for prefix, indices in line_plan:
+        if not indices:
+            kept_lines.append("")
+            continue
+        safe_parts = []
+        for sentence_index in indices:
+            sentence = block_sentences[sentence_index]
+            found = list(unsafe_reasons(sentence, check_diagnosis=check_diagnosis))
+            # A quantity with no in-sentence chemical word is still a dose when
+            # a neighbouring sentence supplies that word.
+            if (
+                CHEMICAL_DOSE not in found
+                and _QUANTITY.search(_fold(sentence))
+                and _dose_context_in_window(block_sentences, sentence_index)
+            ):
+                found.append(CHEMICAL_DOSE)
             if found:
                 for reason in found:
                     if reason not in reasons:
                         reasons.append(reason)
                 continue
-            safe_parts.append(sentence.strip())
+            safe_parts.append(sentence)
         if safe_parts:
             kept_lines.append(prefix + " ".join(safe_parts))
 

@@ -1927,6 +1927,77 @@ def test_rag_answer_keeps_exact_doses_out_of_the_model_path(monkeypatch):
     assert REDACTION_NOTICE in payload["answer"]
 
 
+def _post_ask_answer(monkeypatch, model_answer, question="Question ?"):
+    """Run the model answer through /ask and return the payload."""
+    harness = _UnsafeAnswerHarness(model_answer)
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    response = app_module.app.test_client().post("/ask", data={"messageText": question})
+    return response, response.get_json()
+
+
+def test_ask_blocks_cross_sentence_dose(monkeypatch):
+    """PR review round 2, item 1: a dose split across sentences must be blocked."""
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        "Observez le sol régulièrement.\n"
+        "L'urée convient. Appliquez 100 kg/ha.\n"
+        "La rotation aide beaucoup.",
+        question="Comment nourrir le maïs ?",
+    )
+    body = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert response.status_code == 200
+    assert "100 kg/ha" not in body
+    assert "kg/ha" not in body
+    assert "La rotation aide beaucoup." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+@pytest.mark.parametrize(
+    "diagnosis",
+    [
+        "La cause est la rouille du mil.",
+        "Ces signes confirment une rouille du mil.",
+    ],
+)
+def test_ask_blocks_firm_diagnosis_forms(monkeypatch, diagnosis):
+    """PR review round 2, item 2, exercised through the /ask route."""
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        f"Observez les feuilles chaque matin.\n{diagnosis}\nSurveillez la parcelle.",
+        question="Qu'est-ce que ces taches ?",
+    )
+
+    assert response.status_code == 200
+    assert diagnosis.lower() not in payload["answer"].lower()
+    assert "Observez les feuilles chaque matin." in payload["answer"]
+    assert "Surveillez la parcelle." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit du programme OAPH.",
+        "Il s'agit d'une technique de conservation de l'eau.",
+        "C'est certainement le bon moment pour semer.",
+        "Il s'agit peut-être d'une méthode utile.",
+    ],
+)
+def test_ask_keeps_confident_non_diagnosis_statements(monkeypatch, sentence):
+    """PR review round 2, item 3: confident non-agronomic statements pass through."""
+    response, payload = _post_ask_answer(
+        monkeypatch, sentence, question="Parlez-moi de cette pratique."
+    )
+
+    assert response.status_code == 200
+    assert sentence in payload["answer"]
+    assert REDACTION_NOTICE not in payload["answer"]
+
+
 def _screen_client(monkeypatch, service_status, answer="Analyse indisponible."):
     monkeypatch.setattr(app_module, "disease_configured", lambda: True)
     monkeypatch.setattr(app_module, "IMAGE_COOLDOWN_SECONDS", 0)

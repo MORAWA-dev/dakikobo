@@ -253,9 +253,10 @@ def test_diagnosis_check_flag_is_honoured_both_ways():
 
     The application enables it on every model path (vision and RAG); this test
     only pins the flag's mechanics so a caller can still request product/dose
-    grading alone if a future path needs it.
+    grading alone if a future path needs it. The sentence carries disease
+    context, so it is a firm diagnosis when the flag is on.
     """
-    sentence = "Il s'agit d'une pratique courante au Burkina Faso."
+    sentence = "Il s'agit de la rouille du mil."
 
     assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence, check_diagnosis=True)
     assert unsafe_reasons(sentence, check_diagnosis=False) == ()
@@ -413,3 +414,117 @@ def test_safe_confirmation_falls_back_when_unusable(value):
 def test_safe_confirmation_fallback_is_itself_agent_directed_and_safe():
     # The fallback must pass its own gate, or a second pass would drop it.
     assert safe_confirmation(_AGENT_FALLBACK, fallback="AUTRE") == _AGENT_FALLBACK
+
+
+
+# ---------------------------------------------------------------------------
+# PR review round 2 — cross-sentence dose, firmer diagnosis, anchored certainty
+# ---------------------------------------------------------------------------
+
+# Item 1: a dose split across adjacent sentences.
+
+def test_cross_sentence_dose_is_blocked_by_redaction():
+    """"L'urée convient. Appliquez 100 kg/ha." — the quantity and its chemical
+    noun sit in neighbouring sentences, so a per-sentence check missed it."""
+    review = redact_unsafe_text("L'urée convient. Appliquez 100 kg/ha.")
+
+    assert CHEMICAL_DOSE in review.reasons
+    assert "100 kg/ha" not in review.text
+    assert "kg/ha" not in review.text
+
+
+def test_cross_sentence_dose_blocked_regardless_of_order():
+    review = redact_unsafe_text("Appliquez 100 kg/ha. C'est de l'urée.")
+
+    assert CHEMICAL_DOSE in review.reasons
+    assert "100 kg/ha" not in review.text
+
+
+def test_dose_window_does_not_flag_a_quantity_far_from_chemistry():
+    """The window is small: an irrigation or seed quantity with no chemical
+    noun anywhere nearby stays safe."""
+    irrigation = redact_unsafe_text("Arrosez le champ. Comptez 20 litres d'eau par pied.")
+    assert CHEMICAL_DOSE not in irrigation.reasons
+    assert "20 litres d'eau par pied" in irrigation.text
+
+    seed = redact_unsafe_text("Préparez le sol. Semez 20 kg de semences par hectare.")
+    assert CHEMICAL_DOSE not in seed.reasons
+    assert "20 kg de semences" in seed.text
+
+
+# Item 2: firmer diagnosis forms.
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "La cause est la rouille du mil.",
+        "Ces signes confirment une rouille du mil.",
+        "Le problème est une carence en azote sur les feuilles.",
+        "Ces symptômes confirment le mildiou.",
+    ],
+)
+def test_firm_diagnosis_forms_are_blocked(sentence):
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence)
+
+
+# Item 3: generic certainty only counts with disease/pest/symptom/damage context.
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit du programme OAPH.",
+        "Il s'agit d'une technique de conservation de l'eau.",
+        "C'est certainement le bon moment pour semer.",
+        "Il s'agit peut-être d'une méthode utile.",
+        # Neighbours of the above, to be safe.
+        "Il s'agit de la rotation des cultures.",
+        "C'est certainement une bonne pratique.",
+        "La cause est le manque de pluie cette année.",
+    ],
+)
+def test_generic_certainty_without_disease_context_is_safe(sentence):
+    assert DEFINITIVE_DIAGNOSIS not in unsafe_reasons(sentence)
+    assert unsafe_reasons(sentence) == ()
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit de la rouille du mil.",
+        "C'est certainement le mildiou sur ces feuilles.",
+        "Il s'agit d'une attaque de chenilles.",
+        "C'est assurément une carence, vu ces taches.",
+    ],
+)
+def test_generic_certainty_with_disease_context_is_blocked(sentence):
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence)
+
+
+def test_hedged_diagnosis_is_still_allowed():
+    """The prompt mandates hedging; "il s'agit peut-être" must survive."""
+    assert unsafe_reasons("Il s'agit peut-être d'une rouille, à confirmer.") == ()
+    assert unsafe_reasons("Il pourrait s'agir d'une carence en azote.") == ()
+
+
+def test_full_redaction_path_for_each_review_sentence():
+    """The complete redact_unsafe_text path, not just unsafe_reasons."""
+    # Blocked ones are removed.
+    for text in [
+        "L'urée convient. Appliquez 100 kg/ha.",
+        "La cause est la rouille du mil.",
+        "Ces signes confirment une rouille du mil.",
+    ]:
+        review = redact_unsafe_text(text)
+        assert review.reasons, f"expected redaction for: {text}"
+        assert "100 kg/ha" not in review.text
+
+    # Safe ones pass through untouched.
+    for text in [
+        "Il s'agit du programme OAPH.",
+        "Il s'agit d'une technique de conservation de l'eau.",
+        "C'est certainement le bon moment pour semer.",
+        "Il s'agit peut-être d'une méthode utile.",
+    ]:
+        review = redact_unsafe_text(text)
+        assert review.reasons == ()
+        assert review.text == text
