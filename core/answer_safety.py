@@ -129,7 +129,7 @@ def _strip_accents(text: str) -> str:
 
 def _fold(text: str) -> str:
     """Accent-insensitive, case-insensitive comparison form."""
-    return _strip_accents(str(text or "")).casefold()
+    return _strip_accents(str(text or "")).casefold().replace("’", "'")
 
 
 def clamp_vision_confidence(value) -> str:
@@ -349,11 +349,24 @@ _PRODUCT_CLASS_RECOMMENDATION = re.compile(
     r"raticide|produit chimique|produit phytosanitaire|matiere active)\b"
 )
 
-# A number + unit that could be read as an application rate.
+# A number + unit that could be read as an application rate. The match includes
+# its denominator so ``par plant`` is classified as rate structure, never as
+# evidence that the numerator measures a benign plant quantity.
+_NUMBER = r"\d+(?:[ \u202f]\d{3})*(?:[.,]\d+)?"
+_MEASURE_UNIT = (
+    r"(?:tonnes?|t|kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
+    r"unites?|sachets?|bouchons?|cuilleres?|capsules?|doses?|cm|metres?)"
+)
+_RATE_TARGET = r"(?:ha|hectares?|m2|m²|l|litres?|pieds?|plants?|poquets?)"
+_NUTRIENT_SYMBOL = r"(?:n|p2o5|k2o|p|k)"
+_NUTRIENT_RATE_SUFFIX = (
+    rf"\s+(?:de\s+)?{_NUTRIENT_SYMBOL}\s*"
+    rf"(?:/\s*{_RATE_TARGET}|par\s+{_RATE_TARGET})"
+)
 _QUANTITY = re.compile(
-    r"\b\d+(?:[.,]\d+)?\s*"
-    r"(?:kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
-    r"sachets?|bouchons?|cuilleres?|capsules?|doses?)\b"
+    rf"\b{_NUMBER}\s*{_MEASURE_UNIT}\b"
+    rf"(?:{_NUTRIENT_RATE_SUFFIX}|\s*/\s*{_RATE_TARGET}|"
+    rf"\s+par\s+{_RATE_TARGET})?"
 )
 # A fertilizer formulation such as 14-23-14 is itself a dose statement.
 _NPK_FORMULA = re.compile(r"\b\d{1,2}\s*-\s*\d{1,2}\s*-\s*\d{1,2}\b")
@@ -367,53 +380,86 @@ _CHEMICAL_CONTEXT = re.compile(
     r"pulverisation|semence traitee)\b"
 )
 
-# What a quantity measures. When the number is tied to one of these benign
-# nouns — water, seed, organic matter, spacing, or an explicit yield — it is
-# never a chemical dose, no matter what other words share the sentence or block.
-_BENIGN_MEASURED_NOUN = re.compile(
-    r"\b(?:d'|de )?(?:eau|pluie|irrigation|arrosage|"
-    r"semences?|graines?|plants?|boutures?|"
-    r"compost|fumier|matiere organique|paille|residus?|mulch|"
-    r"grains?|rendement|recolte|production|"
-    r"terre|terreau|sable|gravier|"
-    r"distance|espacement|profondeur|longueur|largeur|hauteur)\b"
+# These patterns are intentionally anchored to one quantity occurrence. A safe
+# noun elsewhere in the sentence cannot launder a different fertilizer rate.
+_QUANTITY_CONNECTOR = r"(?:d'|de\s+|de la\s+|du\s+|des\s+|d'une?\s+)?"
+_BENIGN_QUANTITY_AFTER = re.compile(
+    r"^\s*" + _QUANTITY_CONNECTOR
+    + r"(?:eau|pluie|irrigation|arrosage|semences?|graines?|boutures?|"
+    r"compost|fumier|matiere organique|paille|residus?|mulch|grains?|"
+    r"rendement|recolte|production|terre|terreau|sable|gravier|distance|"
+    r"espacement|ecartement|profondeur|longueur|largeur|hauteur)\b"
+    r"|^\s+(?:entre|sur)\s+(?:les?\s+)?(?:lignes?|plants?|poquets?)\b"
+    r"|^\s+pour\s+(?:l'|la\s+)?(?:irrigation|arrosage)\b"
 )
-# A quantity tied directly to a chemical input, e.g. "100 kg de NPK",
-# "2 g d'urée", "50 kg/ha de phosphate". This is a dose on its own.
-_QUANTITY_OF_CHEMICAL = re.compile(
-    r"\b\d+(?:[.,]\d+)?\s*"
-    r"(?:kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
-    r"sachets?|bouchons?|cuilleres?|capsules?|doses?)"
-    r"(?:\s*/\s*(?:ha|hectares?|m2|m²|l|litres?|pieds?|plants?|poquets?))?"
-    r"\s+(?:d'|de\s+|de la\s+|du\s+|des\s+)?"
+_BENIGN_QUANTITY_BEFORE = re.compile(
+    r"\b(?:rendement|recolte|production|distance|espacement|ecartement|"
+    r"profondeur|longueur|largeur|hauteur)\b"
+    r"(?:(?!\b(?:et|mais|puis|ensuite|tandis\s+que|alors\s+que)\b)"
+    r"[^.!?;:]){0,45}$"
+)
+_CHEMICAL_QUANTITY_BEFORE = re.compile(
+    r"\b(?:dose|dosage|appliqu\w*|apport\w*|mettez|ajoutez|utilis\w*)\b"
+    r"[^.!?;:,]{0,35}$"
+)
+_CHEMICAL_QUANTITY_LABEL_BEFORE = re.compile(
+    r"\b(?:quantite|taux|niveau)\b[^.!?;:,]{0,35}"
+    + _CHEMICAL_CONTEXT.pattern
+    + r"[^.!?;:,]{0,15}$"
+)
+_CHEMICAL_QUANTITY_AFTER = re.compile(
+    r"^\s*" + _QUANTITY_CONNECTOR
     + _CHEMICAL_CONTEXT.pattern.replace(r"\b(?:", r"(?:", 1)
 )
+_NUTRIENT_RATE = re.compile(
+    rf"\b{_NUMBER}\s*{_MEASURE_UNIT}\b{_NUTRIENT_RATE_SUFFIX}\b"
+)
+
+
+def _quantity_occurrence_is_dose(
+    match: "re.Match[str]", folded_sentence: str, folded_block: str
+) -> bool:
+    """Classify one quantity without borrowing another quantity's noun."""
+    before = folded_sentence[max(0, match.start() - 90):match.start()]
+    after = folded_sentence[match.end():match.end() + 80]
+    occurrence = match.group(0)
+
+    # Nutrient notation (``50 kg N/ha``) and a directly named input
+    # (``50 unités d'azote`` or ``100 kg/ha de NPK``) are always doses.
+    if _NUTRIENT_RATE.fullmatch(occurrence) or _CHEMICAL_QUANTITY_AFTER.search(after):
+        return True
+
+    # Only an immediately associated measured object can make this occurrence
+    # benign. Denominators such as ``par plant`` are already inside ``match``
+    # and therefore cannot trigger this exemption.
+    if _BENIGN_QUANTITY_AFTER.search(after):
+        return False
+
+    # An application verb or explicit dose phrase bound to this number wins
+    # over an earlier yield/spacing noun belonging to another occurrence.
+    if (
+        _CHEMICAL_QUANTITY_BEFORE.search(before)
+        or _CHEMICAL_QUANTITY_LABEL_BEFORE.search(before)
+    ):
+        return True
+    benign_before = _BENIGN_QUANTITY_BEFORE.search(before)
+    if benign_before and not _QUANTITY.search(benign_before.group(0)):
+        return False
+
+    # Bare application quantities inherit chemical context from the answer
+    # block so split statements (``L'urée convient. Appliquez 100 kg/ha.``) are
+    # still caught. This decision applies only to the current occurrence.
+    return bool(_CHEMICAL_CONTEXT.search(folded_block))
 
 
 def _quantity_is_dose(sentence: str, block: str) -> bool:
-    """Whether a numeric quantity in ``sentence`` is a chemical dose.
-
-    ``block`` is the surrounding text (the whole answer block), used only to
-    decide whether a *bare* quantity — one with no benign measured noun of its
-    own — is an application rate because a chemical input is described nearby.
-
-    A quantity that measures water, seed, organic matter, spacing, or yield is
-    never a dose, even when a chemical word appears elsewhere in the block. A
-    quantity tied directly to a chemical input is always a dose.
-    """
+    """Whether any independently classified quantity is a chemical dose."""
     folded_sentence = _fold(sentence)
-    if not _QUANTITY.search(folded_sentence):
-        return False
-    # Directly named chemical quantity ("100 kg/ha de NPK") — always a dose.
-    if _QUANTITY_OF_CHEMICAL.search(folded_sentence):
-        return True
-    # A quantity that names what it measures (water/seed/compost/yield/spacing)
-    # is that thing, not a dose — regardless of nearby chemical words.
-    if _BENIGN_MEASURED_NOUN.search(folded_sentence):
-        return False
-    # A bare quantity with no benign noun is a dose when the block describes a
-    # chemical input (in this or any other sentence).
-    return bool(_CHEMICAL_CONTEXT.search(_fold(block)))
+    folded_block = _fold(block)
+    return any(
+        _quantity_occurrence_is_dose(match, folded_sentence, folded_block)
+        for match in _QUANTITY.finditer(folded_sentence)
+    )
 
 # Diagnosis patterns run against accent-preserving lower case. Stripping accents
 # would merge the preposition "à" into the verb "a" and wrongly flag the
@@ -445,22 +491,25 @@ _DIAGNOSIS_UNCONDITIONAL = (
     re.compile(r"\bmaladie (?:identifi[eé]e|confirm[eé]e|certaine)\b"),
 )
 
-# Firm-assertion frames that *name a subject*: "il s'agit de X", "la cause est
-# X", "c'est X", "ces signes confirment X". The captured X is then classified as
-# a diagnosis or not, so detection does not depend on X being in a fixed disease
-# list. Hedged forms ("il s'agit peut-être") are excluded from the frame.
+# Firm assertion frames default to unsafe. Disease vocabulary is deliberately
+# absent: the captured subject is allowed only when its leading category is
+# clearly benign. Hedges and negations are checked before that classification.
 _NAMED_SUBJECT_FRAMES = (
     re.compile(
-        r"\bil s'agit\b(?!\s+(?:peut-[eê]tre|probablement|sans doute))"
-        r"\s+(?:d'|de la |de l'|du |des |de |d')?(?P<subject>[^.!?,;:]+)"
+        r"\bil s'agit\b\s+"
+        r"(?:d'|de la |de l'|du |des |de )?(?P<subject>[^.!?,;:]+)"
     ),
     re.compile(
         r"\b(?:la cause|le probl[eè]me|le souci|l'origine)\s+(?:en\s+)?est\s+"
-        r"(?:d'|de la |de l'|du |des |de |d'|la |le |les |une |un |l')?"
+        r"(?:d'|de la |de l'|du |des |de |la |le |les |une |un |l')?"
         r"(?P<subject>[^.!?,;:]+)"
     ),
     re.compile(
         r"\bc'est\s+(?:bien|clairement|certainement|s[uû]rement)?\s*"
+        r"(?:la |le |les |l'|une |un |du |de la |des )?(?P<subject>[^.!?,;:]+)"
+    ),
+    re.compile(
+        r"\bce sont\s+(?:bien|clairement|certainement|s[uû]rement)?\s*"
         r"(?:la |le |les |l'|une |un |du |de la |des )?(?P<subject>[^.!?,;:]+)"
     ),
     re.compile(
@@ -473,59 +522,60 @@ _NAMED_SUBJECT_FRAMES = (
     ),
 )
 
-# Subjects that a firm assertion may name without being a plant diagnosis:
-# programmes, techniques, agronomic practices, environmental factors, and the
-# like. Compared against the accent-stripped subject text.
-_BENIGN_SUBJECT = re.compile(
-    r"\b(?:programme|projet|offensive|initiative|politique|strategie|plan|"
+# Only a hedge attached to the captured assertion changes a firm frame into a
+# possibility. A hedge elsewhere in the sentence cannot excuse another claim.
+_HEDGED_SUBJECT_START = re.compile(
+    r"^\s*(?:peut-etre|probablement|probables?|possiblement|possibles?|"
+    r"eventuellement|vraisemblablement|vraisemblables?|sans doute)\b"
+)
+_NEGATED_SUBJECT_START = re.compile(
+    r"^\s*(?:non\s+pas|pas|jamais|plus|aucun(?:e)?|ni)\b"
+)
+
+# Head/category allowlist. It is anchored after articles and optional positive
+# qualifiers, unlike the former whole-subject search: a later word such as
+# ``plante`` or ``rendement`` cannot turn an unknown diagnosis into a benign
+# assertion. These categories cover programme, practice, timing, rotation, and
+# other clearly non-diagnostic statements already required by the UI.
+_BENIGN_SUBJECT_HEAD = re.compile(
+    r"^(?:(?:bon(?:ne)?|meilleur(?:e)?|mauvais(?:e)?)\s+)?"
+    r"(?:programme|projet|offensive|initiative|politique|strategie|plan|"
     r"campagne|technique|methode|pratique|approche|solution|option|itineraire|"
-    r"rotation|association|assolement|jachere|semis|repiquage|sarclage|"
-    r"buttage|labour|paillage|compostage|irrigation|arrosage|drainage|"
-    r"variete|semence|culture|cereale|legumineuse|espece|plante|arbre|"
-    r"saison|periode|moment|calendrier|climat|pluie|pluviometrie|secheresse|"
+    r"rotation|association|assolement|jachere|semis|repiquage|sarclage|buttage|"
+    r"labour|paillage|compostage|irrigation|arrosage|drainage|variete|"
+    r"semence|culture|cereale|legumineuse|espece|plante|arbre|saison|"
+    r"periode|moment|calendrier|climat|pluie|pluviometrie|secheresse|"
     r"humidite|temperature|vent|sol|terre|fertilite|matiere organique|"
-    r"manque|exces|deficit|bonne|mauvaise|conseil|recommandation|question|"
-    r"idee|reponse|information|marche|prix|revenu|budget|cooperative|"
-    r"formation|reunion|oaph|cilss|inera|maerah)\b"
+    r"manque|exces|deficit|nourriture|couverture|structure|bordure|"
+    r"conseil|recommandation|question|idee|reponse|information|marche|"
+    r"prix|revenu|budget|cooperative|formation|reunion|oaph|cilss|inera|maerah)\b"
 )
-
-# Words that mark a subject as a plant health problem without naming a specific
-# disease: pathology suffixes (-ose/-iose/-ure/-mycose), generic problem nouns,
-# and common pest/damage vocabulary. Lexicon-independent so a disease not in any
-# list ("ergot", "striure", "helminthosporiose") is still caught.
-_DISEASE_SUBJECT = re.compile(
-    _DISEASE_TERMS
-    # Pathology suffixes only. A bare "-ure" is far too common in benign French
-    # ("nourriture", "ouverture", "bordure", "structure"), so it is not used;
-    # specific disease words ending in -ure ("striure", "brunissure") are listed
-    # explicitly below instead.
-    + r"|\b\w*(?:ose|iose|mycose|sporiose|ellose)\b"
-    + r"|\b(?:maladie|infection|attaque|carence|deficience|parasite|ravageur|"
-    r"nuisible|pathogene|virus|bacterie|champignon|moisissure|pourriture|"
-    r"fonte|tavelure|gale|brunissure|noircissure|chancre|galle|nanisme|"
-    r"deperissement|necrose|chlorose|striure|ergot|larve|ver|asticot|"
-    r"pucero\w*|cochenille|criquet|sauterelle|foreur|mineuse|charancon)\b"
+_LEADING_SUBJECT_DETERMINER = re.compile(
+    r"^\s*(?:(?:d|l)['’]\s*|de\s+l['’]\s*|de\s+la\s+|du\s+|des\s+|"
+    r"de\s+|la\s+|le\s+|les\s+|une\s+|un\s+)"
 )
 
 
-def _subject_is_diagnosis(subject: str) -> bool:
-    """Classify the subject named by a firm-assertion frame.
+def _subject_without_determiners(subject: str) -> str:
+    folded = _fold(subject).strip()
+    previous = None
+    while folded and folded != previous:
+        previous = folded
+        folded = _LEADING_SUBJECT_DETERMINER.sub("", folded, count=1)
+    return folded
 
-    A subject is a diagnosis when it looks like a plant health problem
-    (pathology morphology, or disease/pest vocabulary) and is not one of the
-    recognized benign agronomic subjects. This avoids depending on an exhaustive
-    list of disease names.
-    """
-    folded = _fold(subject)
-    if not folded.strip():
-        return False
-    if not _DISEASE_SUBJECT.search(folded):
-        return False
-    # A subject may mention both (e.g. "rotation contre la rouille"); a benign
-    # head noun with no damage claim should not be treated as a diagnosis.
-    if _BENIGN_SUBJECT.search(folded) and not _DIAGNOSIS_CONTEXT.search(folded):
-        return False
-    return True
+
+def _subject_is_hedged_or_negated(subject: str) -> bool:
+    normalized = _subject_without_determiners(subject)
+    return bool(
+        _HEDGED_SUBJECT_START.search(normalized)
+        or _NEGATED_SUBJECT_START.search(normalized)
+    )
+
+
+def _subject_has_benign_head(subject: str) -> bool:
+    """Whether the subject begins with a clearly non-diagnostic category."""
+    return bool(_BENIGN_SUBJECT_HEAD.search(_subject_without_determiners(subject)))
 
 
 # Generic certainty phrasing ("certainement", "la plante a…") that is a
@@ -541,22 +591,24 @@ _CERTAINTY_WITH_CONTEXT = (
 
 
 def _is_definitive_diagnosis(lowered: str) -> bool:
-    """True when the sentence states a firm diagnosis.
+    """True when the sentence states an unhedged firm diagnosis.
 
-    Detection is lexicon-independent for named subjects: a firm-assertion frame
-    ("il s'agit de …", "la cause est …", "c'est …", "signes confirment …")
-    naming a plant-health problem is a diagnosis even when the specific disease
-    is not in any list, while a frame naming a programme, technique, practice, or
-    environmental factor is not. Generic certainty phrasing counts only with
-    disease/pest/symptom/damage context, so confident non-agronomic statements
-    are left untouched.
+    Named assertion frames are unsafe by default. They pass only when their own
+    subject is explicitly hedged/negated or begins with a clearly benign
+    category. No disease lexicon or pathology suffix is consulted.
     """
     if any(pattern.search(lowered) for pattern in _DIAGNOSIS_UNCONDITIONAL):
         return True
     for frame in _NAMED_SUBJECT_FRAMES:
-        match = frame.search(lowered)
-        if match and _subject_is_diagnosis(match.group("subject")):
-            return True
+        # Advance from the start rather than the end so a hedged frame whose
+        # subject text contains another frame cannot consume and hide it.
+        start = 0
+        while match := frame.search(lowered, start):
+            subject = match.group("subject")
+            if not _subject_is_hedged_or_negated(subject):
+                if not _subject_has_benign_head(subject):
+                    return True
+            start = match.start() + 1
     if _DIAGNOSIS_CONTEXT.search(lowered) and any(
         pattern.search(lowered) for pattern in _CERTAINTY_WITH_CONTEXT
     ):
@@ -572,7 +624,7 @@ def unsafe_reasons(sentence: str, *, check_diagnosis: bool = True) -> tuple[str,
     # Active-ingredient spellings vary in accentuation, so product and dose
     # matching uses the accent-stripped form.
     folded = _fold(text)
-    lowered = text.casefold()
+    lowered = text.casefold().replace("’", "'")
 
     reasons: list[str] = []
     if _PESTICIDE_PATTERN.search(folded) or _PRODUCT_CLASS_RECOMMENDATION.search(

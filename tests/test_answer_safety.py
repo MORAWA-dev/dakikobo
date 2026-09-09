@@ -648,3 +648,237 @@ def test_real_cross_sentence_dose_is_still_removed():
     assert CHEMICAL_DOSE in review.reasons
     assert "100 kg/ha" not in review.text
     assert "L'urée convient." in review.text
+
+
+
+# ---------------------------------------------------------------------------
+# PR review round 4 — default-unsafe diagnosis frames and per-quantity safety
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit du feu bactérien.",
+        "La cause est le flétrissement bactérien.",
+        "C'est le botrytis.",
+        "Ce sont des pucerons.",
+        "La cause est l'helminthosporiose de la plante.",
+    ],
+)
+def test_unhedged_firm_diagnosis_frames_are_unsafe_by_default(sentence):
+    """A firm diagnosis must not depend on knowing the disease name."""
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence)
+    review = redact_unsafe_text(sentence)
+    assert DEFINITIVE_DIAGNOSIS in review.reasons
+    assert review.blocked is True
+    assert review.text == ""
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "C'est peut-être la rouille.",
+        "C'est probablement le mildiou.",
+        "Le test ne confirme pas la rouille.",
+        "Il s'agit d'une variété résistante à la rouille.",
+        "Il s'agit du programme OAPH.",
+        "Il s'agit d'une technique de conservation de l'eau.",
+        "C'est certainement le bon moment pour semer.",
+        "Il s'agit de la rotation des cultures.",
+    ],
+)
+def test_hedges_negations_and_benign_subject_heads_survive_unchanged(sentence):
+    assert unsafe_reasons(sentence) == ()
+    review = redact_unsafe_text(sentence)
+    assert review.reasons == ()
+    assert review.text == sentence
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "L'urée convient. Appliquez 100 kg/ha pour améliorer le rendement.",
+        "L'urée convient. Appliquez 2 g par plant.",
+        "L'urée convient. Appliquez 100 kg/ha et semez 20 kg de semences.",
+        "Appliquez 0,1 tonne/ha d'urée.",
+        "Apportez 50 unités d'azote par hectare.",
+        "Apportez 50 kg N/ha.",
+    ],
+)
+def test_each_unsafe_quantity_occurrence_is_blocked_independently(text):
+    review = redact_unsafe_text(text)
+    assert CHEMICAL_DOSE in review.reasons
+    assert "Appliquez 100 kg/ha" not in review.text
+    assert "Appliquez 2 g par plant" not in review.text
+    assert "0,1 tonne/ha" not in review.text
+    assert "50 unités d'azote" not in review.text
+    assert "50 kg N/ha" not in review.text
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Arrosez avec 20 litres d'eau et appliquez le paillage.",
+        "Semez 20 kg de semences et conservez le reste au sec.",
+        "Ajoutez 5 kg de compost par pied et couvrez le sol.",
+        "Le rendement atteint 1 200 kg/ha de grain avec une bonne pluie.",
+        "Respectez 80 cm entre les lignes et 40 cm sur la ligne.",
+    ],
+)
+def test_each_genuinely_benign_quantity_remains_safe(sentence):
+    assert CHEMICAL_DOSE not in unsafe_reasons(sentence)
+    review = redact_unsafe_text(sentence)
+    assert review.reasons == ()
+    assert review.text == sentence
+
+
+
+# Semantic review regressions: occurrence binding and repeated assertion frames.
+
+def test_yield_quantity_cannot_launder_a_later_fertilizer_dose():
+    text = "Le rendement cible est 2 t/ha et la dose d'engrais est 100 kg/ha."
+    assert CHEMICAL_DOSE in unsafe_reasons(text)
+    assert CHEMICAL_DOSE in redact_unsafe_text(text).reasons
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Apportez 50 kg P2O5/ha.",
+        "Apportez 40 kg K2O/ha.",
+    ],
+)
+def test_standard_nutrient_rate_notation_is_blocked(sentence):
+    assert CHEMICAL_DOSE in unsafe_reasons(sentence)
+
+
+def test_hedged_frame_cannot_hide_a_second_firm_diagnosis():
+    sentence = "C'est peut-être la rouille mais c'est le botrytis."
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence)
+    assert redact_unsafe_text(sentence).blocked is True
+
+
+@pytest.mark.parametrize(
+    "text,quantity",
+    [
+        ("Après l'engrais, gardez un espacement de 80 cm.", "80 cm"),
+        ("L'urée convient. Arrosez avec 20 litres pour l'irrigation.", "20 litres"),
+    ],
+)
+def test_local_spacing_and_irrigation_context_survives_chemical_mentions(
+    text, quantity
+):
+    review = redact_unsafe_text(text)
+    assert CHEMICAL_DOSE not in review.reasons
+    assert quantity in review.text
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit d'une solution de paillage.",
+        "Il s'agit d'une option de rotation.",
+    ],
+)
+def test_additional_clearly_benign_subject_heads_survive(sentence):
+    assert unsafe_reasons(sentence) == ()
+    assert redact_unsafe_text(sentence).text == sentence
+
+
+
+# French typography and adjacent-context regressions from final safety review.
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s’agit du botrytis.",
+        "C’est le botrytis.",
+        "L’origine est le botrytis.",
+    ],
+)
+def test_typographic_apostrophes_do_not_bypass_firm_diagnosis_frames(sentence):
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Le rendement est 2 t/ha et la quantité d'engrais est 100 kg/ha.",
+        "L'espacement est 80 cm et la quantité d'urée est 100 kg/ha.",
+        "Le rendement est 2 t/ha et l'engrais correspond à 100 kg/ha.",
+    ],
+)
+def test_named_chemical_quantity_cannot_borrow_an_earlier_benign_head(text):
+    assert CHEMICAL_DOSE in unsafe_reasons(text)
+
+
+def test_nutrient_rate_in_units_is_blocked():
+    assert CHEMICAL_DOSE in unsafe_reasons("Apportez 50 unités P2O5/ha.")
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit d'une possible rouille.",
+        "Il s'agit non pas de la rouille mais d'un stress hydrique.",
+    ],
+)
+def test_attached_hedges_and_non_pas_negation_are_preserved(sentence):
+    assert unsafe_reasons(sentence) == ()
+    assert redact_unsafe_text(sentence).text == sentence
+
+
+@pytest.mark.parametrize(
+    "text,quantity",
+    [
+        ("L’urée convient. Arrosez avec 20 litres d’eau par pied.", "20 litres d’eau"),
+        ("L’urée convient. Arrosez avec 20 litres pour l’irrigation.", "20 litres"),
+    ],
+)
+def test_typographic_apostrophes_preserve_benign_water_quantities(text, quantity):
+    review = redact_unsafe_text(text)
+    assert CHEMICAL_DOSE not in review.reasons
+    assert quantity in review.text
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit d'une plante résistante.",
+        "Il s'agit d'un arbre sain.",
+    ],
+)
+def test_anchored_plant_and_tree_heads_are_benign(sentence):
+    assert unsafe_reasons(sentence) == ()
+
+
+
+# Alternate nutrient syntax and clause-bound quantity ownership regressions.
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "La recommandation est 50 kg N par hectare.",
+        "La recommandation est 50 kg P par hectare.",
+        "La recommandation est 50 kg K par hectare.",
+        "La recommandation est 50 kg P2O5 par hectare.",
+        "La recommandation est 50 kg K2O par hectare.",
+        "La recommandation est 50 kg de N/ha.",
+        "La recommandation est 50 kg de P2O5/ha.",
+        "La recommandation est 50 unités K2O par hectare.",
+    ],
+)
+def test_alternate_nutrient_rate_syntax_is_blocked(sentence):
+    assert CHEMICAL_DOSE in unsafe_reasons(sentence)
+
+
+def test_tandis_que_stops_yield_from_laundering_fertilizer_quantity():
+    text = "Le rendement est 2 t/ha tandis que l'engrais est 100 kg/ha."
+    assert CHEMICAL_DOSE in unsafe_reasons(text)
+
+
+def test_postposed_spacing_head_remains_benign_near_chemical_context():
+    text = "L’urée convient. Respectez 80 cm d’espacement entre les rangs."
+    review = redact_unsafe_text(text)
+    assert CHEMICAL_DOSE not in review.reasons
+    assert "80 cm d’espacement" in review.text

@@ -214,6 +214,7 @@ def _fertilizer_gate_example(result: dict) -> dict:
         "audio_url": "",
         "answer_kind": advice.get("answer_kind", "refusal"),
         "case": advice.get("case"),
+        "answer_path": "fertilizer",
     }
 
 

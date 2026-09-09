@@ -2291,3 +2291,139 @@ def test_service_worker_identity_changes_with_the_safety_revision(monkeypatch):
         "a code-only safety deployment left the service worker, and therefore "
         "its saved answers, on the previous cache identity"
     )
+
+
+
+# ---------------------------------------------------------------------------
+# PR review round 4 — structural diagnosis, quantity, and demo metadata gates
+# ---------------------------------------------------------------------------
+
+class _SafetyAnswerRagChain:
+    """Return one model answer so route tests exercise the production filter."""
+
+    def __init__(self, answer):
+        self.answer = answer
+
+    def invoke(self, query):
+        return {
+            "result": self.answer,
+            "source_documents": [
+                SimpleNamespace(
+                    metadata={"source": "guide_securite.pdf"},
+                    page_content="Conseils agricoles généraux à confirmer au champ.",
+                )
+            ],
+        }
+
+
+def _ask_with_model_answer(monkeypatch, answer):
+    _install_rag(monkeypatch, _SafetyAnswerRagChain(answer))
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Que faut-il vérifier au champ ?"}
+    )
+    assert response.status_code == 200
+    return response.get_json()["answer"]
+
+
+@pytest.mark.parametrize(
+    "diagnosis",
+    [
+        "Il s'agit du feu bactérien.",
+        "La cause est le flétrissement bactérien.",
+        "C'est le botrytis.",
+        "Ce sont des pucerons.",
+        "La cause est l'helminthosporiose de la plante.",
+        "C'est peut-être la rouille mais c'est le botrytis.",
+        "Il s’agit du botrytis.",
+    ],
+)
+def test_ask_blocks_unhedged_firm_diagnoses_without_a_lexicon(
+    monkeypatch, diagnosis
+):
+    answer = _ask_with_model_answer(monkeypatch, diagnosis)
+    assert diagnosis not in answer
+
+
+@pytest.mark.parametrize(
+    "safe_answer",
+    [
+        "C'est peut-être la rouille.",
+        "C'est probablement le mildiou.",
+        "Le test ne confirme pas la rouille.",
+        "Il s'agit d'une variété résistante à la rouille.",
+        "Il s'agit du programme OAPH.",
+        "Il s'agit d'une technique de conservation de l'eau.",
+        "C'est certainement le bon moment pour semer.",
+        "Il s'agit de la rotation des cultures.",
+    ],
+)
+def test_ask_preserves_hedges_negations_and_benign_diagnosis_subjects(
+    monkeypatch, safe_answer
+):
+    assert _ask_with_model_answer(monkeypatch, safe_answer) == safe_answer
+
+
+@pytest.mark.parametrize(
+    "unsafe_answer,forbidden",
+    [
+        (
+            "L'urée convient. Appliquez 100 kg/ha pour améliorer le rendement.",
+            "100 kg/ha",
+        ),
+        ("L'urée convient. Appliquez 2 g par plant.", "2 g par plant"),
+        (
+            "L'urée convient. Appliquez 100 kg/ha et semez 20 kg de semences.",
+            "100 kg/ha",
+        ),
+        ("Appliquez 0,1 tonne/ha d'urée.", "0,1 tonne/ha"),
+        ("Apportez 50 unités d'azote par hectare.", "50 unités d'azote"),
+        ("Apportez 50 kg N/ha.", "50 kg N/ha"),
+        ("Apportez 50 kg P2O5/ha.", "50 kg P2O5/ha"),
+        ("Apportez 40 kg K2O/ha.", "40 kg K2O/ha"),
+        ("Apportez 50 unités P2O5/ha.", "50 unités P2O5/ha"),
+        (
+            "Le rendement cible est 2 t/ha et la dose d'engrais est 100 kg/ha.",
+            "100 kg/ha",
+        ),
+        (
+            "Le rendement est 2 t/ha et la quantité d'engrais est 100 kg/ha.",
+            "100 kg/ha",
+        ),
+    ],
+)
+def test_ask_blocks_each_unsafe_quantity_occurrence(
+    monkeypatch, unsafe_answer, forbidden
+):
+    answer = _ask_with_model_answer(monkeypatch, unsafe_answer)
+    assert forbidden not in answer
+
+
+def test_fertilizer_demo_declares_its_answer_path_in_the_example_layer():
+    from core.examples import get_demo_example
+
+    example = get_demo_example("fumure_sorgho")
+    assert example["answer_path"] == "fertilizer"
+
+
+def test_demo_route_consumes_answer_path_metadata_without_an_id_special_case(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        app_module,
+        "get_demo_example",
+        lambda example_id: {
+            "kind": "message",
+            "question": "Exemple synthétique",
+            "answer": "Conseil déterministe.",
+            "sources": [],
+            "confidence": "Faible",
+            "audio_url": "",
+            "answer_path": "fertilizer",
+        },
+    )
+
+    payload = app_module.app.test_client().get("/examples/autre_id").get_json()
+
+    assert payload["journal"]["answer_path"] == "fertilizer"
+    assert "answer_path" not in payload
