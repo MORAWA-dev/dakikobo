@@ -321,17 +321,19 @@ def _build_pesticide_pattern(terms) -> "re.Pattern[str]":
 
     Terms are matched against the accent-stripped, lower-cased text but only at
     token boundaries, where a boundary is the start/end of the string or any
-    character that is not a letter, digit, or apostrophe. This way "decis"
+    character that is not a letter or digit. Apostrophes are token separators in
+    French elision, so both ``l'imidaclopride`` and ``l’imidaclopride`` must
+    expose the active ingredient to this matcher. This way "decis"
     matches the standalone trade name and "phosphure d'aluminium" matches as a
     phrase, while "decision" (which merely contains "decis") does not.
     """
-    boundary_left = r"(?:(?<=^)|(?<=[^a-z0-9']))"
+    boundary_left = r"(?:(?<=^)|(?<=[^a-z0-9]))"
     # A short, closed set of French inflection endings may follow a term before
     # the boundary, so "mancozeb" matches "mancozèbe" and a plural trade name
     # matches, without letting "decis" reach into "decision" ("ion" is not an
     # allowed ending).
     inflection = r"(?:e|es|s)?"
-    boundary_right = r"(?=$|[^a-z0-9'])"
+    boundary_right = r"(?=$|[^a-z0-9])"
     alternatives = "|".join(
         re.escape(_fold(term)).replace(r"\ ", r"\s+") for term in terms
     )
@@ -376,6 +378,15 @@ _QUANTITY = re.compile(
     rf"(?:{_NUTRIENT_RATE_SUFFIX}|\s*/\s*{_RATE_TARGET}|"
     rf"\s+par\s+{_RATE_TARGET})?|"
     rf"\b{_PERCENTAGE}(?=$|[^a-z0-9]))"
+)
+# Container application rates require a denominator so an unsafe instruction
+# (``deux sacs d'urée par hectare``) is distinguishable from benign inventory
+# or storage guidance (``stockez deux sacs d'urée au sec``). Product words may
+# occur between the container and denominator, so bags do not belong in the
+# general measure-unit pattern.
+_CONTAINER_RATE = re.compile(
+    rf"\b{_NUMBER}\s+(?:sacs?|bidons?|seaux?|bo[iî]tes?|paquets?)\b"
+    rf"[^.!?;:]{{0,60}}?(?:/\s*|\bpar\s+){_RATE_TARGET}\b"
 )
 # A fertilizer formulation such as 14-23-14 is itself a dose statement.
 _NPK_FORMULA = re.compile(r"\b\d{1,2}\s*-\s*\d{1,2}\s*-\s*\d{1,2}\b")
@@ -468,6 +479,11 @@ def _quantity_is_dose(sentence: str, block: str) -> bool:
     """Whether any independently classified quantity is a chemical dose."""
     folded_sentence = _fold(sentence)
     folded_block = _fold(block)
+    if _CONTAINER_RATE.search(folded_sentence) and (
+        _CHEMICAL_CONTEXT.search(folded_block)
+        or _PESTICIDE_PATTERN.search(folded_block)
+    ):
+        return True
     return any(
         _quantity_occurrence_is_dose(match, folded_sentence, folded_block)
         for match in _QUANTITY.finditer(folded_sentence)
@@ -613,7 +629,7 @@ _CERTAINTY_WITH_CONTEXT = (
         r"\b(?:votre|vos|la|le|les|cette|ce|ces)\s+"
         r"(?:plante|culture|champ|parcelle|ma[iï]s|mil|sorgho|riz|ni[eé]b[eé]|"
         r"arachide|soja|coton|s[eé]same|fonio)s?\s+"
-        r"(?:a\s|ont\s|souffre\w*|est atteinte?|sont atteints?)"
+        r"(?:a\s|ont\s|souffre\w*|pr[eé]sent\w*|est atteinte?|sont atteints?)"
     ),
 )
 
@@ -819,7 +835,7 @@ _AGENT_DIRECTION_STEMS = (
     "clinique",
 )
 _AGENT_DIRECTION_PATTERN = re.compile(
-    r"(?:(?<=^)|(?<=[^a-z0-9']))(?:"
+    r"(?:(?<=^)|(?<=[^a-z0-9]))(?:"
     + "|".join(re.escape(stem) for stem in _AGENT_DIRECTION_STEMS)
     + r")[a-z]*"
 )
@@ -836,7 +852,7 @@ _NON_AFFIRMATIVE_AGENT_DIRECTION = re.compile(
     + r"|"
     r"\bne\s+(?:devez|doit|faut|faudrait|"
     + _REFERRAL_ACTION
-    + r")[^.!?]{0,35}\b(?:pas|jamais|plus)\b[^.!?]{0,60}"
+    + r")[^.!?]{0,35}\b(?:pas|jamais|plus|aucun(?:e)?)\b[^.!?]{0,60}"
     + _AGENT_DIRECTION_PATTERN.pattern
     + r"|"
     r"\b(?:inutile|pas n[eé]cessaire|aucun besoin)\s+de\s+"

@@ -305,6 +305,35 @@ def test_definitive_diagnosis_is_replaced_by_a_hedged_refusal(monkeypatch):
     assert out["case"]["needs_human_confirmation"] is True
 
 
+def test_elision_bag_rate_presenter_diagnosis_and_negative_referral_are_removed(
+    monkeypatch,
+):
+    payload = {
+        "observations": ["Taches brunes visibles."],
+        "problemes_possibles": ["Le maïs présente la rouille."],
+        "actions_immediates": [
+            "Utilisez de l’imidaclopride.",
+            "Appliquez de l’atrazine.",
+            "Fertilisez avec deux sacs d’urée par hectare.",
+        ],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": "Ne contactez aucun agent agricole.",
+        "reponse_courte": "Le maïs présente la rouille.",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(_json.dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="maïs")
+    serialized = _json.dumps(out, ensure_ascii=False).lower()
+
+    assert "imidaclopride" not in serialized
+    assert "atrazine" not in serialized
+    assert "par hectare" not in serialized
+    assert "présente la rouille" not in serialized
+    assert "ne contactez aucun" not in serialized
+    assert out["case"]["confirmation"] == _CONFIRMATION_FALLBACK
+    assert REDACTION_NOTICE in out["answer"]
+
+
 def test_empty_object_yields_deterministic_refusal_not_raw_json(monkeypatch):
     _patch(monkeypatch, _FakeResp(200, _candidate('{"autre": "valeur"}')))
 

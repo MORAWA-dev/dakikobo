@@ -2028,6 +2028,38 @@ def test_ask_blocks_passive_infection_and_contamination(monkeypatch, diagnosis):
     assert REDACTION_NOTICE in payload["answer"]
 
 
+def test_ask_removes_new_adversarial_instructions_before_json_and_speech(monkeypatch):
+    model_answer = (
+        "Utilisez de l’imidaclopride. "
+        "Appliquez de l’atrazine. "
+        "Fertilisez avec deux sacs d’urée par hectare. "
+        "Le maïs présente la rouille. "
+        "Observez les feuilles chaque matin."
+    )
+    harness = _UnsafeAnswerHarness(model_answer)
+    spoken = []
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(
+        app_module, "text_to_speech_to_static", lambda text: spoken.append(text) or ""
+    )
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Que faut-il appliquer au champ ?"}
+    )
+    payload = response.get_json()
+    forbidden = ("imidaclopride", "atrazine", "par hectare", "présente la rouille")
+
+    assert response.status_code == 200
+    assert spoken == [payload["answer"]]
+    assert "Observez les feuilles chaque matin." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+    for phrase in forbidden:
+        assert phrase not in payload["answer"].lower()
+        assert phrase not in spoken[0].lower()
+
+
 @pytest.mark.parametrize(
     "sentence",
     [

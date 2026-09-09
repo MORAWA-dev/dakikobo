@@ -96,6 +96,38 @@ def test_pesticide_identity_provides_cross_field_dose_context():
 def test_passive_infection_and_contamination_are_diagnoses(text):
     assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(text)
 
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Utilisez de l'imidaclopride.",
+        "Utilisez de l’imidaclopride.",
+        "Appliquez de l'atrazine.",
+        "Appliquez de l’atrazine.",
+    ],
+)
+def test_french_elision_cannot_hide_a_blocked_pesticide(text):
+    assert PESTICIDE_PRODUCT in unsafe_reasons(text)
+
+
+def test_bag_per_area_fertilizer_rate_is_blocked_but_storage_count_is_kept():
+    instruction = "Fertilisez avec deux sacs d'urée par hectare."
+    assert CHEMICAL_DOSE in unsafe_reasons(instruction)
+    assert unsafe_reasons("Stockez deux sacs d'urée au sec.") == ()
+
+
+def test_presenter_verb_cannot_hide_a_definitive_diagnosis():
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons("Le maïs présente la rouille.")
+
+
+def test_negative_aucun_agent_referral_uses_fallback():
+    fallback = "Montrez la plante à votre agent agricole pour confirmer."
+    assert (
+        safe_confirmation("Ne contactez aucun agent agricole.", fallback=fallback)
+        == fallback
+    )
+
+
 _AGENT_FALLBACK = "Montrez la plante à un agent agricole pour confirmer."
 
 
