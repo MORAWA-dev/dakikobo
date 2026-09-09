@@ -891,9 +891,14 @@ def demo_example(example_id):
             "confidence": "Faible",
         }), 404
     input_type = (example.get("case") or {}).get("input_type", "text")
-    answer_path = "vision" if input_type == "image" else (
-        "fertilizer" if input_type == "fertilizer" else "rag"
-    )
+    # The fertilizer demo may come back as a gated refusal (case is None), so
+    # its answer path is pinned rather than inferred from the case.
+    if example_id == "fumure_sorgho":
+        answer_path = "fertilizer"
+    else:
+        answer_path = "vision" if input_type == "image" else (
+            "fertilizer" if input_type == "fertilizer" else "rag"
+        )
     example["journal"] = _journal_metadata(answer_path=answer_path)
     return jsonify(example)
 

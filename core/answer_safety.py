@@ -349,7 +349,7 @@ _PRODUCT_CLASS_RECOMMENDATION = re.compile(
     r"raticide|produit chimique|produit phytosanitaire|matiere active)\b"
 )
 
-# A quantity that could be read as an application rate.
+# A number + unit that could be read as an application rate.
 _QUANTITY = re.compile(
     r"\b\d+(?:[.,]\d+)?\s*"
     r"(?:kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
@@ -357,7 +357,8 @@ _QUANTITY = re.compile(
 )
 # A fertilizer formulation such as 14-23-14 is itself a dose statement.
 _NPK_FORMULA = re.compile(r"\b\d{1,2}\s*-\s*\d{1,2}\s*-\s*\d{1,2}\b")
-# Chemical context that turns a bare quantity into an application rate.
+# Chemical inputs (fertilizers, treatments). Presence of one of these anywhere in
+# the surrounding text is what can turn a bare quantity into an application rate.
 _CHEMICAL_CONTEXT = re.compile(
     r"\b(?:engrais|npk|npkb|uree|dap|tsp|kcl|potasse|phosphate|ammonitrate|"
     r"sulfate|nitrate|azote|cuivre|soufre|fumure|microdose|micro-dose|"
@@ -365,6 +366,54 @@ _CHEMICAL_CONTEXT = re.compile(
     r"produit|traitement|bouillie|matiere active|dose|dosage|solution|"
     r"pulverisation|semence traitee)\b"
 )
+
+# What a quantity measures. When the number is tied to one of these benign
+# nouns — water, seed, organic matter, spacing, or an explicit yield — it is
+# never a chemical dose, no matter what other words share the sentence or block.
+_BENIGN_MEASURED_NOUN = re.compile(
+    r"\b(?:d'|de )?(?:eau|pluie|irrigation|arrosage|"
+    r"semences?|graines?|plants?|boutures?|"
+    r"compost|fumier|matiere organique|paille|residus?|mulch|"
+    r"grains?|rendement|recolte|production|"
+    r"terre|terreau|sable|gravier|"
+    r"distance|espacement|profondeur|longueur|largeur|hauteur)\b"
+)
+# A quantity tied directly to a chemical input, e.g. "100 kg de NPK",
+# "2 g d'urée", "50 kg/ha de phosphate". This is a dose on its own.
+_QUANTITY_OF_CHEMICAL = re.compile(
+    r"\b\d+(?:[.,]\d+)?\s*"
+    r"(?:kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
+    r"sachets?|bouchons?|cuilleres?|capsules?|doses?)"
+    r"(?:\s*/\s*(?:ha|hectares?|m2|m²|l|litres?|pieds?|plants?|poquets?))?"
+    r"\s+(?:d'|de\s+|de la\s+|du\s+|des\s+)?"
+    + _CHEMICAL_CONTEXT.pattern.replace(r"\b(?:", r"(?:", 1)
+)
+
+
+def _quantity_is_dose(sentence: str, block: str) -> bool:
+    """Whether a numeric quantity in ``sentence`` is a chemical dose.
+
+    ``block`` is the surrounding text (the whole answer block), used only to
+    decide whether a *bare* quantity — one with no benign measured noun of its
+    own — is an application rate because a chemical input is described nearby.
+
+    A quantity that measures water, seed, organic matter, spacing, or yield is
+    never a dose, even when a chemical word appears elsewhere in the block. A
+    quantity tied directly to a chemical input is always a dose.
+    """
+    folded_sentence = _fold(sentence)
+    if not _QUANTITY.search(folded_sentence):
+        return False
+    # Directly named chemical quantity ("100 kg/ha de NPK") — always a dose.
+    if _QUANTITY_OF_CHEMICAL.search(folded_sentence):
+        return True
+    # A quantity that names what it measures (water/seed/compost/yield/spacing)
+    # is that thing, not a dose — regardless of nearby chemical words.
+    if _BENIGN_MEASURED_NOUN.search(folded_sentence):
+        return False
+    # A bare quantity with no benign noun is a dose when the block describes a
+    # chemical input (in this or any other sentence).
+    return bool(_CHEMICAL_CONTEXT.search(_fold(block)))
 
 # Diagnosis patterns run against accent-preserving lower case. Stripping accents
 # would merge the preposition "à" into the verb "a" and wrongly flag the
@@ -388,30 +437,6 @@ _DIAGNOSIS_CONTEXT = re.compile(
     r"d[eé]g[aâ]ts?|pourri\w*|moisiss\w*|d[eé]p[eé]riss\w*)\b"
 )
 
-# Sentence-level assertions that state a firm diagnosis when disease context is
-# present. Each is applied only after ``_DIAGNOSIS_CONTEXT`` matches the
-# sentence, so it never fires on a confident non-agronomic statement.
-_DIAGNOSIS_ASSERTIONS = (
-    # The prompt mandates the hedged "il pourrait s'agir de"; the indicative
-    # "il s'agit de" is an assertion. "il s'agit peut-être" stays hedged.
-    re.compile(r"\bil s'agit\b(?!\s+(?:peut-[eê]tre|probablement|sans doute\b))"),
-    re.compile(r"\bc'est\s+(?:bien|clairement|certainement|s[uû]rement)?\s*"
-               r"(?:un|une|le|la|l'|du|de la|des)?\s*" + _DISEASE_TERMS),
-    # "La cause est la rouille", "le problème est une carence".
-    re.compile(r"\b(?:la cause|le probl[eè]me|le souci|l'origine)\s+"
-               r"(?:en\s+)?est\b"),
-    # "Ces signes confirment une rouille", "cela confirme le mildiou".
-    re.compile(r"\bconfirm(?:e|ent|ons)\b"),
-    re.compile(r"\bsignes?\s+(?:confirm\w+|indiquent|montrent|r[eé]v[eè]lent)\b"),
-    # Certainty adverbs — only counted when the sentence has disease context.
-    re.compile(
-        r"\b(?:certainement|assur[eé]ment|indubitablement|à coup s[uû]r|"
-        r"avec certitude|sans aucun doute)\b"
-    ),
-    re.compile(r"\b100\s*%\s*(?:s[uû]r|certain)\b"),
-    re.compile(r"\b(?:votre|la|cette)\s+plante\s+(?:a\s|souffre|est atteinte)"),
-)
-
 # Assertions that are firm diagnoses on their own, regardless of extra context
 # (they already name the clinical act or a confirmed disease).
 _DIAGNOSIS_UNCONDITIONAL = (
@@ -420,19 +445,123 @@ _DIAGNOSIS_UNCONDITIONAL = (
     re.compile(r"\bmaladie (?:identifi[eé]e|confirm[eé]e|certaine)\b"),
 )
 
+# Firm-assertion frames that *name a subject*: "il s'agit de X", "la cause est
+# X", "c'est X", "ces signes confirment X". The captured X is then classified as
+# a diagnosis or not, so detection does not depend on X being in a fixed disease
+# list. Hedged forms ("il s'agit peut-être") are excluded from the frame.
+_NAMED_SUBJECT_FRAMES = (
+    re.compile(
+        r"\bil s'agit\b(?!\s+(?:peut-[eê]tre|probablement|sans doute))"
+        r"\s+(?:d'|de la |de l'|du |des |de |d')?(?P<subject>[^.!?,;:]+)"
+    ),
+    re.compile(
+        r"\b(?:la cause|le probl[eè]me|le souci|l'origine)\s+(?:en\s+)?est\s+"
+        r"(?:d'|de la |de l'|du |des |de |d'|la |le |les |une |un |l')?"
+        r"(?P<subject>[^.!?,;:]+)"
+    ),
+    re.compile(
+        r"\bc'est\s+(?:bien|clairement|certainement|s[uû]rement)?\s*"
+        r"(?:la |le |les |l'|une |un |du |de la |des )?(?P<subject>[^.!?,;:]+)"
+    ),
+    re.compile(
+        r"\bsignes?\s+(?:confirm\w+|indiquent|montrent|r[eé]v[eè]lent)\s+"
+        r"(?:une |un |la |le |les |l'|d'|de la )?(?P<subject>[^.!?,;:]+)"
+    ),
+    re.compile(
+        r"\bconfirm(?:e|ent|ons)\s+"
+        r"(?:une |un |la |le |les |l'|d'|de la )?(?P<subject>[^.!?,;:]+)"
+    ),
+)
+
+# Subjects that a firm assertion may name without being a plant diagnosis:
+# programmes, techniques, agronomic practices, environmental factors, and the
+# like. Compared against the accent-stripped subject text.
+_BENIGN_SUBJECT = re.compile(
+    r"\b(?:programme|projet|offensive|initiative|politique|strategie|plan|"
+    r"campagne|technique|methode|pratique|approche|solution|option|itineraire|"
+    r"rotation|association|assolement|jachere|semis|repiquage|sarclage|"
+    r"buttage|labour|paillage|compostage|irrigation|arrosage|drainage|"
+    r"variete|semence|culture|cereale|legumineuse|espece|plante|arbre|"
+    r"saison|periode|moment|calendrier|climat|pluie|pluviometrie|secheresse|"
+    r"humidite|temperature|vent|sol|terre|fertilite|matiere organique|"
+    r"manque|exces|deficit|bonne|mauvaise|conseil|recommandation|question|"
+    r"idee|reponse|information|marche|prix|revenu|budget|cooperative|"
+    r"formation|reunion|oaph|cilss|inera|maerah)\b"
+)
+
+# Words that mark a subject as a plant health problem without naming a specific
+# disease: pathology suffixes (-ose/-iose/-ure/-mycose), generic problem nouns,
+# and common pest/damage vocabulary. Lexicon-independent so a disease not in any
+# list ("ergot", "striure", "helminthosporiose") is still caught.
+_DISEASE_SUBJECT = re.compile(
+    _DISEASE_TERMS
+    # Pathology suffixes only. A bare "-ure" is far too common in benign French
+    # ("nourriture", "ouverture", "bordure", "structure"), so it is not used;
+    # specific disease words ending in -ure ("striure", "brunissure") are listed
+    # explicitly below instead.
+    + r"|\b\w*(?:ose|iose|mycose|sporiose|ellose)\b"
+    + r"|\b(?:maladie|infection|attaque|carence|deficience|parasite|ravageur|"
+    r"nuisible|pathogene|virus|bacterie|champignon|moisissure|pourriture|"
+    r"fonte|tavelure|gale|brunissure|noircissure|chancre|galle|nanisme|"
+    r"deperissement|necrose|chlorose|striure|ergot|larve|ver|asticot|"
+    r"pucero\w*|cochenille|criquet|sauterelle|foreur|mineuse|charancon)\b"
+)
+
+
+def _subject_is_diagnosis(subject: str) -> bool:
+    """Classify the subject named by a firm-assertion frame.
+
+    A subject is a diagnosis when it looks like a plant health problem
+    (pathology morphology, or disease/pest vocabulary) and is not one of the
+    recognized benign agronomic subjects. This avoids depending on an exhaustive
+    list of disease names.
+    """
+    folded = _fold(subject)
+    if not folded.strip():
+        return False
+    if not _DISEASE_SUBJECT.search(folded):
+        return False
+    # A subject may mention both (e.g. "rotation contre la rouille"); a benign
+    # head noun with no damage claim should not be treated as a diagnosis.
+    if _BENIGN_SUBJECT.search(folded) and not _DIAGNOSIS_CONTEXT.search(folded):
+        return False
+    return True
+
+
+# Generic certainty phrasing ("certainement", "la plante a…") that is a
+# diagnosis only alongside disease/pest/symptom/damage context in the sentence.
+_CERTAINTY_WITH_CONTEXT = (
+    re.compile(
+        r"\b(?:certainement|assur[eé]ment|indubitablement|à coup s[uû]r|"
+        r"avec certitude|sans aucun doute)\b"
+    ),
+    re.compile(r"\b100\s*%\s*(?:s[uû]r|certain)\b"),
+    re.compile(r"\b(?:votre|la|cette)\s+plante\s+(?:a\s|souffre|est atteinte)"),
+)
+
 
 def _is_definitive_diagnosis(lowered: str) -> bool:
     """True when the sentence states a firm diagnosis.
 
-    A generic certainty phrase counts only when the sentence also carries
-    disease/pest/symptom/plant-damage context, so confident statements about
-    programmes, techniques, or timing are not treated as diagnoses.
+    Detection is lexicon-independent for named subjects: a firm-assertion frame
+    ("il s'agit de …", "la cause est …", "c'est …", "signes confirment …")
+    naming a plant-health problem is a diagnosis even when the specific disease
+    is not in any list, while a frame naming a programme, technique, practice, or
+    environmental factor is not. Generic certainty phrasing counts only with
+    disease/pest/symptom/damage context, so confident non-agronomic statements
+    are left untouched.
     """
     if any(pattern.search(lowered) for pattern in _DIAGNOSIS_UNCONDITIONAL):
         return True
-    if not _DIAGNOSIS_CONTEXT.search(lowered):
-        return False
-    return any(pattern.search(lowered) for pattern in _DIAGNOSIS_ASSERTIONS)
+    for frame in _NAMED_SUBJECT_FRAMES:
+        match = frame.search(lowered)
+        if match and _subject_is_diagnosis(match.group("subject")):
+            return True
+    if _DIAGNOSIS_CONTEXT.search(lowered) and any(
+        pattern.search(lowered) for pattern in _CERTAINTY_WITH_CONTEXT
+    ):
+        return True
+    return False
 
 
 def unsafe_reasons(sentence: str, *, check_diagnosis: bool = True) -> tuple[str, ...]:
@@ -451,14 +580,13 @@ def unsafe_reasons(sentence: str, *, check_diagnosis: bool = True) -> tuple[str,
     ):
         reasons.append(PESTICIDE_PRODUCT)
 
-    # A bare quantity is a dose only next to a fertilizer, product, or treatment
-    # word. Requiring chemical context for every quantity — including per-plant
-    # and per-pied rates — keeps legitimate irrigation ("20 litres d'eau par
-    # pied"), seed ("20 kg de semences"), spacing ("80 cm"), compost ("5 kg de
-    # compost par pied"), and yield ("1 200 kg/ha de rendement") quantities.
-    if _NPK_FORMULA.search(folded) or (
-        _QUANTITY.search(folded) and _CHEMICAL_CONTEXT.search(folded)
-    ):
+    # A fertilizer formulation is a dose; otherwise a quantity is a dose only
+    # when it is a chemical quantity. What the number measures decides this, so
+    # irrigation ("20 litres d'eau par pied"), seed ("20 kg de semences"),
+    # spacing ("80 cm"), compost ("5 kg de compost par pied"), and yield
+    # ("1 200 kg/ha de rendement") are preserved even next to a chemical word.
+    # In this single-sentence view the sentence is its own block.
+    if _NPK_FORMULA.search(folded) or _quantity_is_dose(text, text):
         reasons.append(CHEMICAL_DOSE)
 
     if check_diagnosis and _is_definitive_diagnosis(lowered):
@@ -494,20 +622,6 @@ def _line_prefix(line: str) -> str:
     return match.group(0) if match else ""
 
 
-# A quantity in one sentence and its chemical noun in a neighbour ("L'urée
-# convient. Appliquez 100 kg/ha.") together form a dose. Evaluation therefore
-# uses a small window of surrounding sentences, not the sentence alone.
-_CONTEXT_WINDOW = 1
-
-
-def _dose_context_in_window(sentences, index) -> bool:
-    """True when a quantity sentence has chemical context in a nearby sentence."""
-    start = max(0, index - _CONTEXT_WINDOW)
-    end = min(len(sentences), index + _CONTEXT_WINDOW + 1)
-    window = " ".join(sentences[start:end])
-    return bool(_CHEMICAL_CONTEXT.search(_fold(window)))
-
-
 def redact_unsafe_text(text, *, check_diagnosis: bool = True) -> SafetyReview:
     """Drop unsafe sentences from generated text, preserving line structure.
 
@@ -515,51 +629,39 @@ def redact_unsafe_text(text, *, check_diagnosis: bool = True) -> SafetyReview:
     caller must then substitute a deterministic refusal rather than show an
     empty answer.
 
-    A bare quantity is judged against a short window of neighbouring sentences,
-    so a dose split across sentences ("L'urée convient. Appliquez 100 kg/ha.")
-    is still removed even though neither sentence names both parts alone.
+    A bare quantity ("Appliquez 100 kg/ha.") is judged against the whole block,
+    so a dose whose chemical noun sits in another sentence is still removed
+    however many sentences apart they are. A quantity that names what it
+    measures — water, seed, compost, yield, spacing — is kept even when a
+    chemical word appears elsewhere in the block.
     """
     original = normalize_scalar(text)
     if not original:
         return SafetyReview(text="", reasons=(), blocked=False)
 
-    # Sentence positions are tracked across the whole block so the dose window
-    # can look past a line break, while line structure is still rebuilt below.
-    block_sentences: list[str] = []
-    line_plan: list[tuple[str, list[int]]] = []  # (prefix, sentence indices)
-    for line in original.splitlines():
-        if not line.strip():
-            line_plan.append(("", []))
-            continue
-        prefix = _line_prefix(line)
-        body = line[len(prefix):]
-        indices = []
-        for sentence in _SENTENCE_SPLIT.split(body):
-            if not sentence.strip():
-                continue
-            indices.append(len(block_sentences))
-            block_sentences.append(sentence.strip())
-        line_plan.append((prefix, indices))
-
-    had_content = any(indices for _, indices in line_plan)
+    # The whole block is the context for judging a bare quantity, so a chemical
+    # noun any number of sentences away still marks it as a dose.
+    block_text = " ".join(original.split())
 
     reasons: list[str] = []
     kept_lines: list[str] = []
-    for prefix, indices in line_plan:
-        if not indices:
+    had_content = False
+    for line in original.splitlines():
+        if not line.strip():
             kept_lines.append("")
             continue
+        had_content = True
+        prefix = _line_prefix(line)
+        body = line[len(prefix):]
         safe_parts = []
-        for sentence_index in indices:
-            sentence = block_sentences[sentence_index]
+        for sentence in _SENTENCE_SPLIT.split(body):
+            if not sentence.strip():
+                continue
+            sentence = sentence.strip()
             found = list(unsafe_reasons(sentence, check_diagnosis=check_diagnosis))
-            # A quantity with no in-sentence chemical word is still a dose when
-            # a neighbouring sentence supplies that word.
-            if (
-                CHEMICAL_DOSE not in found
-                and _QUANTITY.search(_fold(sentence))
-                and _dose_context_in_window(block_sentences, sentence_index)
-            ):
+            # A bare quantity is a dose when a chemical input is described
+            # anywhere in the block, not just this sentence.
+            if CHEMICAL_DOSE not in found and _quantity_is_dose(sentence, block_text):
                 found.append(CHEMICAL_DOSE)
             if found:
                 for reason in found:

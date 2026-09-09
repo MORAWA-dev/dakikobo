@@ -518,11 +518,24 @@ def test_demo_example_route_returns_fertilizer_case():
     response = client.get("/examples/fumure_sorgho")
     payload = response.get_json()
 
+    # The example is produced by the deterministic gate, so while numeric
+    # guidance is unverified it shows the gated refusal — never exact figures.
     assert response.status_code == 200
     assert payload["kind"] == "message"
-    assert "100 kg/ha de NPK" in payload["answer"]
-    assert payload["sources"][0]["type"] == "Outil engrais"
-    assert payload["case"]["input_type"] == "fertilizer"
+    assert payload["answer_kind"] == "refusal"
+    assert payload["confidence"] == "Faible"
+    assert "100 kg/ha" not in payload["answer"]
+    assert "14-23-14" not in payload["answer"]
+    assert "kg/ha" not in payload["answer"]
+    assert payload["sources"] == []
+    assert payload["case"] is None
+    assert payload["journal"]["answer_path"] == "fertilizer"
+    # It matches exactly what the deterministic tool returns for the same query.
+    from core.fertilizer import get_fertilizer_advice
+
+    assert payload["answer"] == get_fertilizer_advice(
+        "Quelle dose d'engrais pour le sorgho ?"
+    )["answer"]
 
 
 def test_demo_example_oaph_uses_correct_expansion():
@@ -1995,6 +2008,75 @@ def test_ask_keeps_confident_non_diagnosis_statements(monkeypatch, sentence):
 
     assert response.status_code == 200
     assert sentence in payload["answer"]
+    assert REDACTION_NOTICE not in payload["answer"]
+
+
+@pytest.mark.parametrize(
+    "diagnosis",
+    [
+        "Il s'agit de l'ergot du mil.",
+        "Il s'agit de la striure du maïs.",
+        "La cause est l'helminthosporiose.",
+    ],
+)
+def test_ask_blocks_lexicon_independent_diagnosis(monkeypatch, diagnosis):
+    """PR review round 3, item 1, exercised through /ask.
+
+    The disease name is in no lexicon, but the firm-assertion frame naming a
+    plant-health subject is still redacted.
+    """
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        f"Observez les feuilles chaque matin.\n{diagnosis}\nSurveillez la parcelle.",
+        question="Qu'est-ce que ces taches ?",
+    )
+
+    assert response.status_code == 200
+    assert diagnosis.lower() not in payload["answer"].lower()
+    assert "Observez les feuilles chaque matin." in payload["answer"]
+    assert "Surveillez la parcelle." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+def test_ask_keeps_exact_hedged_rouille_sentence(monkeypatch):
+    """PR review round 3, item 4: the exact hedged sentence must pass through."""
+    sentence = "Il s'agit peut-être de la rouille."
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        f"Observez les feuilles. {sentence} Montrez la plante à un agent agricole.",
+        question="Que sont ces taches ?",
+    )
+
+    assert response.status_code == 200
+    assert sentence in payload["answer"]
+    assert REDACTION_NOTICE not in payload["answer"]
+
+
+def test_ask_blocks_dose_split_across_several_sentences(monkeypatch):
+    """PR review round 3, item 2: chemical noun two sentences from the quantity."""
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        "L'urée convient. Vérifiez l'humidité du sol. Appliquez 100 kg/ha.",
+        question="Comment nourrir le maïs ?",
+    )
+    body = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert response.status_code == 200
+    assert "100 kg/ha" not in body
+    assert "Vérifiez l'humidité du sol." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+def test_ask_preserves_irrigation_quantity_next_to_chemical_mention(monkeypatch):
+    """PR review round 3, item 2: irrigation quantity must survive."""
+    response, payload = _post_ask_answer(
+        monkeypatch,
+        "L'urée est disponible en ville. Arrosez avec 20 litres d'eau par pied.",
+        question="Comment arroser le maïs ?",
+    )
+
+    assert response.status_code == 200
+    assert "20 litres d'eau par pied" in payload["answer"]
     assert REDACTION_NOTICE not in payload["answer"]
 
 

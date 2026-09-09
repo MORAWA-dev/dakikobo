@@ -441,8 +441,8 @@ def test_cross_sentence_dose_blocked_regardless_of_order():
 
 
 def test_dose_window_does_not_flag_a_quantity_far_from_chemistry():
-    """The window is small: an irrigation or seed quantity with no chemical
-    noun anywhere nearby stays safe."""
+    """A quantity that names what it measures (water, seed) is that thing, not a
+    dose, even if a chemical word sits nearby."""
     irrigation = redact_unsafe_text("Arrosez le champ. Comptez 20 litres d'eau par pied.")
     assert CHEMICAL_DOSE not in irrigation.reasons
     assert "20 litres d'eau par pied" in irrigation.text
@@ -528,3 +528,123 @@ def test_full_redaction_path_for_each_review_sentence():
         review = redact_unsafe_text(text)
         assert review.reasons == ()
         assert review.text == text
+
+
+
+# ---------------------------------------------------------------------------
+# PR review round 3 — lexicon-independent diagnosis, redesigned dose window
+# ---------------------------------------------------------------------------
+
+# Item 1: firm diagnoses whose disease name is in no lexicon.
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Il s'agit de l'ergot du mil.",
+        "Il s'agit de la striure du maïs.",
+        "La cause est l'helminthosporiose.",
+    ],
+)
+def test_lexicon_independent_diagnosis_is_blocked(sentence):
+    assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence)
+    review = redact_unsafe_text(sentence)
+    assert DEFINITIVE_DIAGNOSIS in review.reasons
+    assert review.blocked is True
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # Previously required safe/hedged sentences must stay unchanged.
+        "Il s'agit du programme OAPH.",
+        "Il s'agit d'une technique de conservation de l'eau.",
+        "C'est certainement le bon moment pour semer.",
+        "Il s'agit peut-être d'une méthode utile.",
+        "Il s'agit peut-être de la rouille.",
+        # A firm frame naming a benign agronomic subject is not a diagnosis.
+        "Il s'agit d'une variété de sorgho résistante.",
+        "Il s'agit de la rotation des cultures.",
+        "La cause est le manque de pluie cette année.",
+    ],
+)
+def test_firm_frame_with_benign_subject_stays_safe(sentence):
+    assert unsafe_reasons(sentence) == ()
+    review = redact_unsafe_text(sentence)
+    assert review.reasons == ()
+    assert review.text == sentence
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # Benign French words ending in -ure must not read as pathology.
+        "Il s'agit d'une culture de rente.",
+        "La cause est la nourriture du bétail.",
+        "Il s'agit de la couverture du sol.",
+        "La cause est la structure du sol.",
+        "Il s'agit d'une bordure de champ.",
+    ],
+)
+def test_benign_ure_words_are_not_treated_as_diagnoses(sentence):
+    """The lexicon-independent rule must not over-match common -ure nouns."""
+    assert unsafe_reasons(sentence) == ()
+
+
+def test_exact_hedged_rouille_sentence_survives_both_paths():
+    """PR review round 3, item 4: this exact sentence must remain unchanged."""
+    sentence = "Il s'agit peut-être de la rouille."
+    assert unsafe_reasons(sentence) == ()
+    review = redact_unsafe_text(sentence)
+    assert review.reasons == ()
+    assert review.text == sentence
+
+
+# Item 2: redesigned cross-sentence dose detection.
+
+def test_dose_blocked_when_chemical_is_two_sentences_away():
+    """False negative in the old one-sentence window."""
+    review = redact_unsafe_text(
+        "L'urée convient. Vérifiez l'humidité. Appliquez 100 kg/ha."
+    )
+    assert CHEMICAL_DOSE in review.reasons
+    assert "100 kg/ha" not in review.text
+    # The genuinely safe surrounding advice is kept.
+    assert "Vérifiez l'humidité." in review.text
+
+
+def test_irrigation_quantity_kept_next_to_a_chemical_mention():
+    """False positive in the old one-sentence window."""
+    review = redact_unsafe_text(
+        "L'urée est disponible. Arrosez avec 20 litres d'eau par pied."
+    )
+    assert CHEMICAL_DOSE not in review.reasons
+    assert "20 litres d'eau par pied" in review.text
+
+
+@pytest.mark.parametrize(
+    "text,kept",
+    [
+        (
+            "Le NPK améliore le rendement. On atteint 1 200 kg/ha de grain.",
+            "1 200 kg/ha de grain",
+        ),
+        ("L'urée est utile. Semez 20 kg de semences à l'hectare.", "20 kg de semences"),
+        ("Le NPK existe. Ajoutez 5 kg de compost par pied.", "5 kg de compost"),
+        ("Le NPK au semis. Respectez 80 cm entre les lignes.", "80 cm entre les lignes"),
+        (
+            "Le fongicide est vendu ici. Arrosez avec 15 litres d'eau par plant.",
+            "15 litres d'eau par plant",
+        ),
+    ],
+)
+def test_measured_quantities_kept_even_with_chemical_terms_nearby(text, kept):
+    review = redact_unsafe_text(text)
+    assert CHEMICAL_DOSE not in review.reasons
+    assert kept in review.text
+
+
+def test_real_cross_sentence_dose_is_still_removed():
+    review = redact_unsafe_text("L'urée convient. Appliquez 100 kg/ha.")
+    assert CHEMICAL_DOSE in review.reasons
+    assert "100 kg/ha" not in review.text
+    assert "L'urée convient." in review.text
