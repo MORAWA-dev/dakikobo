@@ -28,6 +28,7 @@ from core.answer_safety import (
     normalize_scalar,
     normalize_vision_payload,
     redact_unsafe_text,
+    safe_confirmation,
     with_redaction_notice,
 )
 from core.case import build_disease_case
@@ -314,7 +315,12 @@ def screen_leaf_image(
         answer = with_redaction_notice(
             answer, obs_reasons + cause_reasons + action_reasons
         )
-        confirmation = structured["a_confirmer_par"] or CONFIRMATION_FALLBACK
+        # The confirmation line is mandatory. Replace it with the deterministic
+        # fallback if the model made it unsafe, malformed, empty, or if it does
+        # not actually send the farmer to an agent who can confirm.
+        confirmation = safe_confirmation(
+            structured["a_confirmer_par"], fallback=CONFIRMATION_FALLBACK
+        )
         return _with_case(
             answer,
             observations=observations,

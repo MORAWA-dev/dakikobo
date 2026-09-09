@@ -363,6 +363,37 @@ Status legend: `[ ]` todo · `[x]` done.
     checks, the farmer/extension-agent pilot, production persistence verification, and live RAG
     evaluation after the intentionally stricter eligible-source rebuild.
 
+- [x] **33. Answer-safety audit repairs** — `core/answer_safety.py`, `core/disease.py`, `app.py`, `core/answer_cache.py`, `core/rag_pipeline.py`, `config.py`, `static/sw.js`
+  - Validate Gemini Vision JSON before use: a non-object payload is rejected instead of crashing,
+    wrongly typed fields are normalized, and vision confidence is clamped to `Faible`/`Moyen`
+    (`Fort` unreachable).
+  - Enforce, not just prompt, the advice ban: model-generated pesticide names, chemical doses, and
+    definitive diagnoses are removed from both the vision path and the grounded RAG answer, with a
+    French redaction notice and a deterministic refusal when nothing safe survives. `a_confirmer_par`
+    is replaced by the agent-confirmation fallback when unsafe, malformed, empty, or not
+    agent-directed. Pesticide names match on normalized token/phrase boundaries so "décision" no
+    longer collides with the trade name "Decis"; a quantity is a dose only with chemical context, so
+    irrigation/seed/spacing/compost/yield figures survive.
+  - Exact fertilizer doses stay out of the model path entirely; agronomist-approved figures remain
+    restricted to the deterministic `core/fertilizer` module (`NUMERIC_GUIDANCE_VERIFIED` unchanged).
+  - Bind both answer caches to a safety/prompt revision, run the answer-cache lookup only after
+    safety-sensitive intent classification, refuse before the LLM when retrieval accepts zero
+    documents, and return 503/502/429 for genuine RAG/vision failures with the French JSON contract
+    intact.
+  - Configuration added, all env-overridable and documented in `README.md`:
+    - `TTS_CACHE_TTL_SECONDS` (default `86400`) — max age of a generated MP3 in `static/audio/`
+      before pruning; `0` disables age-based pruning.
+    - `TTS_CACHE_MAX_BYTES` (default `67108864`) — total size cap for `static/audio/`; the
+      least-recently-used MP3s are removed until it fits; `0` disables size-based pruning.
+    - `MULTIPART_OVERHEAD_BYTES` (default `524288`) — headroom added to the advertised per-file
+      upload limit to form Flask's whole-request `MAX_CONTENT_LENGTH`, so a file at the documented
+      size is accepted despite multipart boundary/header/field overhead.
+  - Generated MP3 filenames now hash the spoken text (identical answers reuse one file), writes are
+    atomic, and the audio directory is bounded by the two TTS cache settings above.
+  - Regression tests cover every finding, including diagnosis in a RAG answer, unsafe content in
+    `a_confirmer_par`, "20 litres d'eau par pied" staying unchanged, and "La décision dépend de la
+    pluie" staying unchanged. Each new test was confirmed to fail against the unmodified sources.
+
 ---
 
 ## Later / parked (do **not** attempt now)

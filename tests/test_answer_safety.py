@@ -21,10 +21,13 @@ from core.answer_safety import (
     normalize_string_list,
     normalize_vision_payload,
     redact_unsafe_text,
+    safe_confirmation,
     safety_policy_revision,
     unsafe_reasons,
     with_redaction_notice,
 )
+
+_AGENT_FALLBACK = "Montrez la plante à un agent agricole pour confirmer."
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +248,13 @@ def test_filter_safe_items_drops_only_the_unsafe_entries():
     assert PESTICIDE_PRODUCT in reasons
 
 
-def test_diagnosis_check_can_be_disabled_for_grounded_text():
-    """RAG answers are graded for products and doses, not for hedging style."""
+def test_diagnosis_check_flag_is_honoured_both_ways():
+    """The diagnosis rule is opt-out via the flag.
+
+    The application enables it on every model path (vision and RAG); this test
+    only pins the flag's mechanics so a caller can still request product/dose
+    grading alone if a future path needs it.
+    """
     sentence = "Il s'agit d'une pratique courante au Burkina Faso."
 
     assert DEFINITIVE_DIAGNOSIS in unsafe_reasons(sentence, check_diagnosis=True)
@@ -273,3 +281,135 @@ def test_safety_policy_revision_tracks_prompt_and_policy_source():
     assert revision == safety_policy_revision()
     assert revision != SAFETY_POLICY_VERSION
     assert len(revision) > len(SAFETY_POLICY_VERSION) + 1
+
+
+
+# ---------------------------------------------------------------------------
+# PR revision — token-boundary pesticide matching (revision item 4)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # These merely *contain* the trade name "decis" as a substring.
+        "La décision dépend de la pluie.",
+        "La décision dépend de la pluie et du sol.",
+        "Décision prise après la récolte.",
+        "Cette indécision coûte cher au producteur.",
+        "Les décisions du comité seront affichées.",
+    ],
+)
+def test_decision_is_not_confused_with_the_trade_name_decis(sentence):
+    assert PESTICIDE_PRODUCT not in unsafe_reasons(sentence)
+    assert unsafe_reasons(sentence) == ()
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Utilisez du Décis contre les chenilles.",
+        "Appliquez du mancozèbe sur les feuilles.",   # inflected form of "mancozeb"
+        "Fumigez avec du phosphure d'aluminium.",     # multi-word phrase
+        "Bouillie bordelaise recommandée.",           # multi-word phrase
+        "Roundup pour désherber.",
+        "Traitez au Karaté.",
+    ],
+)
+def test_pesticide_names_still_match_on_token_and_phrase_boundaries(sentence):
+    assert PESTICIDE_PRODUCT in unsafe_reasons(sentence)
+
+
+# ---------------------------------------------------------------------------
+# PR revision — chemical context required for quantities (revision item 3)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # Irrigation per pied/plant — no chemical context.
+        "Apportez 20 litres d'eau par pied chaque semaine.",
+        "Arrosez avec 20 litres d'eau par pied.",
+        "10 litres d'eau par plant au repiquage.",
+        # Compost per pied — organic, not a chemical dose.
+        "Ajoutez 5 kg de compost par pied.",
+        "Mettez une poignée de fumier par poquet.",
+        # Seed, spacing, and yield quantities.
+        "Semez 20 kg de semences à l'hectare.",
+        "Respectez 80 cm entre les lignes et 40 cm sur la ligne.",
+        "Le rendement peut atteindre 1 200 kg/ha en bonne année.",
+    ],
+)
+def test_legitimate_quantities_are_preserved(sentence):
+    assert CHEMICAL_DOSE not in unsafe_reasons(sentence)
+    assert unsafe_reasons(sentence) == ()
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Utilisez 100 kg/ha de NPK au semis.",
+        "Mettez 2 g d'urée par poquet.",
+        "Apportez du NPK 14-23-14.",
+        "Diluez 10 g de fongicide par litre.",
+        "Ajoutez 50 kg de phosphate à l'hectare.",
+    ],
+)
+def test_chemical_quantities_are_still_flagged(sentence):
+    assert CHEMICAL_DOSE in unsafe_reasons(sentence)
+
+
+def test_per_pied_water_quantity_survives_redaction_intact():
+    text = "Apportez 20 litres d'eau par pied chaque semaine."
+    review = redact_unsafe_text(text)
+    assert review.text == text
+    assert review.reasons == ()
+
+
+def test_decision_sentence_survives_redaction_intact():
+    text = "La décision dépend de la pluie."
+    review = redact_unsafe_text(text)
+    assert review.text == text
+    assert review.reasons == ()
+
+
+# ---------------------------------------------------------------------------
+# PR revision — safe_confirmation (revision item 2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "Agent agricole local.",
+        "Montrez la plante à un agronome.",
+        "Confirmez avec le service de vulgarisation.",
+        "Demandez à un technicien agricole.",
+        "Faites analyser en laboratoire.",
+    ],
+)
+def test_safe_confirmation_keeps_valid_agent_directions(value):
+    assert safe_confirmation(value, fallback=_AGENT_FALLBACK) == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",                                        # empty
+        "   ",                                     # whitespace only
+        "ok",                                      # too short / malformed
+        "x" * 250,                                 # too long / malformed
+        "Traitez avec du Décis à 10 ml.",          # unsafe: product
+        "Appliquez 100 kg/ha de NPK.",             # unsafe: dose
+        "Il s'agit de la rouille.",                # unsafe: diagnosis
+        "Regardez encore la photo demain.",        # not agent-directed
+        "Attendez la prochaine pluie.",            # not agent-directed
+        None,                                      # missing
+        12345,                                     # wrong type
+    ],
+)
+def test_safe_confirmation_falls_back_when_unusable(value):
+    assert safe_confirmation(value, fallback=_AGENT_FALLBACK) == _AGENT_FALLBACK
+
+
+def test_safe_confirmation_fallback_is_itself_agent_directed_and_safe():
+    # The fallback must pass its own gate, or a second pass would drop it.
+    assert safe_confirmation(_AGENT_FALLBACK, fallback="AUTRE") == _AGENT_FALLBACK

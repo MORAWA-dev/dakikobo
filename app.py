@@ -1244,9 +1244,12 @@ def ask():
             # Reasoning models can leak chain-of-thought into `content`; never
             # show that to a farmer.
             answer = sanitize_answer(raw_answer)
-            # Prompt rules are not a control: strip any invented product name or
-            # chemical dose before the answer is graded, cached, or spoken.
-            safety_review = redact_unsafe_text(answer, check_diagnosis=False)
+            # Prompt rules are not a control: strip any invented product name,
+            # chemical dose, or definitive diagnosis before the answer is
+            # graded, cached, or spoken. Exact fertilizer figures stay out of
+            # the model path entirely; agronomist-approved doses are served only
+            # by the deterministic fertilizer module.
+            safety_review = redact_unsafe_text(answer, check_diagnosis=True)
             if safety_review.blocked:
                 # Nothing safe survived; fall back to honest uncertainty instead
                 # of showing an empty answer.

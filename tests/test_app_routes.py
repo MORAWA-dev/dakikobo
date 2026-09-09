@@ -1866,6 +1866,67 @@ def test_fully_unsafe_rag_answer_becomes_honest_uncertainty(monkeypatch):
     assert payload["case"]["risk_level"] == "Non confirmé"
 
 
+def test_rag_answer_definitive_diagnosis_is_redacted(monkeypatch):
+    """PR revision item 1: diagnosis filtering now applies to RAG answers too.
+
+    Previously the grounded path was graded for products and doses only
+    (check_diagnosis=False), so a model asserting a diagnosis reached the farmer.
+    """
+    harness = _UnsafeAnswerHarness(
+        "Observez les feuilles chaque matin.\n"
+        "Il s'agit de la rouille du mil, sans aucun doute.\n"
+        "Retirez les feuilles très atteintes et brûlez-les."
+    )
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Qu'est-ce que ces taches sur le mil ?"}
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    # The definitive claim is gone; the safe surrounding advice remains.
+    assert "il s'agit de la rouille" not in payload["answer"].lower()
+    assert "sans aucun doute" not in payload["answer"].lower()
+    assert "Observez les feuilles chaque matin." in payload["answer"]
+    assert "Retirez les feuilles très atteintes et brûlez-les." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+def test_rag_answer_keeps_exact_doses_out_of_the_model_path(monkeypatch):
+    """PR revision item 7: model-generated exact doses never reach the farmer.
+
+    Agronomist-approved figures are the deterministic fertilizer module's job;
+    a dose the model invents in a grounded answer is stripped.
+    """
+    harness = _UnsafeAnswerHarness(
+        "Le maïs est exigeant en azote.\n"
+        "Apportez 150 kg/ha de NPK 14-23-14 au semis puis 100 kg/ha d'urée.\n"
+        "La rotation avec le niébé aide beaucoup."
+    )
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Comment enrichir le sol pour le maïs ?"}
+    )
+    payload = response.get_json()
+    body = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert response.status_code == 200
+    assert "150 kg/ha" not in body
+    assert "14-23-14" not in body
+    assert "100 kg/ha" not in body
+    # The safe, dose-free agronomy stays.
+    assert "La rotation avec le niébé aide beaucoup." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
 def _screen_client(monkeypatch, service_status, answer="Analyse indisponible."):
     monkeypatch.setattr(app_module, "disease_configured", lambda: True)
     monkeypatch.setattr(app_module, "IMAGE_COOLDOWN_SECONDS", 0)

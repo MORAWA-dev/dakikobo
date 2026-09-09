@@ -332,6 +332,8 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `BUDGET_GLOBAL_PER_DAY` | `2000`                                  | Shared global daily request budget        |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
+| `TTS_CACHE_TTL_SECONDS` | `86400`                                 | Max age of a generated MP3 in `static/audio/` before it is pruned (`0` disables age-based pruning) |
+| `TTS_CACHE_MAX_BYTES`  | `67108864`                               | Total size cap for `static/audio/`; least-recently-used MP3s are removed until it fits (`0` disables size-based pruning) |
 | `STT_MODEL`            | `whisper-large-v3-turbo`                 | Groq model for voice input transcription |
 | `STT_LANGUAGE`         | `fr`                                     | Voice input language hint                |
 | `STT_TIMEOUT_SECONDS`  | `30.0`                                   | Max wait for Groq voice transcription    |
@@ -349,7 +351,23 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `REQUEST_COOLDOWN_SECONDS` | `2.0`                                | Per-session cooldown for `/ask` requests |
 | `VOICE_COOLDOWN_SECONDS` | `2.0`                                  | Per-session cooldown for voice transcription |
 | `IMAGE_COOLDOWN_SECONDS` | `6.0`                                  | Per-session cooldown for image screening |
-| `MAX_IMAGE_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded image size              |
+| `MAX_IMAGE_UPLOAD_MB`  | `5.0`                                    | Maximum uploaded image size (advertised per-file limit, enforced per route) |
+| `MULTIPART_OVERHEAD_BYTES` | `524288`                             | Headroom (512 KiB) added to the per-file limit to form Flask's whole-request `MAX_CONTENT_LENGTH`, so a file at the advertised size is accepted despite multipart boundary/header/field overhead |
+
+Notes on the audio and upload limits:
+
+- **TTS storage is bounded.** Generated MP3s are named after the answer they
+  speak, so identical answers reuse one file instead of writing a new one every
+  time. `TTS_CACHE_TTL_SECONDS` drops files by age first; if `static/audio/` is
+  still above `TTS_CACHE_MAX_BYTES`, the least-recently-used files are removed
+  until it fits. The file being served is never evicted.
+- **The upload limit and the transport ceiling are separate.**
+  `MAX_IMAGE_UPLOAD_MB` / `MAX_AUDIO_UPLOAD_MB` are the advertised per-file
+  limits checked inside each route. Flask's `MAX_CONTENT_LENGTH` caps the whole
+  multipart body and is set to the larger per-file limit **plus**
+  `MULTIPART_OVERHEAD_BYTES`, so a file exactly at the documented size is not
+  rejected once boundary markers, part headers, and field-context values are
+  counted.
 
 ---
 

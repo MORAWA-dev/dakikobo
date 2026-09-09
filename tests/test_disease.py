@@ -330,3 +330,67 @@ def test_unreadable_response_reports_its_own_status(monkeypatch):
     out = screen_leaf_image(b"x", "image/jpeg")
     assert out["service_status"] == "unreadable_response"
     assert "interpréter" in out["answer"]
+
+
+
+# =====================================================================
+# PR revision — a_confirmer_par is safety-filtered (revision item 2)
+# =====================================================================
+
+_CONFIRMATION_FALLBACK = "Montrez la plante à un agent agricole pour confirmer."
+
+
+def _payload_with_confirmation(confirmation):
+    return {
+        "observations": ["Taches brunes visibles."],
+        "problemes_possibles": ["Il pourrait s'agir d'une maladie foliaire."],
+        "actions_immediates": ["Retirez les feuilles très atteintes."],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": confirmation,
+        "reponse_courte": "Observation prudente des taches brunes.",
+    }
+
+
+@pytest.mark.parametrize(
+    "confirmation",
+    [
+        "Traitez vous-même avec du Décis à 10 ml par litre.",  # pesticide + dose
+        "Appliquez 100 kg/ha de NPK 14-23-14.",                # dose
+        "Il s'agit certainement de la rouille.",               # definitive diagnosis
+        "",                                                     # empty
+        "ok",                                                  # malformed
+        "Attendez la prochaine pluie pour décider.",           # not agent-directed
+    ],
+)
+def test_unsafe_or_missing_confirmation_uses_agent_fallback(monkeypatch, confirmation):
+    _patch(
+        monkeypatch,
+        _FakeResp(200, _candidate(_json.dumps(_payload_with_confirmation(confirmation)))),
+    )
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="mil")
+
+    assert out["case"]["confirmation"] == _CONFIRMATION_FALLBACK
+    # No unsafe content leaks through the confirmation field.
+    serialized = _json.dumps(out, ensure_ascii=False).lower()
+    assert "décis".lower() not in serialized
+    assert "100 kg/ha" not in serialized
+    assert out["case"]["needs_human_confirmation"] is True
+
+
+def test_valid_agent_confirmation_is_kept(monkeypatch):
+    _patch(
+        monkeypatch,
+        _FakeResp(
+            200,
+            _candidate(
+                _json.dumps(
+                    _payload_with_confirmation("Confirmez avec un agent agricole local.")
+                )
+            ),
+        ),
+    )
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="mil")
+
+    assert out["case"]["confirmation"] == "Confirmez avec un agent agricole local."

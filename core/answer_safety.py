@@ -240,7 +240,9 @@ CHEMICAL_DOSE = "chemical_dose"
 DEFINITIVE_DIAGNOSIS = "definitive_diagnosis"
 
 # Active ingredients and distinctive trade names quoted in West African advice.
-# Compared against the accent-stripped, lower-cased sentence.
+# Matched on normalized token/phrase boundaries, never as bare substrings: a
+# substring match flagged "décision" (folds to "decision", which contains the
+# trade name "decis"). See ``_build_pesticide_pattern``.
 _PESTICIDE_TERMS = (
     "mancozeb",
     "metalaxyl",
@@ -314,6 +316,31 @@ _PESTICIDE_TERMS = (
     "phostoxin",
 )
 
+def _build_pesticide_pattern(terms) -> "re.Pattern[str]":
+    """Compile the pesticide lexicon as whole-token / whole-phrase matches.
+
+    Terms are matched against the accent-stripped, lower-cased text but only at
+    token boundaries, where a boundary is the start/end of the string or any
+    character that is not a letter, digit, or apostrophe. This way "decis"
+    matches the standalone trade name and "phosphure d'aluminium" matches as a
+    phrase, while "decision" (which merely contains "decis") does not.
+    """
+    boundary_left = r"(?:(?<=^)|(?<=[^a-z0-9']))"
+    # A short, closed set of French inflection endings may follow a term before
+    # the boundary, so "mancozeb" matches "mancozèbe" and a plural trade name
+    # matches, without letting "decis" reach into "decision" ("ion" is not an
+    # allowed ending).
+    inflection = r"(?:e|es|s)?"
+    boundary_right = r"(?=$|[^a-z0-9'])"
+    alternatives = "|".join(
+        re.escape(_fold(term)).replace(r"\ ", r"\s+") for term in terms
+    )
+    return re.compile(f"{boundary_left}(?:{alternatives}){inflection}{boundary_right}")
+
+
+_PESTICIDE_PATTERN = _build_pesticide_pattern(_PESTICIDE_TERMS)
+
+
 # Recommending an unnamed product class is unsafe advice too.
 _PRODUCT_CLASS_RECOMMENDATION = re.compile(
     r"\b(?:appliqu\w*|pulveris\w*|traite\w*|vaporis\w*|asperg\w*|utilis\w*|"
@@ -327,13 +354,6 @@ _QUANTITY = re.compile(
     r"\b\d+(?:[.,]\d+)?\s*"
     r"(?:kg|kilogrammes?|kilos?|g|grammes?|mg|l|litres?|ml|cl|cc|"
     r"sachets?|bouchons?|cuilleres?|capsules?|doses?)\b"
-)
-# Per-plant / per-poquet / per-litre rates are application rates in practice.
-# "/ha" is deliberately excluded here: it also expresses yields, which are safe
-# to quote, so a per-hectare figure needs a chemical context word to be flagged.
-_APPLICATION_RATE = re.compile(
-    r"(?:/|\bpar\s+)\s*(?:poquets?|pieds?|plants?|arbres?|litres?|l\b|sacs?|"
-    r"sachets?|pulverisateurs?|arrosoirs?)"
 )
 # A fertilizer formulation such as 14-23-14 is itself a dose statement.
 _NPK_FORMULA = re.compile(r"\b\d{1,2}\s*-\s*\d{1,2}\s*-\s*\d{1,2}\b")
@@ -393,18 +413,18 @@ def unsafe_reasons(sentence: str, *, check_diagnosis: bool = True) -> tuple[str,
     lowered = text.casefold()
 
     reasons: list[str] = []
-    if any(term in folded for term in _PESTICIDE_TERMS) or (
-        _PRODUCT_CLASS_RECOMMENDATION.search(folded)
+    if _PESTICIDE_PATTERN.search(folded) or _PRODUCT_CLASS_RECOMMENDATION.search(
+        folded
     ):
         reasons.append(PESTICIDE_PRODUCT)
 
-    # A bare quantity ("1 200 kg/ha de rendement") is not a dose; it only
-    # becomes one next to a fertilizer, product, or treatment word.
+    # A bare quantity is a dose only next to a fertilizer, product, or treatment
+    # word. Requiring chemical context for every quantity — including per-plant
+    # and per-pied rates — keeps legitimate irrigation ("20 litres d'eau par
+    # pied"), seed ("20 kg de semences"), spacing ("80 cm"), compost ("5 kg de
+    # compost par pied"), and yield ("1 200 kg/ha de rendement") quantities.
     if _NPK_FORMULA.search(folded) or (
-        _QUANTITY.search(folded)
-        and (
-            _CHEMICAL_CONTEXT.search(folded) or _APPLICATION_RATE.search(folded)
-        )
+        _QUANTITY.search(folded) and _CHEMICAL_CONTEXT.search(folded)
     ):
         reasons.append(CHEMICAL_DOSE)
 
@@ -510,3 +530,49 @@ def with_redaction_notice(text: str, reasons) -> str:
     if REDACTION_NOTICE in body:
         return body
     return f"{body}\n\n{REDACTION_NOTICE}".strip()
+
+
+# Stems showing the confirmation line actually directs the farmer to a person
+# or place that can confirm on the ground. The vision prompt asks for exactly
+# this. Matched as token-initial stems (so "vulgaris" covers "vulgarisation"
+# and "vulgarisateur") to tolerate French inflection.
+_AGENT_DIRECTION_STEMS = (
+    "agent",
+    "agronome",
+    "vulgaris",
+    "technicien",
+    "encadr",
+    "cooperative",
+    "conseiller",
+    "expert",
+    "specialiste",
+    "laboratoire",
+    "clinique",
+)
+_AGENT_DIRECTION_PATTERN = re.compile(
+    r"(?:(?<=^)|(?<=[^a-z0-9']))(?:"
+    + "|".join(re.escape(stem) for stem in _AGENT_DIRECTION_STEMS)
+    + r")[a-z]*"
+)
+
+
+def safe_confirmation(value, *, fallback: str) -> str:
+    """Return a trustworthy agent-confirmation line, or the deterministic fallback.
+
+    The model's ``a_confirmer_par`` is replaced by ``fallback`` when it is
+    empty, malformed (too short/long to be a real instruction), carries an
+    unsafe product/dose/diagnosis, or does not actually point the farmer at a
+    person or place that can confirm. The confirmation line is mandatory, so it
+    must never be dropped and never smuggle unsafe content.
+    """
+    text = normalize_scalar(value)
+    if not text:
+        return fallback
+    # A real instruction is a short sentence, not a word or a paragraph.
+    if len(text) < 8 or len(text) > 200:
+        return fallback
+    if unsafe_reasons(text):
+        return fallback
+    if not _AGENT_DIRECTION_PATTERN.search(_fold(text)):
+        return fallback
+    return text
