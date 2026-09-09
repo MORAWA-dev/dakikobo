@@ -5,6 +5,11 @@ var SHELL_CACHE = VERSION + '-shell';
 var ANSWER_CACHE = VERSION + '-answers';
 var ANSWER_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 var ANSWER_LIMIT = 50;
+// Cache identity markers. A saved answer is only replayed when both the corpus
+// and the safety/prompt revision still match the ones that produced it.
+var CORPUS_MARKER = '/__corpus__';
+var SAFETY_MARKER = '/__safety__';
+var MARKER_KEYS = [CORPUS_MARKER, SAFETY_MARKER];
 var SHELL = [
     '/',
     '/registry',
@@ -80,6 +85,10 @@ function cacheFirst(request) {
             return response;
         });
     });
+}
+
+function isMarkerKey(request) {
+    return MARKER_KEYS.indexOf(new URL(request.url).pathname) !== -1;
 }
 
 function answerKey(formData) {
@@ -221,17 +230,23 @@ async function networkFirstAsk(request) {
             // Await the write so the worker lifetime includes durable persistence.
             try {
                 var corpus = response.headers.get('X-DakiKobo-Corpus');
-                var marker = await cache.match('/__corpus__');
-                if (marker && (await marker.text()) !== corpus) {
+                // A safety-only deployment changes no document, so the corpus
+                // marker alone cannot retire answers written under looser rules.
+                var safety = response.headers.get('X-DakiKobo-Safety') || '';
+                var marker = await cache.match(CORPUS_MARKER);
+                var safetyMarker = await cache.match(SAFETY_MARKER);
+                if ((marker && (await marker.text()) !== corpus) ||
+                    (safetyMarker && (await safetyMarker.text()) !== safety)) {
                     await caches.delete(ANSWER_CACHE);
                     cache = await caches.open(ANSWER_CACHE);
                 }
-                await cache.put('/__corpus__', new Response(corpus));
+                await cache.put(CORPUS_MARKER, new Response(corpus));
+                await cache.put(SAFETY_MARKER, new Response(safety));
                 await cache.put(key, response.clone());
                 var keys = await cache.keys();
-                while (keys.length > ANSWER_LIMIT + 1) {
+                while (keys.length > ANSWER_LIMIT + MARKER_KEYS.length) {
                     var oldest = keys.shift();
-                    if (new URL(oldest.url).pathname !== '/__corpus__') { await cache.delete(oldest); }
+                    if (!isMarkerKey(oldest)) { await cache.delete(oldest); }
                 }
             } catch (_) { /* Storage full/private mode must not discard the online answer. */ }
         }
@@ -241,9 +256,12 @@ async function networkFirstAsk(request) {
         if (cached) {
             var saved = Number(cached.headers.get('X-DakiKobo-Saved-At')) * 1000;
             var age = Date.now() - saved;
-            var marker = await cache.match('/__corpus__');
+            var marker = await cache.match(CORPUS_MARKER);
+            var safetyMarker = await cache.match(SAFETY_MARKER);
             if (saved && age >= 0 && age < ANSWER_MAX_AGE_MS && marker &&
-                (await marker.text()) === cached.headers.get('X-DakiKobo-Corpus')) {
+                (await marker.text()) === cached.headers.get('X-DakiKobo-Corpus') &&
+                safetyMarker &&
+                (await safetyMarker.text()) === (cached.headers.get('X-DakiKobo-Safety') || '')) {
                 var payload = await cached.json();
                 payload.offline = true;
                 payload.saved_at = new Date(saved).toISOString();

@@ -3,7 +3,15 @@
 This is a *screening aid*, not a diagnosis. The prompt forces the model to:
   - refuse politely when the photo is not a clear plant/leaf image, and
   - stay hedged ("il pourrait s'agir de…") for real photos.
-The code also guarantees the "ceci n'est pas un diagnostic" disclaimer is present.
+
+Prompt rules alone are not a safety control, so the code enforces the contract:
+every payload is type-validated (``core.answer_safety``), the reported
+confidence is capped at ``Moyen``, pesticide names / chemical doses / definitive
+diagnoses are removed, and the "ceci n'est pas un diagnostic" disclaimer plus the
+agent-confirmation line are always present.
+
+Each result also carries a ``service_status`` so the HTTP layer can answer with a
+truthful status code instead of dressing an upstream failure as a 200.
 """
 
 import base64
@@ -13,7 +21,36 @@ import re
 import requests
 
 from config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_TIMEOUT_SECONDS
+from core.answer_safety import (
+    BLOCKED_ADVICE_ANSWER,
+    clamp_vision_confidence,
+    filter_safe_items,
+    normalize_scalar,
+    normalize_vision_payload,
+    redact_unsafe_text,
+    safe_confirmation,
+    with_redaction_notice,
+)
 from core.case import build_disease_case
+
+# Screening outcome, mapped to an HTTP status by the route.
+STATUS_OK = "ok"
+STATUS_NOT_CONFIGURED = "not_configured"
+STATUS_UNREACHABLE = "unreachable"
+STATUS_RATE_LIMITED = "rate_limited"
+STATUS_UPSTREAM_ERROR = "upstream_error"
+STATUS_UNREADABLE_RESPONSE = "unreadable_response"
+
+#: Statuses that represent a genuine service failure rather than a screening.
+FAILURE_STATUSES = frozenset(
+    {
+        STATUS_NOT_CONFIGURED,
+        STATUS_UNREACHABLE,
+        STATUS_RATE_LIMITED,
+        STATUS_UPSTREAM_ERROR,
+        STATUS_UNREADABLE_RESPONSE,
+    }
+)
 
 _API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -48,6 +85,9 @@ DISCLAIMER = (
     "⚠️ Ceci n'est pas un diagnostic. Pour confirmer, montrez la plante à votre "
     "agent agricole."
 )
+
+# Used when the model omits `a_confirmer_par`: agent confirmation is mandatory.
+CONFIRMATION_FALLBACK = "Montrez la plante à un agent agricole pour confirmer."
 
 _PROMPT = (
     "Tu es un assistant agricole pour les petits agriculteurs du Burkina Faso. "
@@ -105,15 +145,42 @@ def _extract_json_object(text: str) -> dict | None:
         return None
 
 
-def _with_case(answer: str, **case_kwargs) -> dict:
+def _with_case(answer: str, *, service_status: str = STATUS_OK, **case_kwargs) -> dict:
+    """Build the screening result, capping confidence at the vision ceiling."""
+    case_kwargs["confidence"] = clamp_vision_confidence(
+        case_kwargs.get("confidence", "Moyen")
+    )
     return {
         "answer": answer,
+        "service_status": service_status,
         "case": build_disease_case(
             answer=answer,
             disclaimer=DISCLAIMER,
             **case_kwargs,
         ),
     }
+
+
+def _safe_screening_answer(text: str, *, block_context: str = "") -> str:
+    """Strip unsafe model claims and guarantee the mandatory French messages.
+
+    A screening answer may not name a treatment product, state a chemical dose,
+    or assert a diagnosis. When nothing safe survives, the deterministic refusal
+    is used instead of an empty answer. The non-diagnosis disclaimer and the
+    agent-confirmation sentence are appended in both cases.
+    """
+    review = redact_unsafe_text(
+        text,
+        check_diagnosis=True,
+        block_context=block_context,
+    )
+    body = BLOCKED_ADVICE_ANSWER if review.blocked else review.text
+    body = with_redaction_notice(body, review.reasons)
+    if not body.strip():
+        body = BLOCKED_ADVICE_ANSWER
+    if "pas un diagnostic" not in body.lower():
+        body = f"{body}\n\n{DISCLAIMER}"
+    return body.strip()
 
 
 def screen_leaf_image(
@@ -133,6 +200,7 @@ def screen_leaf_image(
         return _with_case(
             "La fonction d'analyse d'image n'est pas configurée "
             "(clé GEMINI_API_KEY manquante).",
+            service_status=STATUS_NOT_CONFIGURED,
             confidence="Faible",
             risk_level="Indisponible",
             crop=crop,
@@ -166,6 +234,7 @@ def screen_leaf_image(
             return _with_case(
                 "Désolé, je n'ai pas pu contacter le service d'analyse "
                 "d'image. Vérifiez votre connexion et réessayez.",
+                service_status=STATUS_UNREACHABLE,
                 confidence="Faible",
                 risk_level="Indisponible",
                 crop=crop,
@@ -186,6 +255,7 @@ def screen_leaf_image(
             return _with_case(
                 "Le service d'analyse d'image est très sollicité pour le "
                 "moment (quota atteint). Veuillez réessayer plus tard.",
+                service_status=STATUS_RATE_LIMITED,
                 confidence="Faible",
                 risk_level="Indisponible",
                 crop=crop,
@@ -195,6 +265,7 @@ def screen_leaf_image(
         return _with_case(
             "Désolé, l'analyse de l'image a échoué. Veuillez réessayer "
             "plus tard.",
+            service_status=STATUS_UPSTREAM_ERROR,
             confidence="Faible",
             risk_level="Indisponible",
             crop=crop,
@@ -203,11 +274,17 @@ def screen_leaf_image(
         )
 
     try:
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except (KeyError, IndexError, ValueError):
+        payload = resp.json()
+        text = normalize_scalar(
+            payload["candidates"][0]["content"]["parts"][0]["text"]
+        )
+    except (AttributeError, KeyError, IndexError, TypeError, ValueError):
+        text = ""
+    if not text:
         return _with_case(
             "Désolé, je n'ai pas pu interpréter la réponse d'analyse. "
             "Veuillez réessayer.",
+            service_status=STATUS_UNREADABLE_RESPONSE,
             confidence="Faible",
             risk_level="Indisponible",
             crop=crop,
@@ -224,34 +301,67 @@ def screen_leaf_image(
             location=location,
         )
 
-    structured = _extract_json_object(text)
-    if structured:
-        answer = structured.get("reponse_courte") or " ".join(
-            structured.get("observations", [])
+    # A valid JSON *object* is required. A bare list, string, or number parses
+    # successfully but is not a screening payload, so it falls through to the
+    # plain-text path instead of being indexed like a mapping.
+    structured = normalize_vision_payload(_extract_json_object(text))
+    if structured is not None:
+        # An object with no usable field yields the deterministic safe refusal
+        # rather than an empty answer or a dump of the raw JSON.
+        structured_context = " ".join(
+            [
+                *structured["observations"],
+                *structured["problemes_possibles"],
+                *structured["actions_immediates"],
+                structured["a_confirmer_par"],
+                structured["reponse_courte"],
+            ]
         )
-        answer = answer.strip()
-        if "pas un diagnostic" not in answer.lower():
-            answer = f"{answer}\n\n{DISCLAIMER}"
+        raw_answer = structured["reponse_courte"] or " ".join(
+            structured["observations"]
+        )
+        observations, obs_reasons = filter_safe_items(
+            structured["observations"], block_context=structured_context
+        )
+        causes, cause_reasons = filter_safe_items(
+            structured["problemes_possibles"], block_context=structured_context
+        )
+        actions, action_reasons = filter_safe_items(
+            structured["actions_immediates"], block_context=structured_context
+        )
+        answer = _safe_screening_answer(
+            raw_answer, block_context=structured_context
+        )
+        # A dropped list entry is also a redaction the farmer should be told about.
+        answer = with_redaction_notice(
+            answer, obs_reasons + cause_reasons + action_reasons
+        )
+        # The confirmation line is mandatory. Replace it with the deterministic
+        # fallback if the model made it unsafe, malformed, empty, or if it does
+        # not actually send the farmer to an agent who can confirm.
+        confirmation = safe_confirmation(
+            structured["a_confirmer_par"],
+            fallback=CONFIRMATION_FALLBACK,
+            block_context=structured_context,
+        )
         return _with_case(
             answer,
-            observations=structured.get("observations"),
-            possible_causes=structured.get("problemes_possibles"),
-            actions=structured.get("actions_immediates"),
-            confidence=structured.get("niveau_de_confiance", "Moyen"),
-            confirmation=structured.get(
-                "a_confirmer_par",
-                "Montrez la plante à un agent agricole pour confirmer.",
-            ),
+            observations=observations,
+            possible_causes=causes,
+            actions=actions,
+            # Never above the vision ceiling, whatever the model reported.
+            confidence=structured["niveau_de_confiance"],
+            confirmation=confirmation,
             crop=crop,
             growth_stage=growth_stage,
             location=location,
         )
 
-    # Guarantee the non-diagnosis disclaimer is present.
-    if "pas un diagnostic" not in text.lower():
-        text = f"{text}\n\n{DISCLAIMER}"
+    # Plain-text screening: redact unsafe claims, then guarantee the mandatory
+    # non-diagnosis disclaimer.
     return _with_case(
-        text,
+        _safe_screening_answer(text),
+        confidence="Faible",
         crop=crop,
         growth_stage=growth_stage,
         location=location,

@@ -360,3 +360,71 @@ test('clearDeviceData conserve les autres applications', async function() {
     assert.deepEqual(deleted,['dakikobo-v1-answers']);
     delete global.localStorage; delete global.caches;
 });
+
+
+
+test("une nouvelle révision de sécurité invalide les réponses enregistrées", async function() {
+    // Audit finding 3: a code-only safety deployment changes no document, so the
+    // corpus marker alone left older answers replayable offline.
+    let safety = 'safety-a.111111111111';
+    let online = true;
+    const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
+        if (!online) { throw new Error('offline'); }
+        return new Response(JSON.stringify({ answer: 'Conseil enregistré' }), {
+            headers: {
+                'X-DakiKobo-Cacheable': '1',
+                'X-DakiKobo-Corpus': 'corpus-stable',
+                'X-DakiKobo-Safety': safety,
+                'X-DakiKobo-Saved-At': String(Date.now() / 1000)
+            }
+        });
+    });
+    function request(text) {
+        const form = new FormData();
+        form.set('messageText', text);
+        return new runtime.Request('/ask', { method: 'POST', body: form });
+    }
+
+    await runtime.worker.networkFirstAsk(request('Question un'));
+
+    // Same corpus, stricter safety policy.
+    safety = 'safety-b.222222222222';
+    await runtime.worker.networkFirstAsk(request('Question deux'));
+
+    online = false;
+    const stale = await runtime.worker.networkFirstAsk(request('Question un'));
+    assert.equal(stale.status, 503, "une réponse d'avant la révision a été rejouée");
+    const fresh = await runtime.worker.networkFirstAsk(request('Question deux'));
+    assert.equal(fresh.status, 200);
+    assert.equal((await fresh.json()).answer, 'Conseil enregistré');
+});
+
+test('les marqueurs de cache ne consomment pas le quota de réponses', async function() {
+    const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
+        return new Response(JSON.stringify({ answer: 'Conseil' }), {
+            headers: {
+                'X-DakiKobo-Cacheable': '1',
+                'X-DakiKobo-Corpus': 'corpus-stable',
+                'X-DakiKobo-Safety': 'safety-a.111111111111',
+                'X-DakiKobo-Saved-At': String(Date.now() / 1000)
+            }
+        });
+    });
+    function request(text) {
+        const form = new FormData();
+        form.set('messageText', text);
+        return new runtime.Request('/ask', { method: 'POST', body: form });
+    }
+
+    for (let index = 0; index < 4; index += 1) {
+        await runtime.worker.networkFirstAsk(request('Question ' + index));
+    }
+
+    const answers = Array.from(runtime.buckets.entries())
+        .find(function(entry) { return entry[0].endsWith('-answers'); })[1];
+    const paths = Array.from(answers.entries.keys()).map(function(url) { return new URL(url).pathname; });
+    // Both identity markers persist alongside the four saved answers.
+    assert.ok(paths.indexOf('/__corpus__') !== -1);
+    assert.ok(paths.indexOf('/__safety__') !== -1);
+    assert.equal(paths.filter(function(p) { return p.indexOf('/__dakikobo_answer__') === 0; }).length, 4);
+});

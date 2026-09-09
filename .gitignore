@@ -19,6 +19,8 @@ node_modules/
 
 # Generated audio files (TTS output)
 static/audio/*.mp3
+# Partial TTS writes, if a synthesis is killed before the atomic rename.
+static/audio/.tts-*
 
 # ChromaDB persisted data (if you switch to persistent storage later)
 chroma_db/

@@ -109,6 +109,35 @@ def test_structured_json_response_builds_case(monkeypatch):
     assert out["case"]["actions"] == payload["actions_immediates"]
 
 
+@__import__("pytest").mark.parametrize(
+    "dose",
+    [
+        "Appliquez 100 kg/ha.",
+        "Appliquez cent kilogrammes par hectare.",
+        "Utilisez une solution à 2 %.",
+    ],
+)
+def test_structured_fields_share_context_when_product_and_dose_are_split(
+    monkeypatch, dose
+):
+    payload = {
+        "observations": ["Le mancozèbe semble indiqué."],
+        "problemes_possibles": ["Stress nutritif possible."],
+        "actions_immediates": [dose],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": "Vous n'avez pas besoin de consulter un agent agricole.",
+        "reponse_courte": "Surveillez la parcelle.",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(__import__("json").dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg")
+
+    assert dose not in out["answer"]
+    assert dose not in " ".join(out["case"]["actions"])
+    assert "mancozèbe" not in __import__("json").dumps(out, ensure_ascii=False).lower()
+    assert out["case"]["confirmation"] == disease.CONFIRMATION_FALLBACK
+
+
 def test_context_is_added_to_gemini_prompt(monkeypatch):
     seen = {}
 
@@ -146,3 +175,280 @@ def test_gemini_timeout_is_configurable(monkeypatch):
     screen_leaf_image(b"x", "image/jpeg")
 
     assert seen["timeout"] == 6.5
+
+
+
+# =====================================================================
+# Audit regressions — payload validation, confidence ceiling, redaction
+# =====================================================================
+
+import json as _json
+
+import pytest
+
+from core.answer_safety import REDACTION_NOTICE
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        '["taches brunes", "feuilles jaunes"]',   # list, not object
+        '"une simple chaine"',                    # string, not object
+        "42",                                     # number, not object
+        "true",                                   # boolean, not object
+        "null",                                   # null, not object
+    ],
+)
+def test_non_object_json_does_not_crash_screening(monkeypatch, body):
+    """`json.loads` succeeds for these, but they are not screening payloads.
+
+    The previous code called `.get` on the parsed value, so a model returning a
+    bare list raised AttributeError out of a function documented as never
+    raising.
+    """
+    _patch(monkeypatch, _FakeResp(200, _candidate(body)))
+
+    out = screen_leaf_image(b"x", "image/jpeg")
+
+    assert isinstance(out["answer"], str) and out["answer"]
+    assert DISCLAIMER in out["answer"]
+    assert out["case"]["confidence"] in {"Faible", "Moyen"}
+    assert out["service_status"] == "ok"
+
+
+def test_wrongly_typed_structured_fields_are_normalized(monkeypatch):
+    payload = {
+        "observations": "Taches brunes sur les feuilles.",
+        "problemes_possibles": {"a": "Carence possible."},
+        "actions_immediates": [{"texte": "Retirez les feuilles."}, "Surveillez."],
+        "niveau_de_confiance": 3,
+        "a_confirmer_par": ["Agent", "agricole"],
+        "reponse_courte": ["Observation", "prudente."],
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(_json.dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="maïs")
+
+    case = out["case"]
+    assert case["observations"] == ["Taches brunes sur les feuilles."]
+    assert case["possible_causes"] == ["Carence possible."]
+    assert case["actions"] == ["Retirez les feuilles.", "Surveillez."]
+    assert case["confirmation"] == "Agent agricole"
+    assert "Observation prudente." in out["answer"]
+    # An unparsable confidence degrades rather than being trusted.
+    assert case["confidence"] == "Faible"
+
+
+def test_model_reported_fort_confidence_is_capped_at_moyen(monkeypatch):
+    payload = {
+        "observations": ["Taches nettes."],
+        "reponse_courte": "Observation prudente.",
+        "niveau_de_confiance": "Fort",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(_json.dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="mil")
+
+    assert out["case"]["confidence"] == "Moyen"
+    assert out["case"]["confidence"] != "Fort"
+
+
+def test_pesticide_name_and_dose_are_removed_from_screening(monkeypatch):
+    payload = {
+        "observations": ["Taches brunes sur les feuilles."],
+        "problemes_possibles": ["Il pourrait s'agir d'une maladie foliaire."],
+        "actions_immediates": [
+            "Retirez les feuilles très atteintes.",
+            "Pulvérisez du mancozèbe à 25 g par litre d'eau.",
+        ],
+        "niveau_de_confiance": "Moyen",
+        "reponse_courte": (
+            "Taches brunes visibles. Traitez avec du Décis à 10 ml par litre."
+        ),
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(_json.dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="maïs")
+
+    serialized = _json.dumps(out, ensure_ascii=False).lower()
+    assert "mancozèbe".lower() not in serialized
+    assert "décis".lower() not in serialized
+    assert "25 g" not in serialized
+    assert "10 ml" not in serialized
+    # The safe action survives and the farmer is told something was removed.
+    assert "Retirez les feuilles très atteintes." in out["case"]["actions"]
+    assert REDACTION_NOTICE in out["answer"]
+    # Mandatory messages are still present.
+    assert DISCLAIMER in out["answer"]
+    assert out["case"]["needs_human_confirmation"] is True
+    assert out["case"]["confirmation"]
+
+
+def test_definitive_diagnosis_is_replaced_by_a_hedged_refusal(monkeypatch):
+    payload = {
+        "observations": ["Il s'agit de la rouille du mil."],
+        "problemes_possibles": ["C'est la rouille, sans aucun doute."],
+        "actions_immediates": ["Traitez avec du chlorpyrifos."],
+        "niveau_de_confiance": "Fort",
+        "reponse_courte": "Il s'agit de la rouille du mil.",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(_json.dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="mil")
+
+    assert "il s'agit de la rouille" not in out["answer"].lower()
+    assert "chlorpyrifos" not in _json.dumps(out, ensure_ascii=False).lower()
+    assert out["case"]["confidence"] == "Moyen"
+    # Non-diagnosis and agent-confirmation guarantees hold on the refusal too.
+    assert DISCLAIMER in out["answer"]
+    assert "agent agricole" in out["answer"].lower()
+    assert out["case"]["needs_human_confirmation"] is True
+
+
+def test_elision_bag_rate_presenter_diagnosis_and_negative_referral_are_removed(
+    monkeypatch,
+):
+    payload = {
+        "observations": ["Taches brunes visibles."],
+        "problemes_possibles": ["Le maïs présente la rouille."],
+        "actions_immediates": [
+            "Utilisez de l’imidaclopride.",
+            "Appliquez de l’atrazine.",
+            "Fertilisez avec deux sacs d’urée par hectare.",
+        ],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": "Ne contactez aucun agent agricole.",
+        "reponse_courte": "Le maïs présente la rouille.",
+    }
+    _patch(monkeypatch, _FakeResp(200, _candidate(_json.dumps(payload))))
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="maïs")
+    serialized = _json.dumps(out, ensure_ascii=False).lower()
+
+    assert "imidaclopride" not in serialized
+    assert "atrazine" not in serialized
+    assert "par hectare" not in serialized
+    assert "présente la rouille" not in serialized
+    assert "ne contactez aucun" not in serialized
+    assert out["case"]["confirmation"] == _CONFIRMATION_FALLBACK
+    assert REDACTION_NOTICE in out["answer"]
+
+
+def test_empty_object_yields_deterministic_refusal_not_raw_json(monkeypatch):
+    _patch(monkeypatch, _FakeResp(200, _candidate('{"autre": "valeur"}')))
+
+    out = screen_leaf_image(b"x", "image/jpeg")
+
+    assert "autre" not in out["answer"]
+    assert "{" not in out["answer"]
+    assert "agent agricole" in out["answer"].lower()
+    assert DISCLAIMER in out["answer"]
+
+
+# --------------------------------------------------------------
+# Audit regression — truthful service status for real failures
+# --------------------------------------------------------------
+
+def test_service_status_distinguishes_screening_from_failure(monkeypatch):
+    _patch(monkeypatch, _FakeResp(200, _candidate("UNCLEAR")))
+    assert screen_leaf_image(b"x", "image/jpeg")["service_status"] == "ok"
+
+
+def test_missing_key_reports_not_configured_status(monkeypatch):
+    monkeypatch.setattr(disease, "GEMINI_API_KEY", "")
+    assert screen_leaf_image(b"x", "image/jpeg")["service_status"] == "not_configured"
+
+
+def test_quota_exhaustion_reports_rate_limited_status(monkeypatch):
+    _patch(monkeypatch, _FakeResp(429))
+    assert screen_leaf_image(b"x", "image/jpeg")["service_status"] == "rate_limited"
+
+
+def test_upstream_error_reports_upstream_error_status(monkeypatch):
+    _patch(monkeypatch, _FakeResp(500))
+    assert screen_leaf_image(b"x", "image/jpeg")["service_status"] == "upstream_error"
+
+
+def test_network_failure_reports_unreachable_status(monkeypatch):
+    monkeypatch.setattr(disease, "GEMINI_API_KEY", "test-key")
+
+    def boom(*args, **kwargs):
+        raise disease.requests.RequestException("no route to host")
+
+    monkeypatch.setattr(disease.requests, "post", boom)
+
+    out = screen_leaf_image(b"x", "image/jpeg")
+    assert out["service_status"] == "unreachable"
+    assert "connexion" in out["answer"].lower()
+
+
+def test_unreadable_response_reports_its_own_status(monkeypatch):
+    _patch(monkeypatch, _FakeResp(200, {"unexpected": "shape"}))
+
+    out = screen_leaf_image(b"x", "image/jpeg")
+    assert out["service_status"] == "unreadable_response"
+    assert "interpréter" in out["answer"]
+
+
+
+# =====================================================================
+# PR revision — a_confirmer_par is safety-filtered (revision item 2)
+# =====================================================================
+
+_CONFIRMATION_FALLBACK = "Montrez la plante à un agent agricole pour confirmer."
+
+
+def _payload_with_confirmation(confirmation):
+    return {
+        "observations": ["Taches brunes visibles."],
+        "problemes_possibles": ["Il pourrait s'agir d'une maladie foliaire."],
+        "actions_immediates": ["Retirez les feuilles très atteintes."],
+        "niveau_de_confiance": "Moyen",
+        "a_confirmer_par": confirmation,
+        "reponse_courte": "Observation prudente des taches brunes.",
+    }
+
+
+@pytest.mark.parametrize(
+    "confirmation",
+    [
+        "Traitez vous-même avec du Décis à 10 ml par litre.",  # pesticide + dose
+        "Appliquez 100 kg/ha de NPK 14-23-14.",                # dose
+        "Il s'agit certainement de la rouille.",               # definitive diagnosis
+        "",                                                     # empty
+        "ok",                                                  # malformed
+        "Attendez la prochaine pluie pour décider.",           # not agent-directed
+    ],
+)
+def test_unsafe_or_missing_confirmation_uses_agent_fallback(monkeypatch, confirmation):
+    _patch(
+        monkeypatch,
+        _FakeResp(200, _candidate(_json.dumps(_payload_with_confirmation(confirmation)))),
+    )
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="mil")
+
+    assert out["case"]["confirmation"] == _CONFIRMATION_FALLBACK
+    # No unsafe content leaks through the confirmation field.
+    serialized = _json.dumps(out, ensure_ascii=False).lower()
+    assert "décis".lower() not in serialized
+    assert "100 kg/ha" not in serialized
+    assert out["case"]["needs_human_confirmation"] is True
+
+
+def test_valid_agent_confirmation_is_kept(monkeypatch):
+    _patch(
+        monkeypatch,
+        _FakeResp(
+            200,
+            _candidate(
+                _json.dumps(
+                    _payload_with_confirmation("Confirmez avec un agent agricole local.")
+                )
+            ),
+        ),
+    )
+
+    out = screen_leaf_image(b"x", "image/jpeg", crop="mil")
+
+    assert out["case"]["confirmation"] == "Confirmez avec un agent agricole local."

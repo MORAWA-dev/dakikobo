@@ -56,3 +56,36 @@ def test_multiple_or_unsupported_crops_never_select_first_match():
     assert multiple["answer_kind"] == "clarification"
     assert unsupported["answer_kind"] == "refusal"
     assert multiple["sources"] == unsupported["sources"] == []
+
+
+
+def test_approved_doses_are_gated_and_only_live_in_this_module():
+    """PR review item 5: exact fertilizer figures are confined to core/fertilizer.
+
+    The numeric guidance gate stays off, so the deterministic tool withholds
+    doses and the model path (which strips any invented dose) is the only other
+    place a dose could appear — and it is blocked there. The gate is the single
+    switch that would ever release the reviewed figures, and it must stay False
+    until an agronomist approves provenance.
+    """
+    import core.fertilizer as fert
+
+    assert fert.NUMERIC_GUIDANCE_VERIFIED is False
+    # The reviewed figures exist in this module, but are not emitted while gated.
+    assert "100 kg/ha" in fert._RECOMMENDATIONS["sorgho"]["lines"][0]
+    for query in ("engrais sorgho", "npk maïs", "fumure mil"):
+        answer = get_fertilizer_advice(query)["answer"]
+        assert "kg/ha" not in answer
+        assert "14-23-14" not in answer
+
+
+def test_offline_payload_withholds_doses_while_gated():
+    from core.fertilizer import build_offline_fertilizer_payload
+
+    payload = build_offline_fertilizer_payload()
+    for crop in payload["crops"].values():
+        assert crop["available"] is False
+        assert crop["sources"] == []
+        joined = " ".join(crop["lines"])
+        assert "kg/ha" not in joined
+        assert "14-23-14" not in joined
