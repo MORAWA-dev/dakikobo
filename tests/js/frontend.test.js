@@ -428,3 +428,136 @@ test('les marqueurs de cache ne consomment pas le quota de réponses', async fun
     assert.ok(paths.indexOf('/__safety__') !== -1);
     assert.equal(paths.filter(function(p) { return p.indexOf('/__dakikobo_answer__') === 0; }).length, 4);
 });
+
+
+
+function memoryStorage(initial) {
+    // Flat mock: data keys live directly on the object (matching clearDeviceData's
+    // Object.keys(localStorage) contract), with Storage methods as non-enumerable
+    // own properties so the /^dakikobo/i data-key filter never sees them.
+    const store = Object.assign({}, initial || {});
+    Object.defineProperties(store, {
+        getItem: { value: function(key) { return Object.prototype.hasOwnProperty.call(store, key) && typeof store[key] === 'string' ? store[key] : null; } },
+        setItem: { value: function(key, value) { store[key] = String(value); } },
+        removeItem: { value: function(key) { delete store[key]; } }
+    });
+    return store;
+}
+
+test("un suivi hors ligne est mis en file d'attente puis rejoué au retour du réseau", async function() {
+    const originalFetch = global.fetch;
+    const storage = memoryStorage();
+    global.localStorage = storage;
+    let online = false;
+    const posted = [];
+    global.fetch = async function(url, options) {
+        if (String(url) === '/journal/session') {
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (!online) { throw new Error('offline'); }
+        posted.push(String(url));
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        // Offline: the outcome must be queued, not lost, and reported as queued.
+        const queuedResult = await api.submitOutcome(42, 'applied_improved');
+        assert.equal(queuedResult.queued, true);
+        assert.equal(api.pendingOutcomeCount(), 1);
+        // It is durably persisted so a reload keeps it.
+        assert.equal(typeof storage.getItem('dakikobo_outcome_queue_v1'), 'string');
+        assert.deepEqual(JSON.parse(storage.getItem('dakikobo_outcome_queue_v1'))[0].feedback_id, 42);
+
+        // Network returns: the flush replays the queued outcome exactly once and clears it.
+        online = true;
+        const flushed = await api.flushOutcomeQueue();
+        assert.equal(flushed, 1);
+        assert.equal(api.pendingOutcomeCount(), 0);
+        assert.deepEqual(posted, ['/feedback/outcome']);
+        assert.equal(storage.getItem('dakikobo_outcome_queue_v1'), null);
+    } finally {
+        global.fetch = originalFetch;
+        delete global.localStorage;
+    }
+});
+
+test("un suivi en ligne n'est jamais mis en file d'attente", async function() {
+    const originalFetch = global.fetch;
+    const storage = memoryStorage();
+    global.localStorage = storage;
+    global.fetch = async function(url) {
+        if (String(url) === '/journal/session') {
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        const result = await api.submitOutcome(7, 'not_applied');
+        assert.notEqual(result.queued, true);
+        assert.equal(api.pendingOutcomeCount(), 0);
+        assert.equal(storage.getItem('dakikobo_outcome_queue_v1'), null);
+    } finally {
+        global.fetch = originalFetch;
+        delete global.localStorage;
+    }
+});
+
+test("un suivi hors ligne avec photo ne peut pas être mis en file d'attente et échoue clairement", async function() {
+    const originalFetch = global.fetch;
+    const storage = memoryStorage();
+    global.localStorage = storage;
+    global.fetch = async function(url) {
+        if (String(url) === '/journal/session') {
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        throw new Error('offline');
+    };
+    try {
+        await assert.rejects(function() {
+            return api.submitOutcome(9, 'applied_worse', new Blob(['x'], { type: 'image/jpeg' }));
+        });
+        // A photo outcome is not silently dropped into the text-only queue.
+        assert.equal(api.pendingOutcomeCount(), 0);
+        assert.equal(storage.getItem('dakikobo_outcome_queue_v1'), null);
+    } finally {
+        global.fetch = originalFetch;
+        delete global.localStorage;
+    }
+});
+
+test("un rejet serveur du suivi n'est pas mis en file d'attente", async function() {
+    const originalFetch = global.fetch;
+    const storage = memoryStorage();
+    global.localStorage = storage;
+    global.fetch = async function(url) {
+        if (String(url) === '/journal/session') {
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        // The server answered and rejected the outcome (e.g. case not found).
+        return new Response(JSON.stringify({ error: 'introuvable' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        await assert.rejects(function() { return api.submitOutcome(404, 'not_sure'); });
+        assert.equal(api.pendingOutcomeCount(), 0);
+        assert.equal(storage.getItem('dakikobo_outcome_queue_v1'), null);
+    } finally {
+        global.fetch = originalFetch;
+        delete global.localStorage;
+    }
+});
+
+test('clearDeviceData vide aussi la file des suivis hors ligne', async function() {
+    const storage = memoryStorage({
+        dakikobo_outcome_queue_v1: JSON.stringify([{ feedback_id: 1, outcome: 'not_sure' }]),
+        other_app: 'keep'
+    });
+    global.localStorage = storage;
+    global.caches = { keys: async () => [], delete: async () => {} };
+    try {
+        await api.clearDeviceData();
+        assert.equal(storage.getItem('dakikobo_outcome_queue_v1'), null);
+        assert.equal(storage.other_app, 'keep');
+    } finally {
+        delete global.localStorage;
+        delete global.caches;
+    }
+});

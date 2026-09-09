@@ -81,10 +81,15 @@
                 $options.find('.followup-btn').prop('disabled', true);
                 $afterInput.prop('disabled', true);
                 var file = $afterInput[0] && $afterInput[0].files && $afterInput[0].files[0];
-                api.submitOutcome(feedbackId, outcome, file).then(function() {
-                    var thanks = 'Merci pour le suivi !';
-                    if (file) {
-                        thanks += ' Photo après enregistrée pour évaluation (privée).';
+                api.submitOutcome(feedbackId, outcome, file).then(function(response) {
+                    var thanks;
+                    if (response && response.queued) {
+                        thanks = 'Suivi enregistré hors ligne : il sera envoyé automatiquement dès le retour de la connexion.';
+                    } else {
+                        thanks = 'Merci pour le suivi !';
+                        if (file) {
+                            thanks += ' Photo après enregistrée pour évaluation (privée).';
+                        }
                     }
                     $options.after($('<span class="followup-thanks"></span>').text(thanks));
                 }).catch(function() {
