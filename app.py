@@ -29,6 +29,13 @@ from core.rag_pipeline import (
     load_vector_store_if_usable,
     text_to_speech_to_static,
 )
+from core.answer_safety import (
+    VISION_CONFIDENCE_CEILING,
+    clamp_vision_confidence,
+    redact_unsafe_text,
+    safety_policy_revision,
+    with_redaction_notice,
+)
 from core.llm_chain import sanitize_answer, setup_retrieval_qa
 from core.retrieval import (
     GroundedAnswer,
@@ -43,7 +50,13 @@ from core.answer_cache import AnswerCache, build_answer_cache_key, question_hash
 from core.cache import interprocess_file_lock
 from core.fertilizer import get_fertilizer_advice, is_fertilizer_query
 from core.router import classify, INTENT_FERTILIZER
-from core.disease import screen_leaf_image, is_configured as disease_configured
+from core.disease import (
+    FAILURE_STATUSES as VISION_FAILURE_STATUSES,
+    STATUS_NOT_CONFIGURED as VISION_STATUS_NOT_CONFIGURED,
+    STATUS_RATE_LIMITED as VISION_STATUS_RATE_LIMITED,
+    screen_leaf_image,
+    is_configured as disease_configured,
+)
 from core.speech import (
     SpeechTranscriptionError,
     is_configured as speech_configured,
@@ -107,6 +120,7 @@ from config import (
     IMAGE_COOLDOWN_SECONDS,
     MAX_IMAGE_UPLOAD_BYTES,
     MAX_IMAGE_UPLOAD_MB,
+    MULTIPART_OVERHEAD_BYTES,
     VOICE_COOLDOWN_SECONDS,
     MAX_AUDIO_UPLOAD_BYTES,
     MAX_AUDIO_UPLOAD_MB,
@@ -131,7 +145,16 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   PERMANENT_SESSION_LIFETIME=timedelta(days=JOURNAL_RETENTION_DAYS))
-app.config["MAX_CONTENT_LENGTH"] = max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES)
+# Werkzeug's MAX_CONTENT_LENGTH caps the *whole* multipart request body, not the
+# uploaded file. Setting it equal to the advertised file limit rejected files
+# that were themselves within the documented size, because the boundary markers,
+# per-part headers, and the accompanying field-context fields all count towards
+# it. The transport ceiling therefore carries an explicit overhead allowance,
+# while the advertised limit stays the per-file check performed in each route.
+app.config["MAX_CONTENT_LENGTH"] = (
+    max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES) + MULTIPART_OVERHEAD_BYTES
+)
+app.config["MULTIPART_OVERHEAD_BYTES"] = MULTIPART_OVERHEAD_BYTES
 app.config["MAX_IMAGE_UPLOAD_BYTES"] = MAX_IMAGE_UPLOAD_BYTES
 app.config["MAX_IMAGE_UPLOAD_MB"] = MAX_IMAGE_UPLOAD_MB
 app.config["MAX_AUDIO_UPLOAD_BYTES"] = MAX_AUDIO_UPLOAD_BYTES
@@ -376,6 +399,33 @@ def _answer_cache_key(retrieval_query: str, resolved, simple_french: bool) -> st
         simple_french=simple_french,
         llm_model=LLM_MODEL,
         manifest_hash_value=get_active_manifest_hash(),
+        # A code-only safety deployment changes no document and no model name,
+        # so the safety/prompt revision is what makes older answers unreachable.
+        safety_revision=safety_policy_revision(),
+    )
+
+
+def _answer_cache_usable(
+    *,
+    safety_routed: bool,
+    dynamic_context: bool,
+    active_manifest: str,
+) -> bool:
+    """Whether a persisted answer may be read or written for this request.
+
+    Safety-routed questions are excluded outright. The deterministic fertilizer
+    route owns fertilizer wording, and an entry written before a safety route
+    existed must never be able to answer in its place. Combined with the
+    lookup happening only after classification, this makes cache bypass of a
+    newly added safety route unreachable rather than merely unlikely: the cache
+    is never read for such a question, and never held an entry for one either.
+    """
+    return bool(
+        ANSWER_CACHE_ENABLED
+        and answer_cache_store is not None
+        and active_manifest
+        and not dynamic_context
+        and not safety_routed
     )
 
 
@@ -416,12 +466,25 @@ def _weather_signals_for_location(location_text: str) -> tuple[list[str], dict |
     return signals, weather
 
 
+# Vision service failures mapped to truthful HTTP statuses. Anything unlisted
+# falls back to 502 (bad upstream response).
+_VISION_FAILURE_STATUS_CODES = {
+    VISION_STATUS_NOT_CONFIGURED: 503,
+    VISION_STATUS_RATE_LIMITED: 429,
+}
+
+
 def _confidence_for_screen(case: dict | None, has_context: bool) -> str:
+    """Photo screening confidence: never above ``Moyen``, ``Faible`` unaided.
+
+    ``core.disease`` already clamps the model's self-reported level; clamping
+    again here keeps the guarantee even if a future caller builds a case itself.
+    """
     if not has_context:
         return "Faible"
     if case and case.get("confidence"):
-        return case["confidence"]
-    return "Moyen"
+        return clamp_vision_confidence(case["confidence"])
+    return VISION_CONFIDENCE_CEILING
 
 
 def _limit_label_mb() -> str:
@@ -702,6 +765,10 @@ def service_worker():
             digest.update(file.read_bytes())
     digest.update(Path(app.template_folder, "index.html").read_bytes())
     digest.update(json.dumps(_expected_vector_store_manifest(), sort_keys=True).encode())
+    # Server-side safety code is not part of the static bundle, so without this
+    # a safety-only deployment would leave the installed worker (and therefore
+    # its saved answers) on the previous cache identity.
+    digest.update(safety_policy_revision().encode())
     response = app.response_class(worker.replace("__ASSET_REVISION__", digest.hexdigest()[:16]), mimetype="application/javascript")
     response.headers["Service-Worker-Allowed"] = "/"
     response.headers["Cache-Control"] = "no-cache"
@@ -977,10 +1044,107 @@ def ask():
     dynamic_context = bool(effective_context.get("location")) or bool(
         re.search(r"météo|meteo|aujourd|demain|prévision|prevision|cette semaine", query, re.I))
     g.dynamic_context = dynamic_context
+
+    weather_signals, weather_payload = _weather_signals_for_location(
+        effective_context.get("location", "")
+    )
+    _set_log_fields(weather_enriched=bool(weather_signals))
+
+    # Bot self-identification (French + English triggers)
+    identity_triggers = [
+        "who developed you?", "who created you?", "who made you?",
+        "qui t'a développé ?", "qui t'a développé?", "qui t'a créé ?",
+        "qui t'a créé?", "qui t'a fait ?", "qui t'a fait?",
+        "qui es-tu ?", "qui es-tu?", "qui es tu ?", "qui es tu?",
+    ]
+    if query.lower() in identity_triggers:
+        _set_log_fields(
+            intent="identity",
+            model="static",
+            outcome="ok",
+            confidence="Fort",
+            source_count=0,
+            audio_generated=False,
+        )
+        return jsonify({
+            "answer": f"Je suis {BOT_NAME}, un assistant agricole intelligent développé par {BOT_CREATOR}.",
+            "sources": [],
+            "confidence": "Fort",
+            "audio_url": "",
+        })
+
+    # Safety-sensitive intent classification runs BEFORE the answer cache is
+    # consulted. Fertilizer questions stay inside a deterministic safety
+    # boundary; unverified numeric guidance is withheld rather than sent to an
+    # LLM, and no cached answer may stand in for that decision.
+    # Effective crop (question wins over form) completes fertilizer questions.
+    fert_query = resolved.retrieval_query if resolved.expanded_from_prior else query
+    fertilizer_intent = (
+        is_fertilizer_query(fert_query) or classify(fert_query) == INTENT_FERTILIZER
+    )
+    _set_log_fields(safety_routed=fertilizer_intent)
+    if fertilizer_intent:
+        advice = get_fertilizer_advice(
+            fert_query,
+            crop=effective_context["crop"] or None,
+            growth_stage=effective_context["growth_stage"],
+            location=effective_context["location"],
+        )
+        if advice is not None:
+            answer = _maybe_simplify(advice["answer"], simple_french)
+            case = advice.get("case")
+            confidence = advice.get("confidence", "Fort")
+            answer_kind = advice.get("answer_kind", "advice")
+            if case is not None:
+                case = dict(case)
+                case["crop"] = effective_context["crop"] or case.get("crop", "")
+                case["growth_stage"] = effective_context["growth_stage"] or case.get(
+                    "growth_stage", ""
+                )
+                case["location"] = effective_context["location"] or case.get(
+                    "location", ""
+                )
+                if weather_signals:
+                    case["weather_signals"] = weather_signals
+            case = _maybe_simplify_case(case, simple_french)
+            audio_url = text_to_speech_to_static(answer)
+            _set_log_fields(
+                intent="fertilizer",
+                model="deterministic",
+                outcome="ok",
+                confidence=confidence,
+                source_count=len(advice["sources"]),
+                audio_generated=bool(audio_url),
+                case_structured=bool(case),
+            )
+            payload = {
+                "answer": answer,
+                "sources": advice["sources"],
+                "confidence": confidence,
+                "audio_url": audio_url,
+                "answer_kind": answer_kind,
+                "simple_french": simple_french,
+                "journal": _journal_metadata(
+                    answer_path="fertilizer",
+                    crop_id=resolved.crop_id,
+                    place_id=resolved.place_id,
+                ),
+            }
+            if case is not None:
+                payload["case"] = case
+            if weather_payload is not None:
+                payload["weather"] = weather_payload
+            return jsonify(payload)
+
     # The active corpus hash is required before a persisted answer can be
-    # trusted. Lookup happens before intent routing and all upstream calls.
+    # trusted. The lookup now runs only after safety-sensitive routing has
+    # declined the question.
     active_manifest = get_active_manifest_hash()
-    if ANSWER_CACHE_ENABLED and answer_cache_store is not None and active_manifest and not dynamic_context:
+    if _answer_cache_usable(
+        safety_routed=fertilizer_intent,
+        dynamic_context=dynamic_context,
+        active_manifest=active_manifest,
+    ):
         cache_key = _answer_cache_key(retrieval_query, resolved, simple_french)
         try:
             cached = answer_cache_store.get(cache_key)
@@ -1040,91 +1204,6 @@ def ask():
                 payload["case"] = case
             return jsonify(payload)
 
-    weather_signals, weather_payload = _weather_signals_for_location(
-        effective_context.get("location", "")
-    )
-    _set_log_fields(weather_enriched=bool(weather_signals))
-
-    # Bot self-identification (French + English triggers)
-    identity_triggers = [
-        "who developed you?", "who created you?", "who made you?",
-        "qui t'a développé ?", "qui t'a développé?", "qui t'a créé ?",
-        "qui t'a créé?", "qui t'a fait ?", "qui t'a fait?",
-        "qui es-tu ?", "qui es-tu?", "qui es tu ?", "qui es tu?",
-    ]
-    if query.lower() in identity_triggers:
-        _set_log_fields(
-            intent="identity",
-            model="static",
-            outcome="ok",
-            confidence="Fort",
-            source_count=0,
-            audio_generated=False,
-        )
-        return jsonify({
-            "answer": f"Je suis {BOT_NAME}, un assistant agricole intelligent développé par {BOT_CREATOR}.",
-            "sources": [],
-            "confidence": "Fort",
-            "audio_url": "",
-        })
-
-    # Route by intent. Fertilizer questions stay inside a deterministic safety
-    # boundary; unverified numeric guidance is withheld rather than sent to an LLM.
-    # Effective crop (question wins over form) completes fertilizer questions.
-    fert_query = resolved.retrieval_query if resolved.expanded_from_prior else query
-    if is_fertilizer_query(fert_query) or classify(fert_query) == INTENT_FERTILIZER:
-        advice = get_fertilizer_advice(
-            fert_query,
-            crop=effective_context["crop"] or None,
-            growth_stage=effective_context["growth_stage"],
-            location=effective_context["location"],
-        )
-        if advice is not None:
-            answer = _maybe_simplify(advice["answer"], simple_french)
-            case = advice.get("case")
-            confidence = advice.get("confidence", "Fort")
-            answer_kind = advice.get("answer_kind", "advice")
-            if case is not None:
-                case = dict(case)
-                case["crop"] = effective_context["crop"] or case.get("crop", "")
-                case["growth_stage"] = effective_context["growth_stage"] or case.get(
-                    "growth_stage", ""
-                )
-                case["location"] = effective_context["location"] or case.get(
-                    "location", ""
-                )
-                if weather_signals:
-                    case["weather_signals"] = weather_signals
-            case = _maybe_simplify_case(case, simple_french)
-            audio_url = text_to_speech_to_static(answer)
-            _set_log_fields(
-                intent="fertilizer",
-                model="deterministic",
-                outcome="ok",
-                confidence=confidence,
-                source_count=len(advice["sources"]),
-                audio_generated=bool(audio_url),
-                case_structured=bool(case),
-            )
-            payload = {
-                "answer": answer,
-                "sources": advice["sources"],
-                "confidence": confidence,
-                "audio_url": audio_url,
-                "answer_kind": answer_kind,
-                "simple_french": simple_french,
-                "journal": _journal_metadata(
-                    answer_path="fertilizer",
-                    crop_id=resolved.crop_id,
-                    place_id=resolved.place_id,
-                ),
-            }
-            if case is not None:
-                payload["case"] = case
-            if weather_payload is not None:
-                payload["weather"] = weather_payload
-            return jsonify(payload)
-
     try:
         chain = get_rag_chain()
         if _rag_db is None:
@@ -1157,13 +1236,37 @@ def ask():
             if title not in source_scores or score > source_scores[title]:
                 source_scores[title] = score
 
-        raw_answer = chain.combine_documents_chain.run(
-            input_documents=source_docs,
-            question=retrieval_query,
-        )
-        # Reasoning models can leak chain-of-thought into `content`; never show
-        # that to a farmer.
-        answer = sanitize_answer(raw_answer)
+        if source_docs:
+            raw_answer = chain.combine_documents_chain.run(
+                input_documents=source_docs,
+                question=retrieval_query,
+            )
+            # Reasoning models can leak chain-of-thought into `content`; never
+            # show that to a farmer.
+            answer = sanitize_answer(raw_answer)
+            # Prompt rules are not a control: strip any invented product name or
+            # chemical dose before the answer is graded, cached, or spoken.
+            safety_review = redact_unsafe_text(answer, check_diagnosis=False)
+            if safety_review.blocked:
+                # Nothing safe survived; fall back to honest uncertainty instead
+                # of showing an empty answer.
+                answer = _uncertain_fallback_answer()
+            else:
+                answer = with_redaction_notice(
+                    safety_review.text, safety_review.reasons
+                )
+            if safety_review.reasons:
+                _set_log_fields(
+                    safety_redactions=",".join(safety_review.reasons),
+                    safety_blocked=safety_review.blocked,
+                )
+        else:
+            # Zero accepted documents means there is nothing to ground an answer
+            # in. Return the deterministic French refusal without spending a
+            # Groq call on an ungrounded generation.
+            answer = _no_rag_context_answer()
+            _set_log_fields(llm_called=False)
+
         grounded_policy = ground_answer(
             retrieval_query,
             source_docs,
@@ -1194,7 +1297,7 @@ def ask():
             "weather_signals": weather_signals,
         }
         if not source_docs:
-            answer = _no_rag_context_answer()
+            # `answer` already holds the deterministic refusal produced above.
             sources, confidence = [], "Faible"
             refusal = True
             answer_kind = "refusal"
@@ -1282,29 +1385,33 @@ def ask():
         if weather_payload is not None and not refusal:
             payload["weather"] = weather_payload
 
-        if ANSWER_CACHE_ENABLED and answer_cache_store is not None and not dynamic_context:
-            active_manifest = get_active_manifest_hash()
-            if active_manifest:
-                try:
-                    answer_cache_store.set(
-                        _answer_cache_key(
-                            retrieval_query,
-                            resolved,
-                            simple_french,
-                        ),
-                        answer=answer,
-                        case=case,
-                        sources=sources,
-                        confidence=confidence,
-                        retrieved_chunk_ids=retrieved_chunk_ids,
-                        evidence_question_hash=question_hash(query),
-                        evidence_created_at=ledger_created_at,
-                    )
-                except Exception as exc:
-                    logger.warning("Answer cache write skipped: %s", exc)
+        # Writes obey the same exclusion as reads, so the cache never holds an
+        # answer for a question a safety route claims.
+        if _answer_cache_usable(
+            safety_routed=fertilizer_intent,
+            dynamic_context=dynamic_context,
+            active_manifest=get_active_manifest_hash(),
+        ):
+            try:
+                answer_cache_store.set(
+                    _answer_cache_key(retrieval_query, resolved, simple_french),
+                    answer=answer,
+                    case=case,
+                    sources=sources,
+                    confidence=confidence,
+                    retrieved_chunk_ids=retrieved_chunk_ids,
+                    evidence_question_hash=question_hash(query),
+                    evidence_created_at=ledger_created_at,
+                )
+            except Exception as exc:
+                logger.warning("Answer cache write skipped: %s", exc)
         return jsonify(payload)
 
     except Exception as e:
+        # A genuine retrieval/LLM failure is not an answer. Report it with a
+        # non-2xx status so clients, the service worker, and uptime monitoring
+        # can tell "the service broke" from "the corpus has no answer", while the
+        # French JSON contract stays byte-identical in shape.
         print(f"ERROR — LLM/RAG execution failed: {e}")
         _set_log_fields(
             intent="rag",
@@ -1317,7 +1424,7 @@ def ask():
             "sources": [],
             "confidence": "Faible",
             "audio_url": "",
-        })
+        }), 503
 
 
 @app.route("/speech", methods=["POST"])
@@ -1389,13 +1496,14 @@ def screen():
     _set_log_fields(feature="screen", model=GEMINI_MODEL)
     if not disease_configured():
         _set_log_fields(outcome="not_configured", failure_type="missing_gemini_key", confidence="Faible")
+        # Unconfigured is a service state, not a screening result.
         return jsonify({
             "answer": "L'analyse d'image n'est pas disponible (clé Gemini non "
             "configurée).",
             "sources": [],
             "confidence": "Faible",
             "audio_url": "",
-        })
+        }), 503
 
     file = request.files.get("image")
     if file is None or not file.filename:
@@ -1439,6 +1547,7 @@ def screen():
         growth_stage=growth_stage,
         location=location,
     )
+    service_status = result.get("service_status", "ok")
     answer = _maybe_simplify(result["answer"], simple_french)
     case = result.get("case")
     confidence = _confidence_for_screen(
@@ -1452,13 +1561,7 @@ def screen():
     audio_url = text_to_speech_to_static(answer)
     crop_entry = resolve_crop(crop) if crop else None
     place_entry = resolve_place(location) if location else None
-    _set_log_fields(
-        outcome="ok",
-        confidence=confidence,
-        case_structured=case is not None,
-        audio_generated=bool(audio_url),
-    )
-    return jsonify({
+    payload = {
         "answer": answer,
         "case": case,
         "sources": [],
@@ -1470,7 +1573,28 @@ def screen():
             crop_id=crop_entry.id if crop_entry else "",
             place_id=place_entry.id if place_entry else "",
         ),
-    })
+    }
+    # An unusable photo is a valid screening outcome (200). An unreachable,
+    # rate-limited, or erroring vision service is not, so it gets a truthful
+    # status while the French JSON body keeps the same shape.
+    if service_status in VISION_FAILURE_STATUSES:
+        status_code = _VISION_FAILURE_STATUS_CODES.get(service_status, 502)
+        _set_log_fields(
+            outcome="service_error",
+            failure_type=service_status,
+            confidence=confidence,
+            case_structured=case is not None,
+            audio_generated=bool(audio_url),
+        )
+        return jsonify(payload), status_code
+
+    _set_log_fields(
+        outcome="ok",
+        confidence=confidence,
+        case_structured=case is not None,
+        audio_generated=bool(audio_url),
+    )
+    return jsonify(payload)
 
 
 def _journal_owner():
@@ -1526,6 +1650,9 @@ def _answer_freshness(response):
         response.set_data(app.json.dumps(data))
         response.headers["X-DakiKobo-Cacheable"] = "1" if cacheable else "0"
         response.headers["X-DakiKobo-Corpus"] = get_active_manifest_hash() or ""
+        # Saved answers are bound to the safety policy that produced them, so a
+        # stricter guardrail invalidates them even when the corpus is unchanged.
+        response.headers["X-DakiKobo-Safety"] = safety_policy_revision()
         response.headers["X-DakiKobo-Saved-At"] = str(datetime.fromisoformat(data["saved_at"]).timestamp())
         response.headers["Cache-Control"] = "no-store"
     return response

@@ -964,3 +964,80 @@ cd - && git worktree remove "$WT" --force
 - Live fertilizer checks withheld an exact sorghum dose with `confidence=Faible`, no sources/case,
   and asked for clarification when sorghum and maize were both named.
 - Strict public evaluation: **14/14 hard-passed (100%)**. Three non-blocking advisory warnings remain.
+
+
+---
+
+### 2026-09-09 — Verified audit findings repaired (vision validation, cache identity, statuses, storage bounds)
+
+**Scope**
+
+- Fixed the eight verified code findings from the audit review. No corpus, review status, or
+  eligibility record was touched: `git diff main -- Data/` is empty and
+  `NUMERIC_GUIDANCE_VERIFIED` stays `False`. Source approval remains a separate human/agronomist task.
+- Branch `fix/audit-safety-and-cache-identity`; all user-facing strings remain French.
+
+**Root causes and fixes**
+
+- **Vision payload trust.** `core/disease.py` called `.get` on whatever `json.loads` returned, so a
+  bare JSON list/string/number raised `AttributeError` out of a function documented as never raising;
+  list fields were joined without type checks; `niveau_de_confiance` reached the farmer verbatim, so
+  the model could self-report `Fort`. New `core/answer_safety.py` normalises every field and caps
+  vision confidence at `Moyen` (`clamp_vision_confidence`), applied again in `app._confidence_for_screen`.
+- **Unenforced advice ban.** The prompts forbade pesticide names and exact doses, but nothing checked
+  the output. `redact_unsafe_text` drops offending sentences (products, chemical doses, definitive
+  diagnoses), appends a French notice, and substitutes a deterministic refusal when nothing safe
+  survives. Applied to vision and, for products/doses only, to the grounded RAG answer. The
+  non-diagnosis disclaimer and agent-confirmation line are appended unconditionally.
+- **Safety-blind cache identity.** A safety deployment changes no document and no model name, so both
+  cache keys were unchanged by it. `safety_policy_revision()` (declared version + digest of
+  `answer_safety`/`disease`/`fertilizer`/`llm_chain` source) now enters the server key, the `/sw.js`
+  asset digest, and a new `X-DakiKobo-Safety` header checked against a `/__safety__` marker in `sw.js`.
+- **Cache ahead of the safety route.** The lookup ran before intent classification, so a pre-gate
+  cached answer could still serve an exact dose. Demonstrated with a regression test: on `main` the
+  planted entry `Appliquez 100 kg/ha de NPK 14-23-14 au semis.` was returned. Classification now runs
+  first and `_answer_cache_usable` excludes safety-routed questions from **both** reads and writes.
+- **Ungrounded generation.** `/ask` always ran the combine chain, then discarded its answer when no
+  document cleared the threshold. Zero accepted documents now returns the deterministic French refusal
+  before any Groq call.
+- **Failures reported as success.** `/ask` returned 200 on chain failure and `/screen` returned 200 for
+  unconfigured/unreachable/quota/upstream errors. `screen_leaf_image` now returns a `service_status`
+  mapped to 503/502/429; the French JSON body shape is unchanged. An unclear photo stays 200.
+- **Multipart ceiling.** `MAX_CONTENT_LENGTH` equalled the advertised per-file limit, so a 5 Mo photo
+  plus boundary markers and field-context fields was rejected with 413. Added
+  `MULTIPART_OVERHEAD_BYTES` (512 KiB) on top of the transport ceiling; per-file checks unchanged.
+- **Unbounded audio.** Random MP3 names meant every repeat wrote a new file forever. Filenames now
+  hash the spoken text (reused without re-synthesis), writes are atomic via temp + rename, and
+  `prune_audio_cache` bounds the directory by TTL then by least-recently-used size.
+
+**Verification**
+
+- Complete Python suite: **401 passed, 1 skipped** (`tests/test_rag.py` skips itself: no `GROQ_API_KEY`
+  in this environment). Was 290 before; 111 tests added. One pre-existing PyPDF2 deprecation warning.
+- Complete JavaScript suite: **15 passed** (`npm run test:js`), up from 13.
+- Every new regression test was confirmed to **fail against the unmodified sources** (reverted file by
+  file): 15 in `test_disease.py`, 20 across `test_app_routes.py`/`test_answer_cache.py`, 8 in
+  `test_tts.py`, 2 in `frontend.test.js`. The vision crash reproduced as
+  `AttributeError: 'list' object has no attribute 'get'`.
+- Guardrail discrimination checked on 30 hand-written French sentences: 14/14 unsafe caught, 16/16 safe
+  advice untouched — including the mandatory disclaimer, yields (`1 200 kg/ha`), seed rates, and row
+  spacing.
+- `compileall`, `node --check`, `git diff --check` passed. `scripts/export_offline_fertilizer.py`
+  reproduced `static/data/fertilizer.json` byte-for-byte.
+
+**Not done / still open**
+
+- No deployment. No live Space verification and no strict public RAG evaluation were run: this
+  environment has no `GROQ_API_KEY` and no Space access, so no live model-quality claim is made.
+- The pesticide list and dose patterns are heuristics. They are conservative by design but need an
+  agronomist to confirm the vocabulary, and a French reviewer to confirm the redaction wording reads
+  well to a farmer.
+- Redacting doses from grounded RAG answers matches the current F6 gate. It must be revisited when an
+  agronomist approves exact provenance, or approved figures will be suppressed too.
+- All previously blocked gates remain blocked: agronomist provenance approval, approved corpus
+  inventory, production persistence checks, real-phone accessibility, and participant sessions.
+
+**Next action**
+
+- Review the PR. Before any deploy, run the strict public evaluation with real credentials and confirm
+  `/screen` and `/ask` status codes against the live Space.

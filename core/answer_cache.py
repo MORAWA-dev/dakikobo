@@ -12,6 +12,7 @@ from config import (
     QUESTION_HASH_SALT,
     STATE_DB_PATH,
 )
+from core.answer_safety import safety_policy_revision
 from core.cache import TTLCache
 from core.retrieval import get_active_manifest_hash
 
@@ -34,12 +35,22 @@ def build_answer_cache_key(
     simple_french: bool = False,
     llm_model: str = LLM_MODEL,
     manifest_hash_value: str | None = None,
+    safety_revision: str | None = None,
 ) -> str:
-    """Build the locked Phase 3 key over question, context, model, and corpus."""
+    """Build the answer key over question, context, model, corpus, and safety policy.
+
+    The safety/prompt revision is part of the key material because a safety
+    deployment can change nothing but code: the corpus manifest and the model
+    name both stay identical, so without it a stricter guardrail would keep
+    serving answers generated under the previous rules until the TTL expired.
+    """
     active_manifest = (
         get_active_manifest_hash()
         if manifest_hash_value is None
         else manifest_hash_value
+    )
+    active_safety = (
+        safety_policy_revision() if safety_revision is None else safety_revision
     )
     material = "|".join(
         (
@@ -50,6 +61,7 @@ def build_answer_cache_key(
             "true" if simple_french else "false",
             (llm_model or "").strip(),
             active_manifest or "",
+            active_safety or "",
         )
     )
     return sha256(material.encode("utf-8")).hexdigest()

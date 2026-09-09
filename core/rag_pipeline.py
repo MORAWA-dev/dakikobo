@@ -5,9 +5,9 @@ from core.source_policy import eligible_source, source_review, split_markdown_fr
 import glob
 import hashlib
 import json
-import random
 import shutil
-import string
+import tempfile
+import time
 
 import requests
 import PyPDF2
@@ -25,6 +25,8 @@ from config import (
     EMBEDDING_MODEL,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
+    TTS_CACHE_MAX_BYTES,
+    TTS_CACHE_TTL_SECONDS,
     TTS_LANGUAGE,
     TTS_MAX_CHARS,
     TTS_TIMEOUT_SECONDS,
@@ -336,9 +338,81 @@ def initialize_vector_store(documents: list[Document], source_manifest: dict | N
 # TEXT-TO-SPEECH (TTS)
 # =================================================================
 
-def _random_filename(length: int = 15) -> str:
-    chars = string.ascii_lowercase + string.digits
-    return "".join(random.choice(chars) for _ in range(length)) + ".mp3"
+def _speech_filename(text: str, *, language: str = TTS_LANGUAGE) -> str:
+    """Derive a stable filename from the spoken text.
+
+    Random names meant every repeat of the same answer wrote another MP3, so
+    ``static/audio/`` grew without bound and never reused work. Hashing the
+    language plus the exact synthesized text makes identical answers collapse
+    onto one file that can be served straight from disk.
+    """
+    digest = hashlib.sha256(f"{language}|{text}".encode("utf-8")).hexdigest()
+    return f"tts_{digest[:32]}.mp3"
+
+
+def _audio_cache_entries() -> list[tuple[float, int, str]]:
+    """Return (mtime, size, path) for every generated MP3, oldest first."""
+    entries = []
+    try:
+        names = os.listdir(AUDIO_OUTPUT_DIR)
+    except OSError:
+        return entries
+    for name in names:
+        if not name.endswith(".mp3"):
+            continue
+        path = os.path.join(AUDIO_OUTPUT_DIR, name)
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        entries.append((stat.st_mtime, stat.st_size, path))
+    entries.sort(key=lambda entry: entry[0])
+    return entries
+
+
+def prune_audio_cache(*, keep: str = "", now: float | None = None) -> int:
+    """Bound ``static/audio/`` by age and then by total size.
+
+    Files older than ``TTS_CACHE_TTL_SECONDS`` are removed first. If the
+    directory is still above ``TTS_CACHE_MAX_BYTES``, the least recently used
+    files are removed until it fits. ``keep`` is never deleted so the response
+    being served right now stays valid. Returns the number of files removed.
+    """
+    now = time.time() if now is None else now
+    keep_path = os.path.abspath(keep) if keep else ""
+    removed = 0
+
+    entries = _audio_cache_entries()
+    survivors: list[tuple[float, int, str]] = []
+    for mtime, size, path in entries:
+        if keep_path and os.path.abspath(path) == keep_path:
+            survivors.append((mtime, size, path))
+            continue
+        if TTS_CACHE_TTL_SECONDS > 0 and (now - mtime) > TTS_CACHE_TTL_SECONDS:
+            try:
+                os.remove(path)
+                removed += 1
+            except OSError:
+                survivors.append((mtime, size, path))
+            continue
+        survivors.append((mtime, size, path))
+
+    if TTS_CACHE_MAX_BYTES <= 0:
+        return removed
+
+    total = sum(size for _, size, _ in survivors)
+    for mtime, size, path in survivors:
+        if total <= TTS_CACHE_MAX_BYTES:
+            break
+        if keep_path and os.path.abspath(path) == keep_path:
+            continue
+        try:
+            os.remove(path)
+        except OSError:
+            continue
+        total -= size
+        removed += 1
+    return removed
 
 
 def _truncate_for_speech(text: str, max_chars: int) -> str:
@@ -365,19 +439,51 @@ def text_to_speech_to_static(text: str) -> str:
     """
     Convert text to an MP3 file saved under static/audio/.
     Returns the browser-accessible URL path, or '' on failure.
+
+    The filename is derived from the spoken text, so an answer that was already
+    voiced is served from disk without another gTTS call. Storage stays bounded
+    by ``prune_audio_cache``.
     """
     try:
         os.makedirs(AUDIO_OUTPUT_DIR, exist_ok=True)
         truncated = _truncate_for_speech(text, TTS_MAX_CHARS)
-        filename = _random_filename()
+        filename = _speech_filename(truncated)
         output_path = os.path.join(AUDIO_OUTPUT_DIR, filename)
 
-        tts = gtts.gTTS(
-            text=truncated,
-            lang=TTS_LANGUAGE,
-            timeout=TTS_TIMEOUT_SECONDS,
-        )
-        tts.save(output_path)
+        if os.path.isfile(output_path) and os.path.getsize(output_path) > 0:
+            # Mark as recently used so a popular answer is evicted last.
+            try:
+                os.utime(output_path, None)
+            except OSError:
+                pass
+        else:
+            # Write to a private temp file first: a partially written MP3 must
+            # never be reachable under the deterministic name, including when a
+            # second worker asks for the same answer concurrently.
+            handle, temp_path = tempfile.mkstemp(
+                dir=AUDIO_OUTPUT_DIR, prefix=".tts-", suffix=".part"
+            )
+            os.close(handle)
+            try:
+                tts = gtts.gTTS(
+                    text=truncated,
+                    lang=TTS_LANGUAGE,
+                    timeout=TTS_TIMEOUT_SECONDS,
+                )
+                tts.save(temp_path)
+                os.replace(temp_path, output_path)
+            except BaseException:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+                raise
+
+        # Bounding the directory must never fail the request that produced audio.
+        try:
+            prune_audio_cache(keep=output_path)
+        except Exception as exc:
+            print(f"Audio cleanup skipped: {exc}")
 
         return url_for("static", filename="audio/" + filename)
     except Exception as e:

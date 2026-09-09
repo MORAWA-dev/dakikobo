@@ -118,6 +118,12 @@ TTS_LANGUAGE = "fr"           # French — official language of Burkina Faso
 TTS_MAX_CHARS = 700           # answers run ~100 words (~600 chars); cover the full reply
 TTS_TIMEOUT_SECONDS = float(os.getenv("TTS_TIMEOUT_SECONDS", "8.0"))
 AUDIO_OUTPUT_DIR = os.path.join("static", "audio")
+# Generated MP3s are named after the answer they speak, so repeats reuse one
+# file. These bounds keep the directory from growing without limit on a
+# long-running host: files are dropped by age first, then least-recently-used
+# until the total fits. Set either to 0 to disable that half of the policy.
+TTS_CACHE_TTL_SECONDS = float(os.getenv("TTS_CACHE_TTL_SECONDS", str(24 * 60 * 60)))
+TTS_CACHE_MAX_BYTES = int(os.getenv("TTS_CACHE_MAX_BYTES", str(64 * 1024 * 1024)))
 
 # --- STT ---
 STT_MODEL = os.getenv("STT_MODEL", "whisper-large-v3-turbo")
@@ -144,6 +150,12 @@ REQUEST_COOLDOWN_SECONDS = float(os.getenv("REQUEST_COOLDOWN_SECONDS", "2.0"))
 IMAGE_COOLDOWN_SECONDS = float(os.getenv("IMAGE_COOLDOWN_SECONDS", "6.0"))
 MAX_IMAGE_UPLOAD_MB = float(os.getenv("MAX_IMAGE_UPLOAD_MB", "5.0"))
 MAX_IMAGE_UPLOAD_BYTES = int(MAX_IMAGE_UPLOAD_MB * 1024 * 1024)
+# Headroom added on top of the advertised per-file limit to form Flask's
+# whole-request ceiling (MAX_CONTENT_LENGTH). A multipart POST also carries
+# boundary markers, per-part headers, and the field-context form values, so
+# without this allowance a file exactly at the documented limit was rejected
+# with 413 even though the file itself was acceptable.
+MULTIPART_OVERHEAD_BYTES = int(os.getenv("MULTIPART_OVERHEAD_BYTES", 512 * 1024))
 # Reject oversized text questions before RAG/TTS work.
 MAX_QUESTION_CHARS = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
 

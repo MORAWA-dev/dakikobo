@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import app as app_module
+from core.answer_safety import REDACTION_NOTICE
 from core.case_log import list_evidence, list_feedback_events, record_feedback
 from core.retrieval import chunk_id, get_active_manifest_hash, manifest_hash
 
@@ -1290,10 +1291,13 @@ def test_rag_route_handles_chain_errors(monkeypatch):
     response = client.post("/ask", data={"messageText": "Quand semer le mil ?"})
     payload = response.get_json()
 
-    assert response.status_code == 200
+    # A genuine retrieval/LLM failure is reported as a service error, not as a
+    # successful answer, while the French JSON contract is preserved.
+    assert response.status_code == 503
     assert "erreur de traitement" in payload["answer"]
     assert payload["sources"] == []
     assert payload["confidence"] == "Faible"
+    assert payload["audio_url"] == ""
 
 
 def test_speech_route_reports_unconfigured_service(monkeypatch):
@@ -1419,7 +1423,8 @@ def test_screen_reports_unconfigured_service(monkeypatch):
     response = client.post("/screen", data={})
     payload = response.get_json()
 
-    assert response.status_code == 200
+    # An unconfigured vision service is a service state, not a screening result.
+    assert response.status_code == 503
     assert "clé Gemini non configurée" in payload["answer"]
     assert payload["confidence"] == "Faible"
 
@@ -1714,3 +1719,361 @@ def test_feedback_outcome_stores_after_image(tmp_path, monkeypatch):
     rows = list_feedback_events(str(case_log))
     assert rows[0]["after_image_ref"]
     assert Path(rows[0]["after_image_ref"]).is_file()
+
+
+
+# =====================================================================
+# Audit regressions — findings 5, 6 and 7
+# =====================================================================
+
+class _ZeroAcceptedDocsHarness:
+    """Retrieval returns candidates, but none clears the similarity threshold."""
+
+    def __init__(self):
+        self.combine_documents_chain = self
+        self.search_calls = 0
+        self.llm_calls = 0
+
+    def similarity_search_with_relevance_scores(self, query, k):
+        self.search_calls += 1
+        return [
+            (
+                SimpleNamespace(
+                    metadata={"source": "hors_sujet.pdf"},
+                    page_content="Contenu sans rapport avec la question.",
+                ),
+                # Below app_module.SIMILARITY_THRESHOLD (0.2).
+                0.01,
+            )
+        ]
+
+    def run(self, *, input_documents, question):
+        self.llm_calls += 1
+        raise AssertionError("the LLM must not be called without grounded documents")
+
+
+def test_zero_accepted_documents_refuses_before_calling_the_llm(monkeypatch):
+    """Finding 5: an ungrounded generation was requested and then thrown away.
+
+    The old code always ran the combine chain, then overwrote its answer with
+    the refusal when no document had been accepted. That spent a Groq call and
+    briefly produced ungrounded text.
+    """
+    harness = _ZeroAcceptedDocsHarness()
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Quel est le cours du bitcoin ?"}
+    )
+    payload = response.get_json()
+
+    assert harness.search_calls == 1
+    assert harness.llm_calls == 0, "the LLM was called with zero accepted documents"
+    assert response.status_code == 200
+    assert "Je ne sais pas encore" in payload["answer"]
+    assert payload["sources"] == []
+    assert payload["confidence"] == "Faible"
+    assert payload["answer_kind"] == "refusal"
+
+
+def test_zero_document_refusal_is_logged_without_an_llm_call(monkeypatch, caplog):
+    harness = _ZeroAcceptedDocsHarness()
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    with caplog.at_level(logging.INFO, logger="dakikobo"):
+        app_module.app.test_client().post(
+            "/ask", data={"messageText": "Question sans rapport agricole ?"}
+        )
+
+    events = [json.loads(record.message) for record in caplog.records]
+    ask_events = [e for e in events if e.get("route") == "/ask"]
+    assert ask_events
+    assert ask_events[-1]["llm_called"] is False
+    assert ask_events[-1]["refusal"] is True
+
+
+class _UnsafeAnswerHarness:
+    """A grounded answer that names a product and a dose."""
+
+    def __init__(self, answer):
+        self.combine_documents_chain = self
+        self.answer = answer
+
+    def similarity_search_with_relevance_scores(self, query, k):
+        return [
+            (
+                SimpleNamespace(
+                    metadata={"source": "manuel_extension.pdf"},
+                    page_content="Gestion des maladies foliaires au champ.",
+                ),
+                0.4,
+            )
+        ]
+
+    def run(self, *, input_documents, question):
+        return self.answer
+
+
+def test_rag_answer_product_and_dose_are_redacted(monkeypatch):
+    """Finding 2 on the grounded path: the prompt ban was not enforced."""
+    harness = _UnsafeAnswerHarness(
+        "Surveillez la parcelle après la pluie.\n"
+        "Pulvérisez du mancozèbe à 25 g par litre d'eau.\n"
+        "Retirez les feuilles très atteintes."
+    )
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Comment gérer les taches sur les feuilles ?"}
+    )
+    payload = response.get_json()
+    body = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert response.status_code == 200
+    assert "mancozèbe".lower() not in body
+    assert "25 g" not in body
+    assert "Surveillez la parcelle après la pluie." in payload["answer"]
+    assert "Retirez les feuilles très atteintes." in payload["answer"]
+    assert REDACTION_NOTICE in payload["answer"]
+
+
+def test_fully_unsafe_rag_answer_becomes_honest_uncertainty(monkeypatch):
+    harness = _UnsafeAnswerHarness("Traitez avec du Décis à 10 ml par litre d'eau.")
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Quel traitement contre les chenilles ?"}
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert "décis" not in json.dumps(payload, ensure_ascii=False).lower()
+    assert "Je ne peux pas confirmer" in payload["answer"]
+    assert payload["answer_kind"] == "uncertain"
+    assert payload["confidence"] == "Faible"
+    assert payload["case"]["risk_level"] == "Non confirmé"
+
+
+def _screen_client(monkeypatch, service_status, answer="Analyse indisponible."):
+    monkeypatch.setattr(app_module, "disease_configured", lambda: True)
+    monkeypatch.setattr(app_module, "IMAGE_COOLDOWN_SECONDS", 0)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module,
+        "screen_leaf_image",
+        lambda image_bytes, mime_type, **context: {
+            "answer": answer,
+            "service_status": service_status,
+            "case": {
+                "case_id": "case_test",
+                "input_type": "image",
+                "confidence": "Faible",
+                "risk_level": "Indisponible",
+            },
+        },
+    )
+    return app_module.app.test_client()
+
+
+@pytest.mark.parametrize(
+    "service_status,expected_status",
+    [
+        ("unreachable", 502),
+        ("upstream_error", 502),
+        ("unreadable_response", 502),
+        ("rate_limited", 429),
+        ("not_configured", 503),
+    ],
+)
+def test_screen_reports_genuine_vision_failures_with_non_2xx(
+    monkeypatch, service_status, expected_status
+):
+    """Finding 6: every vision failure used to be dressed up as HTTP 200."""
+    client = _screen_client(monkeypatch, service_status)
+
+    response = client.post(
+        "/screen",
+        data={"image": (__import__("io").BytesIO(b"fake"), "leaf.jpg")},
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == expected_status
+    # The French JSON contract is unchanged, only the status differs.
+    assert set(payload) >= {
+        "answer",
+        "case",
+        "sources",
+        "confidence",
+        "audio_url",
+        "simple_french",
+        "journal",
+    }
+    assert payload["confidence"] == "Faible"
+    assert payload["sources"] == []
+    assert isinstance(payload["answer"], str) and payload["answer"]
+
+
+def test_screen_unusable_photo_is_still_a_successful_screening(monkeypatch):
+    """An unclear photo is a valid outcome and must stay 200."""
+    client = _screen_client(monkeypatch, "ok", answer="Photo floue, reprenez-la.")
+
+    response = client.post(
+        "/screen",
+        data={"image": (__import__("io").BytesIO(b"fake"), "leaf.jpg")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+
+
+def test_screen_vision_confidence_never_reaches_fort(monkeypatch):
+    """Finding 1: a model-reported 'Fort' used to reach the farmer verbatim."""
+    monkeypatch.setattr(app_module, "disease_configured", lambda: True)
+    monkeypatch.setattr(app_module, "IMAGE_COOLDOWN_SECONDS", 0)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module,
+        "screen_leaf_image",
+        lambda image_bytes, mime_type, **context: {
+            "answer": "Observation prudente.",
+            "service_status": "ok",
+            "case": {"case_id": "c", "input_type": "image", "confidence": "Fort"},
+        },
+    )
+
+    response = app_module.app.test_client().post(
+        "/screen",
+        data={
+            "image": (__import__("io").BytesIO(b"fake"), "leaf.jpg"),
+            "crop": "maïs",
+        },
+        content_type="multipart/form-data",
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["confidence"] == "Moyen"
+    assert payload["case"]["confidence"] == "Moyen"
+
+
+def test_multipart_ceiling_leaves_room_above_the_advertised_file_limit():
+    """Finding 7: the transport ceiling must exceed the per-file limit.
+
+    They used to be equal, so a file exactly at the documented size was rejected
+    once boundary markers, part headers, and the field-context values were added.
+    """
+    file_limit = app_module.app.config["MAX_IMAGE_UPLOAD_BYTES"]
+    audio_limit = app_module.app.config["MAX_AUDIO_UPLOAD_BYTES"]
+    ceiling = app_module.app.config["MAX_CONTENT_LENGTH"]
+
+    assert ceiling > max(file_limit, audio_limit)
+    assert ceiling == max(file_limit, audio_limit) + app_module.MULTIPART_OVERHEAD_BYTES
+
+
+def test_image_at_the_advertised_limit_is_accepted_despite_multipart_overhead(
+    monkeypatch,
+):
+    file_limit = 4096
+    monkeypatch.setitem(app_module.app.config, "MAX_IMAGE_UPLOAD_BYTES", file_limit)
+    monkeypatch.setitem(app_module.app.config, "MAX_IMAGE_UPLOAD_MB", 0.004)
+    monkeypatch.setitem(
+        app_module.app.config,
+        "MAX_CONTENT_LENGTH",
+        file_limit + app_module.MULTIPART_OVERHEAD_BYTES,
+    )
+    monkeypatch.setattr(app_module, "disease_configured", lambda: True)
+    monkeypatch.setattr(app_module, "IMAGE_COOLDOWN_SECONDS", 0)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+    monkeypatch.setattr(
+        app_module,
+        "screen_leaf_image",
+        lambda image_bytes, mime_type, **context: {
+            "answer": "Observation prudente.",
+            "service_status": "ok",
+            "case": {"case_id": "c", "input_type": "image", "confidence": "Moyen"},
+        },
+    )
+
+    response = app_module.app.test_client().post(
+        "/screen",
+        data={
+            # Exactly at the advertised per-file limit.
+            "image": (__import__("io").BytesIO(b"x" * file_limit), "leaf.jpg"),
+            # Real requests also carry the field-context values.
+            "crop": "maïs",
+            "growth_stage": "fructification / épi",
+            "location": "Bobo-Dioulasso",
+            "simple_french": "1",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200, (
+        "a file within the documented limit was rejected because of multipart "
+        "overhead"
+    )
+    assert response.get_json()["answer"]
+
+
+def test_image_above_the_advertised_limit_is_still_rejected(monkeypatch):
+    file_limit = 4096
+    monkeypatch.setitem(app_module.app.config, "MAX_IMAGE_UPLOAD_BYTES", file_limit)
+    monkeypatch.setitem(app_module.app.config, "MAX_IMAGE_UPLOAD_MB", 0.004)
+    monkeypatch.setitem(
+        app_module.app.config,
+        "MAX_CONTENT_LENGTH",
+        file_limit + app_module.MULTIPART_OVERHEAD_BYTES,
+    )
+    monkeypatch.setattr(app_module, "disease_configured", lambda: True)
+
+    response = app_module.app.test_client().post(
+        "/screen",
+        data={"image": (__import__("io").BytesIO(b"x" * (file_limit + 1)), "leaf.jpg")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 413
+    assert "trop lourd" in response.get_json()["error"]
+
+
+def test_ask_response_carries_the_safety_revision_for_browser_cache_identity(
+    monkeypatch,
+):
+    """Finding 3: the browser had no way to retire answers on a safety deploy."""
+    _install_rag(monkeypatch, _FakeRagChain())
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "Quand semer le mil ?"}
+    )
+
+    assert response.headers["X-DakiKobo-Safety"] == app_module.safety_policy_revision()
+    assert response.headers["X-DakiKobo-Safety"]
+
+
+def test_service_worker_identity_changes_with_the_safety_revision(monkeypatch):
+    client = app_module.app.test_client()
+    baseline = client.get("/sw.js").get_data(as_text=True)
+
+    monkeypatch.setattr(
+        app_module, "safety_policy_revision", lambda: "safety-different.deadbeef"
+    )
+    changed = client.get("/sw.js").get_data(as_text=True)
+
+    assert baseline != changed, (
+        "a code-only safety deployment left the service worker, and therefore "
+        "its saved answers, on the previous cache identity"
+    )
