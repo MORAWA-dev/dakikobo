@@ -110,6 +110,7 @@ from config import (
     EMBEDDING_MODEL,
     VECTORSTORE_DIR,
     DEBUG,
+    IS_PRODUCTION,
     SECRET_KEY,
     BOT_NAME,
     BOT_CREATOR,
@@ -127,6 +128,7 @@ from config import (
     MAX_QUESTION_CHARS,
     OPS_METRICS_ENABLED,
     OPS_METRICS_MAX_EVENTS,
+    SEARCH_ENGINE_INDEXING_ENABLED,
     ANSWER_CACHE_ENABLED,
     ANSWER_CACHE_TTL_SECONDS,
     STATE_DB_PATH,
@@ -143,14 +145,14 @@ logger = logging.getLogger("dakikobo")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
-                  PERMANENT_SESSION_LIFETIME=timedelta(days=JOURNAL_RETENTION_DAYS))
-# Werkzeug's MAX_CONTENT_LENGTH caps the *whole* multipart request body, not the
-# uploaded file. Setting it equal to the advertised file limit rejected files
-# that were themselves within the documented size, because the boundary markers,
-# per-part headers, and the accompanying field-context fields all count towards
-# it. The transport ceiling therefore carries an explicit overhead allowance,
-# while the advertised limit stays the per-file check performed in each route.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=JOURNAL_RETENTION_DAYS),
+)
+# The whole multipart request includes boundaries, headers and field context;
+# each route still enforces its advertised per-file limit.
 app.config["MAX_CONTENT_LENGTH"] = (
     max(MAX_IMAGE_UPLOAD_BYTES, MAX_AUDIO_UPLOAD_BYTES) + MULTIPART_OVERHEAD_BYTES
 )
@@ -276,6 +278,34 @@ def _request_log_finish(response):
             timestamp=_utc_now_iso(),
             **payload,
         )
+    return response
+
+
+@app.after_request
+def _add_security_headers(response):
+    """Apply browser protections to HTML, JSON, static files, and errors."""
+    headers = {
+        "Content-Security-Policy": (
+            "default-src 'self'; base-uri 'none'; object-src 'none'; "
+            "frame-ancestors 'none'; form-action 'self'; "
+            "script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
+            "media-src 'self' blob:; connect-src 'self'; worker-src 'self'; "
+            "manifest-src 'self'"
+        ),
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "same-origin",
+        "Permissions-Policy": "camera=(self), microphone=(self), geolocation=()",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-Permitted-Cross-Domain-Policies": "none",
+    }
+    if IS_PRODUCTION:
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    for name, value in headers.items():
+        response.headers.setdefault(name, value)
+    if not SEARCH_ENGINE_INDEXING_ENABLED:
+        response.headers.setdefault("X-Robots-Tag", "noindex, nofollow, noarchive")
     return response
 
 
@@ -751,7 +781,22 @@ def _rag_runtime_status() -> dict:
 
 @app.route("/")
 def index():
-    return render_template("index.html", journal_retention_days=JOURNAL_RETENTION_DAYS)
+    return render_template(
+        "index.html",
+        journal_retention_days=JOURNAL_RETENTION_DAYS,
+        search_engine_indexing_enabled=SEARCH_ENGINE_INDEXING_ENABLED,
+    )
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    """Keep non-production/demo deployments out of search-engine indexes."""
+    body = "User-agent: *\nAllow: /\n" if SEARCH_ENGINE_INDEXING_ENABLED else (
+        "User-agent: *\nDisallow: /\n"
+    )
+    response = app.response_class(body, mimetype="text/plain")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
 
 
 @app.route("/sw.js")

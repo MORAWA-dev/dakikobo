@@ -9,7 +9,6 @@ itsdangerous==2.2.0
 gunicorn==23.0.0
 
 # Environment / config
-python-dotenv
 
 # LLM & RAG — LangChain stack
 langchain==0.2.0

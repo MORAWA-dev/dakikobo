@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     if not os.environ.get("FIRECRAWL_API_KEY"):
         # firecrawl_ingest also checks config; fail early with a clear message.
         print(
-            "ERROR: FIRECRAWL_API_KEY is not set. Load .env before refreshing.",
+            "ERROR: FIRECRAWL_API_KEY is not set in the process environment.",
             file=sys.stderr,
         )
         return 2

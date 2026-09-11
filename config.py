@@ -2,9 +2,13 @@
 # All tuneable values live here. Secret keys are loaded from environment variables.
 
 import os
-from dotenv import load_dotenv
 
-load_dotenv()  # Loads variables from a .env file if present
+# The web process intentionally never loads a .env file. Production secrets must
+# be injected by the hosting platform; local developers can export variables in
+# their shell before starting Flask. This also prevents a misplaced webroot
+# .env file from silently becoming part of the application's secret store.
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
 
 # --- LLM ---
 APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
@@ -123,6 +127,8 @@ AUDIO_OUTPUT_DIR = os.path.join("static", "audio")
 # long-running host: files are dropped by age first, then least-recently-used
 # until the total fits. Set either to 0 to disable that half of the policy.
 TTS_CACHE_TTL_SECONDS = float(os.getenv("TTS_CACHE_TTL_SECONDS", str(24 * 60 * 60)))
+# Abandoned partial writes; active workers hold an advisory file lock.
+TTS_PARTIAL_TTL_SECONDS = float(os.getenv("TTS_PARTIAL_TTL_SECONDS", "3600"))
 TTS_CACHE_MAX_BYTES = int(os.getenv("TTS_CACHE_MAX_BYTES", str(64 * 1024 * 1024)))
 
 # --- STT ---
@@ -142,7 +148,15 @@ SOIL_TIMEOUT_SECONDS = float(os.getenv("SOIL_TIMEOUT_SECONDS", "18.0"))
 # --- Flask ---
 DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 from core.session_secret import load_session_secret
-SECRET_KEY = load_session_secret(os.getenv("FLASK_SECRET_KEY"), os.path.dirname(STATE_DB_PATH) or ".")
+_configured_secret = os.getenv("FLASK_SECRET_KEY", "").strip()
+if IS_PRODUCTION and DEBUG:
+    raise RuntimeError("FLASK_DEBUG must be false when APP_ENV=production")
+if IS_PRODUCTION and not _configured_secret:
+    raise RuntimeError("FLASK_SECRET_KEY must be supplied by the hosting platform")
+SECRET_KEY = load_session_secret(
+    _configured_secret,
+    os.path.dirname(STATE_DB_PATH) or ".",
+)
 # Phase 3/4 privacy contract: question hashes are salted with the existing
 # Flask secret rather than stored or hashed unsalted.
 QUESTION_HASH_SALT = SECRET_KEY
@@ -162,6 +176,9 @@ MAX_QUESTION_CHARS = int(os.getenv("MAX_QUESTION_CHARS", "1000"))
 # SQLite-backed observability window (privacy-safe aggregates only).
 OPS_METRICS_MAX_EVENTS = int(os.getenv("OPS_METRICS_MAX_EVENTS", "200"))
 OPS_METRICS_ENABLED = os.getenv("OPS_METRICS_ENABLED", "true").lower() == "true"
+SEARCH_ENGINE_INDEXING_ENABLED = (
+    os.getenv("SEARCH_ENGINE_INDEXING_ENABLED", "false").lower() == "true"
+)
 
 # --- Bot Identity ---
 BOT_NAME = "DakiKobo"

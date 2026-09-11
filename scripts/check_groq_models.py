@@ -15,16 +15,13 @@ import sys
 import urllib.error
 import urllib.request
 
-from dotenv import load_dotenv
-
 MODELS_URL = "https://api.groq.com/openai/v1/models"
 
 
 def main() -> int:
-    load_dotenv()
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
-        print("GROQ_API_KEY is not set in .env")
+        print("GROQ_API_KEY is not set in the process environment")
         return 1
 
     print(f"key loaded: yes (length {len(api_key)})")

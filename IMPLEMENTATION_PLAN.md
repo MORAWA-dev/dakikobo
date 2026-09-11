@@ -144,9 +144,10 @@ Status legend: `[ ]` todo · `[x]` done.
 
 - [x] **15. Rewrite `README.md`** — `README.md`
   - *Done when:* the README matches the current stack (Flask, Groq `llama-3.3-70b`, LangChain,
-    Chroma, French TTS), uses `.env`, and contains no instruction to put API keys in source. **(M)**
+    Chroma, French TTS), uses server-level environment variables for the web process, and contains
+    no instruction to put API keys in source or the served webroot. **(M)**
   - Full rewrite: accurate stack (Groq `llama-3.3-70b-versatile`, multilingual MiniLM embeddings,
-    persistent Chroma), `uv`/`.env` setup workflow (cp `.env.example` → `.env`), features list
+    persistent Chroma), local shell/server environment setup workflow, features list
     (sources, TTS/STT, quick chips, feedback, mobile UI), config reference table, project layout,
     and a first-run/rebuild note. Removed the old insecure "put your key in chat2.py" instruction
     and the stale Mixtral references.
@@ -414,3 +415,45 @@ Status legend: `[ ]` todo · `[x]` done.
 (lighter than `bge-m3` for a laptop on a 3-week timeline); persist dir → `chroma_db/` (already
 git-ignored); Gemini's session-2 source-chip JS diff has a string-concatenation bug, so task 9 is
 hand-written rather than pasted.*
+
+- [x] **Plan 2026-09-09, ticket 03 — missing offline policy identity:** require a
+  nonempty safety revision before saving or replaying an answer. Regression
+  coverage includes absent, empty and whitespace headers and legacy stored
+  entries with an empty marker. Full real-browser migration acceptance remains open.
+
+- [x] **Plan ticket 06 — abandoned audio fragments:** configurable
+  `TTS_PARTIAL_TTL_SECONDS=3600`; prune old generated partials only when unlocked,
+  skip symlinks, hold a POSIX advisory lock through synthesis and atomic rename.
+  Recent and unrelated files are preserved. MP3 budget semantics are unchanged.
+- [x] **Plan ticket 03 — worker activation regression:** old-version answer cache
+  removal followed by offline refusal tested with shared simulated cache storage.
+  Real-phone/browser lifecycle verification remains open.
+- [x] **Plan ticket 05 — review preparation:** five-crop × four-topic matrix in
+  `Data/reviews/CROP_COVERAGE_MATRIX_2026-09-09.md`. Original IITA and ProSol PDF
+  pages and document hashes are recorded. Specialist approval, ingestion and
+  measured post-review coverage remain open.
+
+- [x] **Plan ticket 06 — expired audio replay:** visible French live status on
+  playback rejection/media error; text preserved and retry clears the message.
+  Full chat UI tested with jsdom and a simulated Audio boundary.
+- [x] **Plan ticket 07 — synthetic recovery rehearsal prepared:** separate Flask
+  processes, stable test secret, owner/other-client isolation, SQLite backup and
+  isolated restore, deletion/expiry checks in `tests/test_recovery.py`.
+  DEPLOYMENT.md documents durable paths, WAL-safe backup and rollback. Actual
+  host persistence and photo restoration remain release checks.
+- [x] **Plan tickets 06–08 — local acceptance expansion:** synthetic journal
+  photos survive an isolated same-path snapshot restore and are removed by owner
+  deletion or expiry; concurrent audio writes publish only complete files and
+  converge to the configured soft budget after writers finish. A headless Chromium
+  check at 320 px and 1280 px confirms visible replay recovery, preserved text,
+  no horizontal overflow and no page errors. Physical-device and participant
+  testing remain open.
+- [x] **Weather midnight regression:** use the provider response date for recent
+  and forecast windows, falling back to Burkina time. This prevents a host/provider
+  date boundary from shifting rainfall totals by one day.
+- [x] **Plan ticket 08 — local keyboard preparation:** added a skip link and main
+  landmark, distinct accessible names for soil selectors, dialog semantics and
+  focus containment for Sources and Mes conseils, Escape dismissal with focus
+  restoration, and focus styling for links and text areas. Verified through the
+  rendered accessibility tree and keyboard interaction at 320 px. Physical-phone,
+  screen-reader and participant acceptance remain open.

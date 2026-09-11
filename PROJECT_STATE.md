@@ -1,6 +1,24 @@
 # DakiKobo Project State
 
-Last updated: 2026-07-10 (cannot-confirm + vision lab)
+Last updated: 2026-09-12 (improvement-plan verification)
+
+## Current baseline — 2026-09-12
+
+Local `main` is now at `40bb8a85`, with the pre-existing uncommitted security
+and configuration changes restored and integrated. The safety fixes and offline
+follow-up queue are present locally. The combined offline suite now passes
+641 Python tests and 27 JavaScript tests after photo restore, concurrent audio,
+real Chromium, timezone-boundary weather and keyboard-accessibility coverage. The
+credentialed RAG test was excluded. No live deployment or model call was verified
+in this pass.
+
+Only two documents are currently eligible under `core/source_policy.py`: CILSS
+and MAERAH/OAPH. The older corpus counts and live observations below are historical,
+not current source eligibility or deployment evidence. See
+[the dated ticket report](plans/IMPLEMENTATION_STATUS_2026-09-09.md) for acceptance
+gaps and the next integration step. Earlier capability descriptions below must
+be read against this dated baseline.
+
 
 This file is a compact state report for another model, reviewer, or engineer to
 evaluate what already exists before proposing new work.
@@ -548,11 +566,12 @@ Manual browser test still recommended:
 Required:
 
 - `GROQ_API_KEY`
+- `APP_ENV=production` (hosted deployments; set by the Docker image)
+- `FLASK_SECRET_KEY` (hosted deployments; startup fails closed when missing)
 
 Optional but used by features:
 
 - `GEMINI_API_KEY`
-- `FLASK_SECRET_KEY`
 - `APP_VERSION`
 - `LLM_MODEL`
 - `GROQ_USER_AGENT`
@@ -585,6 +604,7 @@ Optional but used by features:
 - `MAX_IMAGE_UPLOAD_MB`
 - `LOG_LEVEL`
 - `CASE_LOG_DB_PATH`
+- `SEARCH_ENGINE_INDEXING_ENABLED` (defaults to `false`)
 
 Do not commit:
 

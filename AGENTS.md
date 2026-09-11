@@ -38,7 +38,9 @@ Models/config:
 ## Safety And Product Rules
 
 - All user-facing app text should be in French.
-- Do not put API keys in source code. Use `.env`.
+- Secrets come from server-level or exported process environment settings. Keep
+  any private shell helper outside every served directory and uncommitted; the
+  application and maintenance scripts do not load `.env` files.
 - Advice must stay cautious and source-grounded.
 - Fertilizer and disease answers must include the relevant confirmation/disclaimer.
 - Do not invent exact fertilizer doses through the LLM; use `core/fertilizer.py`.

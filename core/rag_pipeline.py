@@ -3,6 +3,8 @@
 import os
 from core.source_policy import eligible_source, source_review, split_markdown_frontmatter
 import glob
+import fcntl
+import stat
 import hashlib
 import json
 import shutil
@@ -25,6 +27,7 @@ from config import (
     EMBEDDING_MODEL,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
+    TTS_PARTIAL_TTL_SECONDS,
     TTS_CACHE_MAX_BYTES,
     TTS_CACHE_TTL_SECONDS,
     TTS_LANGUAGE,
@@ -362,12 +365,34 @@ def _audio_cache_entries() -> list[tuple[float, int, str]]:
             continue
         path = os.path.join(AUDIO_OUTPUT_DIR, name)
         try:
-            stat = os.stat(path)
+            info = os.stat(path, follow_symlinks=False)
+            if not stat.S_ISREG(info.st_mode):
+                continue
         except OSError:
             continue
-        entries.append((stat.st_mtime, stat.st_size, path))
+        entries.append((info.st_mtime, info.st_size, path))
     entries.sort(key=lambda entry: entry[0])
     return entries
+
+
+def _prune_partial_audio(now: float) -> int:
+    """Remove abandoned writes, never a file locked by a synthesizing worker."""
+    removed = 0
+    if TTS_PARTIAL_TTL_SECONDS <= 0:
+        return removed
+    for path in glob.glob(os.path.join(AUDIO_OUTPUT_DIR, ".tts-*.part")):
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(descriptor, "rb") as partial:
+                fcntl.flock(partial, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                info = os.fstat(partial.fileno())
+                if stat.S_ISREG(info.st_mode) and now - info.st_mtime > TTS_PARTIAL_TTL_SECONDS:
+                    os.unlink(path)
+                    removed += 1
+        except OSError:
+            # Locked, already removed, or inaccessible: let a later pass retry.
+            continue
+    return removed
 
 
 def prune_audio_cache(*, keep: str = "", now: float | None = None) -> int:
@@ -380,7 +405,7 @@ def prune_audio_cache(*, keep: str = "", now: float | None = None) -> int:
     """
     now = time.time() if now is None else now
     keep_path = os.path.abspath(keep) if keep else ""
-    removed = 0
+    removed = _prune_partial_audio(now)
 
     entries = _audio_cache_entries()
     survivors: list[tuple[float, int, str]] = []
@@ -463,8 +488,8 @@ def text_to_speech_to_static(text: str) -> str:
             handle, temp_path = tempfile.mkstemp(
                 dir=AUDIO_OUTPUT_DIR, prefix=".tts-", suffix=".part"
             )
-            os.close(handle)
             try:
+                fcntl.flock(handle, fcntl.LOCK_EX)
                 tts = gtts.gTTS(
                     text=truncated,
                     lang=TTS_LANGUAGE,
@@ -478,6 +503,8 @@ def text_to_speech_to_static(text: str) -> str:
                 except OSError:
                     pass
                 raise
+            finally:
+                os.close(handle)
 
         # Bounding the directory must never fail the request that produced audio.
         try:

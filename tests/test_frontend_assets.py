@@ -53,6 +53,23 @@ def test_media_privacy_note_is_visible():
     assert ".media-privacy-note" in css
 
 
+def test_keyboard_and_screen_reader_landmarks_are_wired():
+    html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
+    js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    assert 'class="skip-link" href="#mainContent"' in html
+    assert 'id="mainContent"' in html
+    assert 'role="dialog"' in html and 'id="journalPanel"' in html
+    assert 'aria-expanded="false"' in html.split('id="journalToggle"', 1)[1].split(">", 1)[0]
+    assert 'aria-label="Culture pour le conseil sol et engrais"' in html
+    assert 'aria-label="Lieu pour le conseil sol et engrais"' in html
+    assert "function trapDialogFocus" in js
+    assert "setJournalOpen" in js
+    assert ".skip-link" in css
+    assert "textarea:focus-visible" in css
+
+
 def test_landing_strip_is_wired_in_frontend_assets():
     html = (ROOT / "templates/index.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
