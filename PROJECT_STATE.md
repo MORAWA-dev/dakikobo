@@ -7,8 +7,8 @@ Last updated: 2026-09-12 (improvement-plan verification)
 Local `main` is now at `40bb8a85`, with the pre-existing uncommitted security
 and configuration changes restored and integrated. The safety fixes and offline
 follow-up queue are present locally. The combined offline suite now passes
-641 Python tests and 27 JavaScript tests after photo restore, concurrent audio,
-real Chromium, timezone-boundary weather and keyboard-accessibility coverage. The
+647 Python tests and 29 JavaScript tests after recovery, concurrent audio,
+real Chromium, timezone-boundary weather, accessibility and evaluation-gate coverage. The
 credentialed RAG test was excluded. No live deployment or model call was verified
 in this pass.
 

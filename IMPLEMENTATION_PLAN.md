@@ -457,3 +457,8 @@ hand-written rather than pasted.*
   restoration, and focus styling for links and text areas. Verified through the
   rendered accessibility tree and keyboard interaction at 320 px. Physical-phone,
   screen-reader and participant acceptance remain open.
+- [x] **Plan ticket 09 — evaluation-gate preparation:** development and held-out
+  scorecards can be generated separately. Added strict claim-level and anonymous
+  participant/task ledgers with explicit 90% and 80% denominators, completeness
+  checks and a release-decision template that defaults to postponed. Human review,
+  authorized live-model execution and the pilot remain open.

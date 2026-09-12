@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {% if not search_engine_indexing_enabled %}
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    {% endif %}
+    <link
+      id="favicon"
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='images/logo.png') }}"
+      type="image/x-png"
+    />
+    <title>Confidentialité — DakiKobo</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+  <body>
+    <main class="doc-page">
+      <h1>Politique de confidentialité</h1>
+      <p><a href="/">← Retour à la conversation</a></p>
+
+      <section>
+        <h2>Ce que DakiKobo enregistre</h2>
+        <p>
+          Quand vous notez une réponse (pouce levé ou baissé) ou que vous
+          enregistrez un résultat après application d'un conseil, DakiKobo
+          conserve dans son journal&nbsp;:
+        </p>
+        <ul>
+          <li>la question posée et la réponse donnée&nbsp;;</li>
+          <li>votre note et, plus tard, le résultat observé au champ&nbsp;;</li>
+          <li>la photo « après » si vous choisissez d'en joindre une&nbsp;;</li>
+          <li>la culture et le lieu si vous les avez indiqués.</li>
+        </ul>
+        <p>
+          Ces éléments sont rattachés à un identifiant anonyme conservé dans un
+          cookie de votre navigateur. Aucun compte, nom ni numéro de téléphone
+          n'est demandé.
+        </p>
+      </section>
+
+      <section>
+        <h2>Ce qui n'est pas conservé</h2>
+        <ul>
+          <li>
+            Les photos de feuilles envoyées pour le dépistage sont lues en
+            mémoire pour l'analyse puis abandonnées&nbsp;: l'application ne les
+            enregistre pas.
+          </li>
+          <li>
+            Les dictées vocales servent uniquement à la transcription et ne
+            sont pas conservées.
+          </li>
+        </ul>
+        <p>
+          Évitez les visages, noms, numéros ou documents personnels dans les
+          photos et les dictées.
+        </p>
+      </section>
+
+      <section>
+        <h2>Services qui traitent vos demandes</h2>
+        <p>
+          Pour répondre, DakiKobo transmet le contenu strictement nécessaire à
+          des services techniques configurés par l'équipe&nbsp;:
+        </p>
+        <ul>
+          <li>Groq — génération des réponses et transcription de la voix&nbsp;;</li>
+          <li>Google Gemini — analyse des photos de feuilles&nbsp;;</li>
+          <li>Open-Meteo — signaux météo par localité&nbsp;;</li>
+          <li>SoilGrids (ISRIC) — indicateurs de sol&nbsp;;</li>
+          <li>gTTS — lecture vocale des réponses.</li>
+        </ul>
+        <p>
+          Les questions et réponses ne sont ni vendues, ni utilisées pour de la
+          publicité, ni affichées publiquement.
+        </p>
+      </section>
+
+      <section>
+        <h2>Conservation et suppression</h2>
+        <p>
+          Le journal est conservé au maximum
+          {{ journal_retention_days }}&nbsp;jours, puis supprimé
+          automatiquement. Vous pouvez à tout moment&nbsp;:
+        </p>
+        <ul>
+          <li>
+            supprimer un conseil enregistré depuis le panneau
+            «&nbsp;Mes conseils&nbsp;»&nbsp;;
+          </li>
+          <li>
+            effacer les données enregistrées sur votre appareil (réponses hors
+            ligne, préférences) depuis les réglages de l'application.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Réutilisation pour l'évaluation</h2>
+        <p>
+          Les notes et résultats peuvent servir, de façon anonymisée, à
+          évaluer et améliorer la qualité des conseils. Aucune donnée n'est
+          partagée à des fins commerciales.
+        </p>
+      </section>
+
+      <p><a href="/">← Retour à la conversation</a></p>
+    </main>
+  </body>
+</html>

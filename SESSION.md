@@ -1360,6 +1360,25 @@ cd - && git worktree remove "$WT" --force
   passed; one existing PyPDF2 deprecation warning. Browser scripts compiled and
   `git diff --check` passed.
 
+### 2026-09-12 — Ticket 09 evaluation denominator preparation
+
+- Extended scripts/farmer_evaluation.py so development (40 cases) and held-out
+  (20 cases) scorecards can be prepared separately. Existing complete-scorecard
+  behavior remains supported.
+- Added a claim evidence ledger with exact case/split validation, unique claim ids,
+  required source/page/excerpt/reviewer evidence and a true claim-level 90% gate.
+- Added an anonymous participant/task ledger that requires all five planned tasks
+  for at least eight participant codes and applies separate 80% independent-task
+  and next-action-comprehension gates.
+- Added evaluation/RELEASE_DECISION_TEMPLATE.md. It defaults to REPORTÉ and keeps
+  critical safety, claim grounding and participant outcomes as separate gates.
+- Six focused evaluation tests pass, including denominator boundaries, incomplete
+  evidence, split isolation and missing tasks. No human results, expert identity,
+  live-model score or release decision was invented.
+- Fresh complete verification: 647 offline Python tests and 29 JavaScript tests
+  passed with one existing PyPDF2 deprecation warning. The evaluation script
+  compiled and `git diff --check` passed.
+
 ### 2026-09-12 — Independent review and improvement plan (Kimi)
 
 - Reviewed the three plans in `plans/`, PROJECT_STATE, TODO and SESSION, then
@@ -1373,3 +1392,36 @@ cd - && git worktree remove "$WT" --force
   existing work), K1 (live end-to-end verification), K2 (grow eligible corpus),
   K3 (prepare the agronomist review packet), K4 (pilot readiness), K5 (human gates).
 - No code changes, no commits, no deployment, no provider calls in this pass.
+
+### 2026-09-12 — Kimi plan implementation (K0–K4)
+
+- K0: committed the previously uncommitted hardening/verification work as
+  `38cfbb19` on branch `chore/security-hardening-and-verification` (42 files,
+  +1984/−97), including the coverage matrix, ticket report, browser replay
+  artifacts, security/recovery/audio tests, and the Kimi plan. Added `tmp/` to
+  `.gitignore` (review-PDF workspace was untracked but not ignored). The stash
+  `codex-plan-integration-20260909` is fully merged into that commit and kept
+  as a labeled backup. No push or PR yet — held for owner confirmation.
+- K1: live verification passed — `/healthz` ok/rag ready, `/version` shows
+  deployed commit `bc0670e3`; `scripts/evaluate_rag.py` against the live Space:
+  14/14 hard-passed, 3 advisory warnings (expected thinner-corpus behavior
+  after source-eligibility tightening). Report refreshed in
+  `reports/rag_eval_results.md`.
+- K2: trusted-source probe — 6/9 up. WASCAL recovered (both hosts UP; was DOWN
+  in July), FAO AGRISurvey back up. INERA and AGRHYMET still DOWN. FAO
+  countryprofiles URL now 404 (was UP in July) — seed URL needs updating.
+  Logged in `reports/trusted_source_health.md`. No scrape/promote: human
+  review gate unchanged.
+- K3: created `Data/reviews/AGRONOMIST_REVIEW_PACKET_2026-09-12.md` (20 matrix
+  cells with sign-off columns, unblock rule: nothing approved by silence) and
+  `evaluation/BENCHMARK_APPROVAL_SHEET.md` (all 60 cases, held-out tuning ban).
+  11 cells without candidate extracts are marked "à vérifier".
+- K4: `/confidentialite` privacy policy page (French, retention from config)
+  linked from the credibility modal; `.doc-page` styles. Server answer-cache
+  hits now show a visible freshness label ("Réponse établie le …") in
+  `static/js/api.js`; the offline label keeps precedence.
+- Verification: 29 JavaScript tests passed (2 new freshness tests). Full
+  offline Python suite result recorded below after the final run.
+- Not done (human/offline gates): agronomist review session, benchmark
+  approval, real-phone pilot, corpus scrape/promote, push/PR.
+- Final verification: 643 offline Python tests passed (3 new privacy-page tests), 29 JavaScript tests passed; one PyPDF2 warning; credentialed RAG excluded.

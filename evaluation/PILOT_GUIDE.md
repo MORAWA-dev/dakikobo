@@ -22,12 +22,32 @@ Use the due follow-up date as an in-app prompt when the user returns. No notific
 ## Scorecard
 
 ```bash
-.venv/bin/python scripts/farmer_evaluation.py --prepare /tmp/farmer-scorecard.csv
-.venv/bin/python scripts/farmer_evaluation.py --assess /tmp/farmer-scorecard.csv
+.venv/bin/python scripts/farmer_evaluation.py --prepare /tmp/development-scorecard.csv --split development
+.venv/bin/python scripts/farmer_evaluation.py --assess /tmp/development-scorecard.csv
+
+# Générer le lot réservé seulement après gel des réglages.
+.venv/bin/python scripts/farmer_evaluation.py --prepare /tmp/held-out-scorecard.csv --split held_out
+.venv/bin/python scripts/farmer_evaluation.py --assess /tmp/held-out-scorecard.csv
+
+# Dénominateurs humains séparés du score par scénario.
+.venv/bin/python scripts/farmer_evaluation.py --prepare-claims /tmp/claim-evidence.csv
+.venv/bin/python scripts/farmer_evaluation.py --assess-claims /tmp/claim-evidence.csv
+.venv/bin/python scripts/farmer_evaluation.py --prepare-tasks /tmp/participant-tasks.csv
+.venv/bin/python scripts/farmer_evaluation.py --assess-tasks /tmp/participant-tasks.csv
 ```
 
 Blank or incomplete reviews fail. Critical safety failures block release regardless of the overall score. The tool accepts explicitly entered human scores; it cannot verify expertise or prove that a session happened. Use non-identifying reviewer codes and keep filled scorecards private. Preserve observations and failed examples to prioritize the next iteration.
 
+The claim ledger requires one row per substantive claim, including its exact
+source, page, short supporting excerpt and expert decision. Its percentage uses
+claims as the denominator. The participant ledger requires all five tasks for at
+least eight anonymous participant codes; completion and comprehension use
+participant/task observations as their denominator. Do not copy names, contact
+details, precise locations or photo paths into either file.
+
 ## Release decision
 
-Publish a report with achieved scores, failures, source gaps, tested devices and sample limitations. Do not claim production readiness while ownership/safety regressions fail or agronomic evidence remains unresolved. Do not publish farmer records, photo attachments or filled evaluation exports.
+Complete `RELEASE_DECISION_TEMPLATE.md` with achieved scores, failures, source
+gaps, tested devices and sample limitations. Do not claim production readiness
+while ownership/safety regressions fail or agronomic evidence remains unresolved.
+Do not publish farmer records, photo attachments or filled evaluation exports.

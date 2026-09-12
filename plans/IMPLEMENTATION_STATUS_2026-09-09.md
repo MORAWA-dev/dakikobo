@@ -164,3 +164,20 @@ La livraison reste soumise aux preuves du plan, notamment revue humaine et pilot
 - Vérification complète : 641 tests Python hors RAG réel et 27 tests JavaScript
   réussis ; un avertissement PyPDF2. Compilation des scripts navigateur et contrôle
   des différences réussis.
+
+## Lot suivant — portes d'évaluation du ticket 09 (12 septembre 2026)
+
+- Les feuilles de développement (40 cas) et réservées (20 cas) peuvent être
+  générées séparément. La feuille réservée reste destinée à l'évaluation après gel
+  des réglages.
+- Un registre d'affirmations exige source, page, extrait court, décision et code de
+  relecteur pour chaque affirmation. Le seuil de 90 % utilise les affirmations
+  comme dénominateur.
+- Un registre participant × tâche exige les cinq parcours pour au moins huit codes
+  anonymes. Réussite autonome et compréhension utilisent ces observations comme
+  dénominateur et doivent chacune atteindre 80 %.
+- Un modèle de décision reste sur REPORTÉ tant que les preuves humaines,
+  agronomiques et opérationnelles ne sont pas remplies.
+- Vérification complète : 647 tests Python hors RAG réel et 29 tests JavaScript
+  réussis ; un avertissement PyPDF2. Compilation du script et contrôle des
+  différences réussis.

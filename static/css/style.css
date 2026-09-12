@@ -1861,3 +1861,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     #toolsToggle span { display:inline; }
     #offlineReady { font-size:11px; }
 }
+
+/* Standalone document pages (privacy policy) */
+.doc-page {
+    background: #ffffff;
+    color: #173f20;
+    max-width: 720px;
+    margin: 24px auto;
+    padding: 24px 28px;
+    border-radius: 12px;
+    line-height: 1.6;
+}
+.doc-page h1 { font-size: 1.6rem; margin: 0 0 12px; }
+.doc-page h2 { font-size: 1.15rem; margin: 24px 0 8px; }
+.doc-page ul { padding-left: 22px; }
+.doc-page a { color: #1c6b32; font-weight: 600; }

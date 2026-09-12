@@ -799,6 +799,16 @@ def robots_txt():
     return response
 
 
+@app.route("/confidentialite")
+def privacy_policy():
+    """Static French privacy policy page linked from the chat privacy notes."""
+    return render_template(
+        "confidentialite.html",
+        journal_retention_days=JOURNAL_RETENTION_DAYS,
+        search_engine_indexing_enabled=SEARCH_ENGINE_INDEXING_ENABLED,
+    )
+
+
 @app.route("/sw.js")
 def service_worker():
     """Serve the static worker at the site root so it can control every route."""

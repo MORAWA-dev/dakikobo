@@ -646,3 +646,42 @@ test('une activation de nouvelle version supprime les anciens conseils avant le 
     assert.equal(response.status, 503);
     assert.notEqual((await response.json()).answer, 'Ancienne politique');
 });
+
+
+test('une réponse du cache serveur affiche sa date d\'établissement', async function() {
+    const originalFetch = global.fetch;
+    global.fetch = async function() {
+        return new Response(JSON.stringify({
+            answer: 'Conseil frais',
+            saved_at: '2026-09-10T08:00:00+00:00'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        const payload = await api.sendMessage({ messageText: 'Quand semer le mil ?' });
+        const date = new Date('2026-09-10T08:00:00+00:00').toLocaleDateString('fr-FR');
+        assert.ok(payload.answer.startsWith('Réponse établie le ' + date));
+        assert.ok(payload.answer.includes('Conseil frais'));
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+
+test('le libellé hors ligne prime sur le libellé du cache serveur', async function() {
+    const originalFetch = global.fetch;
+    global.fetch = async function() {
+        return new Response(JSON.stringify({
+            answer: 'Conseil hors ligne',
+            offline: true,
+            saved_at: '2026-09-10T08:00:00+00:00'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        const payload = await api.sendMessage({ messageText: 'Quand semer le mil ?' });
+        const date = new Date('2026-09-10T08:00:00+00:00').toLocaleDateString('fr-FR');
+        assert.ok(payload.answer.startsWith('Conseil enregistré le ' + date));
+        assert.ok(!payload.answer.startsWith('Réponse établie le'));
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
