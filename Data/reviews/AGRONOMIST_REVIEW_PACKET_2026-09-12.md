@@ -229,7 +229,7 @@ champs.
 
 ### Cellules sans extrait candidat
 
-Les 11 cellules « À relever dans le PDF » (mil, sorgho, maïs et arachide hors
-fertilité générale) n'ont **aucun extrait identifié** à ce jour : il n'existe
-donc rien à annexer pour elles. Le relecteur peut soit les laisser en attente,
-soit indiquer un document de référence à acquérir.
+Les 12 cellules « À relever dans le PDF » — semis, ravageurs et stockage du
+mil, du sorgho, du maïs et de l'arachide — n'ont **aucun extrait identifié** à
+ce jour : il n'existe donc rien à annexer pour elles. Le relecteur peut soit
+les laisser en attente, soit indiquer un document de référence à acquérir.

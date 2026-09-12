@@ -52,12 +52,17 @@ def report(root=ROOT):
     return '\n'.join(lines) + '\n'
 
 
+# Canonical, always-current inventory. Dated snapshots can be produced with
+# --output (e.g. before/after a corpus change) without moving the canonical path.
+DEFAULT_OUTPUT = ROOT / 'Data' / 'reviews' / 'SOURCE_ELIGIBILITY.md'
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         '--output',
-        default=str(ROOT / 'Data/reviews/SOURCE_ELIGIBILITY_2026-09-06.md'),
-        help='Markdown inventory destination.',
+        default=str(DEFAULT_OUTPUT),
+        help='Markdown inventory destination (canonical undated file by default).',
     )
     args = parser.parse_args()
     destination = Path(args.output)

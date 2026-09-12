@@ -254,3 +254,10 @@ Contenu.
 
     assert quarantined_source(source)
     assert not eligible_source(source)
+
+
+def test_audit_script_default_output_is_canonical_undated():
+    from scripts.audit_source_eligibility import DEFAULT_OUTPUT
+
+    assert DEFAULT_OUTPUT.name == "SOURCE_ELIGIBILITY.md"
+    assert DEFAULT_OUTPUT.parent.name == "reviews"
