@@ -132,3 +132,29 @@ ACTIVE_MANIFEST_HASH: 11391cefa86f9f32
 cilss_orientation_sahel_2026.md sha256: 881bebe13573…
 maerah_oaph_orientation_burkina_2026.md sha256: dcc8c6d377ea…
 ```
+
+## Vérification sur la tête de branche déployée (seconde passe, 12 septembre)
+
+Le Space a été redéployé sur la tête courante de la branche PR
+(commit de déploiement `a2798eb39a24316a55448afc0f04951ac28e2885`).
+Le delta entre l'arbre déployé et la tête de branche finale (`36cfb185`)
+est limité à des fichiers de documentation/preuve (`reports/`, `plans/`,
+`PROJECT_STATE.md`), au chemin de sortie par défaut de
+`scripts/audit_source_eligibility.py` et à la correction du comptage dans
+`Data/reviews/AGRONOMIST_REVIEW_PACKET_2026-09-12.md` — aucun changement de
+comportement d'exécution de l'application.
+
+Vérifications rejouées contre `https://kimcomehome-dakikobo.hf.space` :
+
+- `GET /healthz` : `ok=true`, `rag_status=ready` (warm-up terminé
+  2026-09-12T19:23:28+00:00).
+- `GET /version` : commit `a2798eb39a24316a55448afc0f04951ac28e2885`,
+  modèle `openai/gpt-oss-120b`, `answer_cache_enabled=true`.
+- `POST /ask` (« Quel engrais pour le sorgho ? ») : `HTTP 200`, en-tête
+  `x-dakikobo-corpus: 11391cefa86f9f32` — le corpus servi correspond au
+  hachage local post-K2.
+- TTS complet : `audio_url: /static/audio/tts_a7740bcefc6710903e37692458eca4e3.mp3`,
+  téléchargé à 174336 octets, `file` : MPEG ADTS, layer III, 64 kbps.
+- Évaluateur RAG live : **14/14 hard-pass (100 %, seuil 75 %)**, 3
+  avertissements consultatifs. Rapport régénéré :
+  `reports/rag_eval_results.md` (horodaté 2026-09-12T19:25:56+00:00).

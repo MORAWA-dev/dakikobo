@@ -4,9 +4,9 @@
 
 Content checks (`confidence`, `answer_terms`, `source_terms`, `refusal`) are **advisory**. Groq/LLM wording varies; a `WARN` on those checks does not fail the smoke gate. Hard case status uses structural signals only (HTTP, transport errors, empty answers when sources are expected, source counts). CI strict mode fails when the hard pass-rate is below `75%` or when a request exception / readiness failure occurs.
 
-- Generated: `2026-09-12T10:38:04+00:00`
+- Generated: `2026-09-12T19:25:56+00:00`
 - Base URL: `https://kimcomehome-dakikobo.hf.space`
-- Health: `{"bot": "DakiKobo", "ok": true, "rag_ready": true, "rag_status": "ready", "rag_warmup": {"error": null, "finished_at": "2026-09-08T21:53:04+00:00", "started_at": "2026-09-08T21:52:56+00:00", "status": "ready"}}`
+- Health: `{"bot": "DakiKobo", "ok": true, "rag_ready": true, "rag_status": "ready", "rag_warmup": {"error": null, "finished_at": "2026-09-12T19:23:28+00:00", "started_at": "2026-09-12T19:23:08+00:00", "status": "ready"}}`
 - Summary: `14 passed / 14 total` (hard pass-rate `100%`, min `75%`)
 - Advisory warnings: `3`
 
@@ -14,20 +14,20 @@ Content checks (`confidence`, `answer_terms`, `source_terms`, `refusal`) are **a
 
 | Case | Category | Status | HTTP | Confidence | Sources | Latency |
 | --- | --- | --- | --- | --- | ---: | ---: |
-| rag_mil_semis | RAG | PASS | 200 | Moyen | 1 | 2921 ms |
-| rag_niebe_stockage | RAG | PASS | 200 | Moyen | 1 | 3656 ms |
-| rag_mais_maladie | RAG | PASS | 200 | Fort | 1 | 3577 ms |
-| rag_arachide | RAG | PASS | 200 | Moyen | 1 | 2765 ms |
-| tool_fertilizer_sorgho | Tool | PASS | 200 | Faible | 0 | 1429 ms |
-| off_topic_car_engine | Safety | PASS | 200 | Faible | 0 | 1016 ms |
-| rag_compost_sol | RAG | PASS | 200 | Fort | 1 | 3787 ms |
-| rag_with_field_context | RAG | PASS | 200 | Moyen | 1 | 2511 ms |
-| weather_ouagadougou | Weather | PASS | 200 | Moyen | 1 | 424 ms |
-| soil_mais_ouagadougou | Soil | PASS | 200 | Faible | 1 | 464 ms |
-| rag_oaph_acronym | RAG | PASS | 200 | Fort | 1 | 5707 ms |
-| rag_niebe_rotation | RAG | PASS | 200 | Moyen | 1 | 2766 ms |
-| rag_sorgho_humidite | RAG | PASS | 200 | Moyen | 1 | 2553 ms |
-| tool_fertilizer_simple_french | Tool | PASS | 200 | Faible | 0 | 1636 ms |
+| rag_mil_semis | RAG | PASS | 200 | Moyen | 1 | 3179 ms |
+| rag_niebe_stockage | RAG | PASS | 200 | Moyen | 1 | 2302 ms |
+| rag_mais_maladie | RAG | PASS | 200 | Fort | 1 | 3699 ms |
+| rag_arachide | RAG | PASS | 200 | Moyen | 1 | 3180 ms |
+| tool_fertilizer_sorgho | Tool | PASS | 200 | Faible | 0 | 486 ms |
+| off_topic_car_engine | Safety | PASS | 200 | Faible | 0 | 885 ms |
+| rag_compost_sol | RAG | PASS | 200 | Fort | 1 | 4560 ms |
+| rag_with_field_context | RAG | PASS | 200 | Moyen | 1 | 6064 ms |
+| weather_ouagadougou | Weather | PASS | 200 | Moyen | 1 | 578 ms |
+| soil_mais_ouagadougou | Soil | PASS | 200 | Faible | 1 | 2758 ms |
+| rag_oaph_acronym | RAG | PASS | 200 | Fort | 1 | 2372 ms |
+| rag_niebe_rotation | RAG | PASS | 200 | Moyen | 1 | 2936 ms |
+| rag_sorgho_humidite | RAG | PASS | 200 | Moyen | 1 | 2731 ms |
+| tool_fertilizer_simple_french | Tool | PASS | 200 | Faible | 0 | 1704 ms |
 
 ## Case Details
 
@@ -39,7 +39,7 @@ Content checks (`confidence`, `answer_terms`, `source_terms`, `refusal`) are **a
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `2921 ms`
+- Latency: `3179 ms`
 
 **Checks**
 
@@ -52,7 +52,7 @@ Content checks (`confidence`, `answer_terms`, `source_terms`, `refusal`) are **a
 
 **Answer / Context**
 
-Le millet se sème au tout début de la saison des pluies, généralement en juin, voire début juillet selon les premières averses. - Préparez le sol en le labourant légèrement et en nivelant la surface. - Répartissez les graines à 2‑3 cm de profondeur, à raison de 15‑20 kg / ha. - Arrosez légèrement si les premières pluies sont tardives pour assurer la germination. Attention : adaptez la date de semis aux prévisions locales de pluie et confirmez...
+Le millet se sème au début de la saison des pluies, dès les premières pluies fiables, généralement entre la mi‑mai et début juin dans le Sahel burkinabé. - Préparez le sol en labour léger ou en herse pour aérer la terre. - Répartissez les graines à 2‑3 cm de profondeur, à 20 cm d’intervalle, en lignes espacées de 70 cm. - Arrosez légèrement si les premières pluies sont tardives, puis laissez le sol sécher entre les arrosages. Attention : évitez...
 
 **Sources**
 
@@ -66,7 +66,7 @@ Le millet se sème au tout début de la saison des pluies, généralement en jui
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `3656 ms`
+- Latency: `2302 ms`
 
 **Checks**
 
@@ -81,7 +81,7 @@ Le millet se sème au tout début de la saison des pluies, généralement en jui
 
 **Answer / Context**
 
-Le niébé doit être stocké sec et à l’abri des insectes. - Nettoyez les grains et séchez-les à l’ombre jusqu’à 12 % d’humidité. - Conservez-les dans des sacs en toile de jute ou des conteneurs hermétiques, ajoutez une petite quantité de poudre de diatomée ou de feuilles de neem séchées. - Vérifiez chaque mois et retirez les grains infestés. Attention : ne pas stocker le niébé en plein soleil, sinon il se fissure et attire les bruches.
+Le niébé doit être stocké sec et à l’abri des insectes. - Nettoyez les grains et séchez-les à l’ombre jusqu’à 12 % d’humidité. - Conservez-les dans des sacs en toile de jute ou des conteneurs hermétiques, puis placez un sachet de terre de diatomée ou de poudre de neem à l’intérieur. - Vérifiez chaque mois et retirez les grains infestés. Attention : ne pas stocker le niébé en plein soleil, sinon il se fissure et attire les bruches.
 
 **Sources**
 
@@ -95,7 +95,7 @@ Le niébé doit être stocké sec et à l’abri des insectes. - Nettoyez les gr
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Fort`
-- Latency: `3577 ms`
+- Latency: `3699 ms`
 
 **Checks**
 
@@ -108,7 +108,7 @@ Le niébé doit être stocké sec et à l’abri des insectes. - Nettoyez les gr
 
 **Answer / Context**
 
-Sur les feuilles de maïs, surveillez : jaunissement uniforme du limbe, taches brunes ou noires, décoloration en forme de “taches d’eau”, feuilles qui se recourbent ou se dessèchent, présence de petites taches jaunes avec un halo vert. 1. Inspectez chaque semaine les jeunes feuilles dès le stade V3. 2. Si vous voyez des taches brunes, retirez les feuilles affectées et aérez la parcelle. 3. Arrosez modérément, évitez l’excès d’eau qui favorise les...
+Sur les feuilles de maïs, observez : jaunissement ou décoloration uniforme, taches brunes ou noires, feuilles qui se recroquevillent, présence de points blancs ou de toiles, et chute prématurée des feuilles. - Inspectez chaque semaine les feuilles du haut au bas. - Si vous voyez des taches ou toiles, nettoyez les feuilles et arrosez modérément. Attention : ne pulvérisez pas de produit sans connaître la dose exacte ; demandez confirmation à votre...
 
 **Sources**
 
@@ -122,7 +122,7 @@ Sur les feuilles de maïs, surveillez : jaunissement uniforme du limbe, taches b
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `2765 ms`
+- Latency: `3180 ms`
 
 **Checks**
 
@@ -135,7 +135,7 @@ Sur les feuilles de maïs, surveillez : jaunissement uniforme du limbe, taches b
 
 **Answer / Context**
 
-L’arachide réussit mieux sur un sol sableux à bonne profondeur, bien drainé et légèrement acide. - Préparez le sol en le labourant à 20 cm, ajoutez du compost ou du fumier bien décomposé. - Semez les graines à 5 cm de profondeur, 30 cm entre les rangées, dès les premières pluies de juin. - Contrôlez les mauvaises herbes manuellement ou avec un désherbant léger, puis arrosez modérément en cas de sécheresse. Attention : ne pas sur‑fertiliser en...
+L’arachide réussit mieux sur un sol sableux à bonne profondeur, bien drainé et légèrement acide. - Semez les graines à 5 cm de profondeur, en rangées espacées de 75 cm, et arrosez légèrement après la germination. - Contrôlez les mauvaises herbes dès l’apparition et appliquez un paillis pour conserver l’humidité. Attention : ne pas dépasser les doses d’engrais sans l’avis d’un agent agricole. ⚠️ Une partie de cette réponse a été retirée :...
 
 **Sources**
 
@@ -149,7 +149,7 @@ L’arachide réussit mieux sur un sol sableux à bonne profondeur, bien drainé
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Faible`
-- Latency: `1429 ms`
+- Latency: `486 ms`
 
 **Checks**
 
@@ -177,7 +177,7 @@ Pour le sorgho, je ne peux pas encore donner une dose exacte en toute sécurité
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Faible`
-- Latency: `1016 ms`
+- Latency: `885 ms`
 
 **Checks**
 
@@ -206,7 +206,7 @@ Je ne sais pas encore. Cette information n'est pas disponible dans la base de do
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Fort`
-- Latency: `3787 ms`
+- Latency: `4560 ms`
 
 **Checks**
 
@@ -235,7 +235,7 @@ Le compost améliore la matière organique et la fertilité du sol. 1. Rassemble
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `2511 ms`
+- Latency: `6064 ms`
 
 **Checks**
 
@@ -247,7 +247,7 @@ Le compost améliore la matière organique et la fertilité du sol. 1. Rassemble
 
 **Answer / Context**
 
-Semer le mil à Kaya dès que les premières pluies régulières arrivent, généralement entre fin juin et début juillet. - Préparer le sol en labour léger et ajouter du compost ou du fumier bien décomposé. - Répartir les graines à 5 cm de profondeur, à 20 cm d’intervalle, en lignes espacées de 70 cm. - Surveiller l’humidité du sol et arroser légèrement si la pluie tarde. Attention : adaptez le moment exact aux prévisions locales et confirmez avec un...
+Semer le mil à Kaya dès que les premières pluies régulières arrivent, généralement fin juin‑début juillet. - Préparer le sol en labour léger et ajouter du compost ou du fumier bien décomposé. - Répartir les graines à 5 cm de profondeur, espacées de 20 cm en rangs de 75 cm. - Arroser légèrement si la pluie tarde, puis surveiller la levée. Attention : évitez de semer trop tôt avant les pluies, sinon les graines peuvent se dessécher. Confirmé avec...
 
 **Sources**
 
@@ -261,7 +261,7 @@ Semer le mil à Kaya dès que les premières pluies régulières arrivent, gén�
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `424 ms`
+- Latency: `578 ms`
 
 **Checks**
 
@@ -289,7 +289,7 @@ Pluie utile (7 jours): 27.1 mm récents : humidité favorable si le champ infilt
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Faible`
-- Latency: `464 ms`
+- Latency: `2758 ms`
 
 **Checks**
 
@@ -316,7 +316,7 @@ Pour le maïs, je ne peux pas encore donner une dose exacte en toute sécurité.
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Fort`
-- Latency: `5707 ms`
+- Latency: `2372 ms`
 
 **Checks**
 
@@ -344,7 +344,7 @@ L'OAPH 2023‑2025 est l'Offensive agropastorale et halieutique, plan opération
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `2766 ms`
+- Latency: `2936 ms`
 
 **Checks**
 
@@ -358,7 +358,7 @@ L'OAPH 2023‑2025 est l'Offensive agropastorale et halieutique, plan opération
 
 **Answer / Context**
 
-Faire une rotation niébé‑céréales améliore la fertilité du sol et réduit les maladies. 1. Après le niébé, semez du sorgho, du mil ou du maïs pour profiter de l’azote laissé par le niébé. 2. Alternez chaque saison afin que la même culture ne reste pas sur la parcelle plus de deux années consécutives. 3. Intégrez les résidus du niébé au sol comme engrais vert. Attention : évitez de planter du niébé immédiatement après une culture déjà riche en...
+Faire une rotation niébé‑céréales améliore la fertilité du sol et réduit les maladies. 1. Après le niébé, semez du sorgho, du mil ou du maïs pour profiter de l’azote fixé par le niébé. 2. Alternez chaque saison pour éviter l’accumulation de parasites spécifiques aux céréales. 3. Intégrez les résidus du niébé comme paillis pour protéger le sol et retenir l’humidité. Attention : adaptez les doses d’engrais et les traitements phytosanitaires avec...
 
 **Sources**
 
@@ -372,7 +372,7 @@ Faire une rotation niébé‑céréales améliore la fertilité du sol et rédui
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Moyen`
-- Latency: `2553 ms`
+- Latency: `2731 ms`
 
 **Checks**
 
@@ -386,7 +386,7 @@ Faire une rotation niébé‑céréales améliore la fertilité du sol et rédui
 
 **Answer / Context**
 
-Gardez l’humidité du sol pour le sorgho en limitant l’évaporation et en favorisant la rétention d’eau. - Travaillez le sol en profondeur (15‑20 cm) avant le semis pour améliorer la capacité de rétention. - Appliquez un paillis de paille ou de résidus de culture autour des plants dès la levée. - Faites des arrosages légers mais fréquents pendant les premières semaines, surtout après les pluies rares. Attention : évitez le sur‑arrosage qui peut...
+Gardez le sol humide en couvrant la parcelle et en limitant l’évaporation. - Faites un labour léger puis ajoutez du paillis (paille, résidus de culture) à 5 cm d’épaisseur. - Creusez des rigoles ou des fossés de rétention autour des rangées et remplissez-les après chaque pluie. - Arrosez tôt le matin ou tard le soir quand la chaleur est moindre. Attention : évitez le sur‑garnissage qui empêche l’aération du sol.
 
 **Sources**
 
@@ -400,7 +400,7 @@ Gardez l’humidité du sol pour le sorgho en limitant l’évaporation et en fa
 - Status: `PASS` (hard checks)
 - HTTP: `200`
 - Confidence: `Faible`
-- Latency: `1636 ms`
+- Latency: `1704 ms`
 
 **Checks**
 

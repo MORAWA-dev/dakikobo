@@ -1457,3 +1457,10 @@ cd - && git worktree remove "$WT" --force
   Verification: 650 offline Python tests, 30 JavaScript tests, git diff --check
   clean. This entry is intentionally left uncommitted to avoid sweeping another
   session's in-flight SESSION.md edits into these commits.
+## 2026-09-12 — PR #5 Kimi continuation
+
+- Continued Kimi's interrupted PR #5 correction pass after its provider quota ended.
+- Preserved unrelated local microphone/accessibility work without staging it.
+- Confirmed the integration stash was removed only after Kimi documented it as redundant.
+- Prepared the current-head live verification record and refreshed committed RAG evaluation evidence.
+- K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
