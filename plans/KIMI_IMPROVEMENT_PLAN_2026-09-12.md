@@ -155,3 +155,19 @@ the three things the docs themselves admit are missing — **uncommitted work (R
 thin eligible corpus (R2), and unscheduled human gates (R3)**. If only one thing
 happens next: **K0**. If two: K0 + K3, because K3 is what finally moves the critical
 path off the engineering team and onto the calendar.
+
+---
+
+## Addendum — implementation status, 12 September 2026 (second pass)
+
+Status wording follows the review rule: a phase is *complete* only with
+committed, reproducible evidence.
+
+| Phase | Status | Evidence / remaining action |
+|---|---|---|
+| K0 | **Complete** | Commits `38cfbb19` and `66d15593` on `chore/security-hardening-and-verification`; stash kept as labeled backup. |
+| K1 | **Complete (with evidence)** | Local rebuild from the eligible corpus, manifest guard acceptance, served corpus identity (`x-dakikobo-corpus`), `/healthz`, `/version`, one complete TTS fetch, live evaluator 14/14 hard-pass. Full record: `reports/live_verification_2026-09-12.md` + `reports/rag_eval_results.md`. Local credentialed RAG test not run this pass (limitation recorded). |
+| K2 | **Partial / blocked by human approval** | Done: `scope` document metadata in ingestion, explicit quarantine (`rights_unclear` / `_quarantine/`, quarantine always wins), FAO synthesis formally quarantined, dated eligibility audit `Data/reviews/SOURCE_ELIGIBILITY_2026-09-12.md`, `DATA_SOURCES.md` drift corrected, reachability results committed in `reports/trusted_source_health.md`. **Not done:** the 4-source target. Remaining exact actions: (1) agronomist signs packet cells (K3), (2) FAO reuse terms confirmed, (3) only then pending → review → promote. |
+| K3 | **Ready for human review** | `Data/reviews/AGRONOMIST_REVIEW_PACKET_2026-09-12.md` now includes verbatim source-page annexes with source name, SHA-256, physical/printed pages and fidelity notes; I3 explicitly flagged as not present in the original. Reviewer name, date, decisions and signature remain blank. Not complete until a real reviewer signs. |
+| K4 | **Blocked / partial** | No physical-phone test was performed; headless Chromium (`reports/browser_replay_check/`) is not represented as one. Remaining exact action: `evaluation/PILOT_REHEARSAL_CHECKLIST_2026-09-12.md` executed on a real low-end Android phone with 1–2 non-farmer testers. |
+| K5 | **Not started** | Human gates (agronomist session, benchmark approval, field pilot) unchanged. |

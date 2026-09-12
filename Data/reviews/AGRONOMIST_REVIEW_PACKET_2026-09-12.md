@@ -1,5 +1,6 @@
 # Dossier de revue agronomique — 12 septembre 2026
 
+**Statut : PRÊT POUR REVUE HUMAINE — relecteur et date à confirmer.**
 **Objet :** validation des 20 cellules de la matrice de couverture cultures × thèmes.
 **Document de référence :** `Data/reviews/CROP_COVERAGE_MATRIX_2026-09-09.md`
 **Durée visée :** environ 2 heures.
@@ -124,3 +125,111 @@ implicite.
 **Modalité :** ☐ revue en présentiel ☐ revue à distance — durée effective : ＿＿＿＿
 
 *(Modèle vierge — aucune signature ni décision n'est pré-remplie.)*
+
+## Annexes — extraits des pages sources
+
+**Note sur les droits :** les passages ci-dessous sont reproduits uniquement pour
+la revue agronomique interne. Ils ne font pas partie de l'application publiée et
+les documents originaux conservent leurs licences et droits d'origine (guide
+IITA via la notice CGIAR ; catalogue ProSol via Inter-réseaux). Si le relecteur
+souhaite une diffusion plus large, les conditions de réutilisation de chaque
+source doivent d'abord être confirmées.
+
+Chaque extrait indique : l'identifiant du candidat, la source, l'empreinte
+SHA-256 du PDF contrôlé, la page physique (PDF) et le numéro imprimé (p.),
+puis le passage verbatim. La note de fidélité reprend le rapprochement déjà
+établi le 12 septembre 2026.
+
+### I1 — Semis niébé — IITA, PDF 12 (p. 6)
+
+Source : *Guide sur la production du niébé en Afrique de l'Ouest* (IITA).
+SHA-256 : `a3c823be2a118f153bae16f6fa8d5e727beb193154c05ca9ff32a779042a47a3`.
+Fidélité : **paraphrase fidèle**.
+
+> « Choisissez des semences en bon état (Fig. 2a) exemptes de trous
+> d'infestation ou de rides (Fig. 2b) pour le semis. Des semences bien stockées
+> dans des conditions optimales auront une bonne germination. »
+
+*(La même page décrit l'enrobage des semences avec des produits précis — ce
+passage n'est pas repris comme recommandation : les produits et doses exigent
+une vérification d'homologation actuelle.)*
+
+### I2 — Fertilité niébé — IITA, PDF 29 (p. 23)
+
+Même source et même empreinte que I1. Fidélité : **paraphrase fidèle** ; les
+doses du tableau 9 ne sont **pas** validées par cette revue technique.
+
+> « Les plants de niébé ne nécessitent pas trop d'engrais azoté car ils fixent
+> leur propre azote dans l'air à l'aide des nodules des racines. […] Le niébé a
+> besoin de plus de phosphore que d'azote […] pour aider la culture à bien
+> produire de nodule et à fixer son propre azote dans l'air. […] Cependant, une
+> analyse de sol est la meilleure façon de déterminer les niveaux d'éléments
+> nutritifs du sol. »
+
+### I3 — Ravageurs niébé — IITA, PDF 34 (p. 28)
+
+Même source et même empreinte que I1. Fidélité : **règle de prudence ajoutée
+par la synthèse locale — non trouvée comme recommandation dans l'original.**
+La formulation « Les maladies et ravageurs doivent être confirmés au champ »
+n'a pas de passage source correspondant ; c'est un constat de la revue, pas un
+oubli. Le passage réel de la page :
+
+> « Le niébé est sensible à un large éventail de parasites et de maladies qui
+> attaquent la culture à tous les stades de croissance. Il s'agit des insectes,
+> des bactéries, des champignons et des virus. Des densités d'organismes
+> nuisibles élevées peuvent entraîner une perte totale de rendement en grains
+> si aucune mesure de lutte n'est appliquée. »
+
+Décision suggérée à trancher par le relecteur : conserver la phrase comme règle
+produit DakiKobo sans l'attribuer à l'IITA, ou la retirer.
+
+### I4 — Stockage niébé — IITA, PDF 60–61 (p. 54–55)
+
+Même source et même empreinte que I1. Fidélité : **paraphrase fidèle de deux
+pages**.
+
+> PDF 60 (p. 54) : « Après la récolte, séchez les gousses sur une plateforme ou
+> une bâche pour bien les sécher avant le battage (Fig. 5b). Ensuite, battez
+> les gousses et vannez pour séparer les graines de la balle ou des fanes. Les
+> graines sont ensuite triées pour éliminer les débris et les brisures […] »
+>
+> PDF 61 (p. 55) : « Nettoyez le magasin à fond avant le chargement d'une
+> nouvelle récolte. […] Seules les semences bien séchées et bien nettoyées
+> doivent être conservées (Fig. 7a et 7b). La teneur en humidité propice pour
+> le stockage est de 7 à 8% ; les graines produisent un craquement lorsqu'elles
+> sont écrasées entre les dents. […] Il existe divers matériels hermétiques
+> pour le stockage ; les sacs PICS sont les plus utilisés […] »
+
+### P1 — Fertilité (général) — ProSol, PDF 6 (p. v), 9–10 (p. 1–2)
+
+Source : *Catalogue de fiches techniques des mesures d'amélioration de la
+fertilité des sols* (ProSol / Inter-réseaux, 2020).
+SHA-256 : `e0e45222a0f182ec53d612b29ce591c161578cbfc3e2b76d478f2ee494057bb0`.
+Fidélité : **synthèse interprétative, non textuelle** — la formulation locale
+« La fumure organique est un levier central » n'apparaît pas dans l'original ;
+le catalogue présente la fumure organique comme le premier de cinq thèmes et
+décrit le parc amélioré comme moyen de produire du fumier et d'amender les
+champs.
+
+> PDF 6 (p. v) : « L'une des principales contraintes à laquelle les
+> agriculteurs du Burkina Faso font face, demeure la baisse de la fertilité des
+> sols. […] Le projet ProSol s'est inscrit dans une dynamique de capitalisation
+> et de valorisation des bonnes pratiques agricoles […] »
+>
+> PDF 9 (p. 1) : « Un parc amélioré est un enclos fixe, utilisé pendant toute
+> l'année pour la stabulation des animaux et la production du fumier […]
+> Objectifs de production : Stabuliser des animaux ; Optimiser la collecte du
+> fumier ; Amender les champs ; Amélioration le rendement agricole. »
+>
+> PDF 10 (p. 2) : « Il est conseillé de composter les déjections et les restes
+> de débris avant de l'apporter au champ. […] Avantages : Faible coût de
+> production ; Amélioration de la collecte du fumier ; Recyclage des résidus de
+> récolte […] Inconvénients/contraintes : Exigence de main d'œuvre […] ;
+> Compétition sur la biomasse. »
+
+### Cellules sans extrait candidat
+
+Les 11 cellules « À relever dans le PDF » (mil, sorgho, maïs et arachide hors
+fertilité générale) n'ont **aucun extrait identifié** à ce jour : il n'existe
+donc rien à annexer pour elles. Le relecteur peut soit les laisser en attente,
+soit indiquer un document de référence à acquérir.
