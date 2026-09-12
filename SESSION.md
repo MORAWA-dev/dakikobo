@@ -1379,6 +1379,18 @@ cd - && git worktree remove "$WT" --force
   passed with one existing PyPDF2 deprecation warning. The evaluation script
   compiled and `git diff --check` passed.
 
+### 2026-09-12 — Ticket 08 microphone permission recovery
+
+- Added a full-index.js jsdom regression for a browser `NotAllowedError` from
+  getUserMedia. The existing question remains in the input, manual controls stay
+  enabled, and the microphone button returns to its idle accessible name.
+- The regression exposed that permission guidance did not mention the immediately
+  available keyboard fallback. Both MediaRecorder and native speech-recognition
+  denial messages now explicitly offer typing while retaining permission advice.
+- Updated the local accessibility report. Fresh verification: 647 offline Python
+  tests and 30 JavaScript tests passed with one existing PyPDF2 warning;
+  `git diff --check` passed. Physical phone permission UI remains unverified.
+
 ### 2026-09-12 — Independent review and improvement plan (Kimi)
 
 - Reviewed the three plans in `plans/`, PROJECT_STATE, TODO and SESSION, then
@@ -1425,3 +1437,23 @@ cd - && git worktree remove "$WT" --force
 - Not done (human/offline gates): agronomist review session, benchmark
   approval, real-phone pilot, corpus scrape/promote, push/PR.
 - Final verification: 643 offline Python tests passed (3 new privacy-page tests), 29 JavaScript tests passed; one PyPDF2 warning; credentialed RAG excluded.
+
+### 2026-09-12 — Kimi plan second pass (review-feedback corrections)
+
+- K1 evidence: local vector store rebuilt from the 2-source eligible corpus;
+  manifest guard verified (accept on match); live Space serves the same corpus
+  hash (x-dakikobo-corpus 828d5d06eeb22bba, pre-metadata); one complete live
+  TTS fetch (valid MP3, 174 KB); evaluator 14/14 hard-pass. Dated record in
+  reports/live_verification_2026-09-12.md. Credentialed local RAG not run.
+- K2 partial: scope metadata ingested; quarantine (rights_unclear/_quarantine)
+  always wins; FAO synthesis formally quarantined; dated eligibility audit
+  regenerated (2 eligible, 1 quarantined, 34 pending). Four-source target
+  blocked on human agronomic approval — exact remaining actions documented.
+- K3 ready for human review: packet now embeds verbatim IITA/ProSol page
+  annexes with hashes, page refs and fidelity notes; reviewer fields blank.
+- K4 blocked/partial: no physical-phone test done; five-task rehearsal
+  checklist with recording grid added under evaluation/.
+- Commits 89b2c005, 603ceb8a, 78622caf on chore/security-hardening-and-verification.
+  Verification: 650 offline Python tests, 30 JavaScript tests, git diff --check
+  clean. This entry is intentionally left uncommitted to avoid sweeping another
+  session's in-flight SESSION.md edits into these commits.
