@@ -204,6 +204,7 @@ def load_markdown_from_folder(folder_path: str) -> list[Document]:
                 "source_url",
                 "review_status",
                 "license",
+                "scope",
                 "scraped_at",
                 "reviewed_at",
             ):

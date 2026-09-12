@@ -193,3 +193,64 @@ def test_fetch_website_content_uses_configured_timeout(monkeypatch):
     assert docs[0].page_content == "page agricole"
     assert docs[0].metadata["source"] == "https://example.test"
     assert calls["timeout"] == 2.5
+
+
+def test_scope_metadata_is_preserved(tmp_path):
+    source = tmp_path / "scoped.md"
+    source.write_text(
+        """---
+title: "Document borné"
+source_url: "https://example.test/scoped"
+review_status: "reviewed_by_owner"
+scope: "orientation générale ; pas de doses par parcelle"
+---
+Corps du document.
+""",
+        encoding="utf-8",
+    )
+
+    docs = load_markdown_from_folder(str(tmp_path))
+
+    assert len(docs) == 1
+    assert docs[0].metadata["scope"] == "orientation générale ; pas de doses par parcelle"
+
+
+def test_quarantine_directory_wins_over_approval(tmp_path):
+    from core.source_policy import eligible_source, quarantined_source
+
+    quarantine = tmp_path / "_quarantine"
+    quarantine.mkdir()
+    source = quarantine / "rights_pending.md"
+    source.write_text(
+        """---
+title: "Droits non confirmés"
+source_url: "https://example.test/unclear"
+review_status: "reviewed_by_owner"
+---
+Contenu dont les droits ne sont pas confirmés.
+""",
+        encoding="utf-8",
+    )
+
+    assert quarantined_source(source)
+    assert not eligible_source(source)
+    assert list(rag_pipeline.list_markdown_files(str(tmp_path))) == []
+
+
+def test_rights_unclear_status_is_quarantined(tmp_path):
+    from core.source_policy import eligible_source, quarantined_source
+
+    source = tmp_path / "unclear.md"
+    source.write_text(
+        """---
+title: "Droits incertains"
+source_url: "https://example.test/unclear2"
+review_status: "rights_unclear"
+---
+Contenu.
+""",
+        encoding="utf-8",
+    )
+
+    assert quarantined_source(source)
+    assert not eligible_source(source)

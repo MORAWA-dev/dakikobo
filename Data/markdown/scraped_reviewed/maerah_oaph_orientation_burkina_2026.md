@@ -10,6 +10,7 @@ publisher: "Ministère de l'Agriculture, de l'Eau, des Ressources Animales et Ha
 year: "2026"
 license: "public_government_web_orientation_summary; full pages remain ministry property; short orientation synthesis with URL citation for non-substitutive field advisory; not a bulk republication or official gazette"
 review_status: "reviewed_by_owner"
+scope: "orientation institutionnelle OAPH et programmes du ministère ; ne pas utiliser pour des doses, des traitements phytosanitaires ou des conseils de fertilisation par parcelle"
 owner_signed_by: "morawa-dev"
 owner_signed_at: "2026-07-10"
 scraped_at: "2026-07-10T11:51:00+00:00"

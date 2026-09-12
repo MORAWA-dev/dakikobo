@@ -4,6 +4,18 @@ from pathlib import Path
 
 APPROVED_STATUSES = frozenset({'reviewed_by_owner', 'reviewed_by_agronomist'})
 
+# Explicit set-aside: unclear usage rights or a reviewer decision to exclude.
+# Quarantine always wins over any approval flag, including via the
+# `_quarantine` directory convention.
+QUARANTINE_STATUSES = frozenset({'quarantined', 'rights_unclear'})
+
+
+def quarantined_source(path):
+    """True when a source is explicitly set aside and must never be indexed."""
+    if '_quarantine' in Path(path).parts:
+        return True
+    return source_review(path).get('review_status') in QUARANTINE_STATUSES
+
 
 def split_markdown_frontmatter(raw_text):
     """Return flat YAML-style metadata and body for the reviewed corpus."""
@@ -43,6 +55,8 @@ def source_review(path):
 
 
 def eligible_source(path):
+    if quarantined_source(path):
+        return False
     metadata = source_review(path)
     return (metadata.get('review_status') in APPROVED_STATUSES
             and bool(metadata.get('title'))
