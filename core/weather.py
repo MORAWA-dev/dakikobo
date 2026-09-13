@@ -293,9 +293,15 @@ def build_weather_context(location_id: str, payload: dict | None = None) -> dict
     daily = raw.get("daily", {})
     hourly = raw.get("hourly", {})
     current = raw.get("current", {})
+    provider_date = _parse_date(str(current.get("time") or "")[:10])
+    weather_date = provider_date or today
 
-    recent = _daily_window(daily, today - timedelta(days=7), today)
-    forecast = _daily_window(daily, today, today + timedelta(days=3))
+    recent = _daily_window(
+        daily, weather_date - timedelta(days=7), weather_date
+    )
+    forecast = _daily_window(
+        daily, weather_date, weather_date + timedelta(days=3)
+    )
 
     rain_7d = round(_sum_numbers(recent["precipitation_sum"]), 1)
     et0_7d = round(_sum_numbers(recent["et0_fao_evapotranspiration"]), 1)
@@ -319,7 +325,7 @@ def build_weather_context(location_id: str, payload: dict | None = None) -> dict
             "latitude": location.latitude,
             "longitude": location.longitude,
         },
-        "updated_at": current.get("time") or today.isoformat(),
+        "updated_at": current.get("time") or weather_date.isoformat(),
         "cached": False,
         "metrics": {
             "rain_7d_mm": rain_7d,

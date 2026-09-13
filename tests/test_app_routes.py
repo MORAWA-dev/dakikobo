@@ -224,6 +224,24 @@ def test_index_route_renders():
     assert b'id="mediaPrivacyNote"' in response.data
 
 
+def test_privacy_policy_route_renders_french_page():
+    client = app_module.app.test_client()
+    response = client.get("/confidentialite")
+    assert response.status_code == 200
+    assert response.content_type.startswith("text/html")
+    assert "Politique de confidentialité".encode() in response.data
+    assert b'Mes conseils' in response.data
+    # Retention is rendered from configuration, not hardcoded.
+    assert str(app_module.JOURNAL_RETENTION_DAYS).encode() in response.data
+
+
+def test_index_links_to_privacy_policy():
+    client = app_module.app.test_client()
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b'href="/confidentialite"' in response.data
+
+
 def test_health_route_is_lightweight():
     client = app_module.app.test_client()
     response = client.get("/healthz")

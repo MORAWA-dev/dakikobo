@@ -211,3 +211,121 @@ def test_corrupt_zero_byte_file_is_regenerated(tmp_path, monkeypatch):
     assert url
     assert _CountingGTTS.calls == 1
     assert (tmp_path / Path(url).name).stat().st_size > 0
+
+
+def test_abandoned_partial_is_removed_but_recent_and_unrelated_files_survive(tmp_path, monkeypatch):
+    _install_tts(monkeypatch, tmp_path)
+    stale = tmp_path / '.tts-abandoned.part'
+    fresh = tmp_path / '.tts-active.part'
+    unrelated = tmp_path / 'notes.part'
+    for path in (stale, fresh, unrelated):
+        path.write_bytes(b'partial')
+    os.utime(stale, (1, 1))
+    os.utime(unrelated, (1, 1))
+    rag_pipeline.prune_audio_cache()
+    assert not stale.exists()
+    assert fresh.read_bytes() == b'partial'
+    assert unrelated.read_bytes() == b'partial'
+
+
+def test_audio_cleanup_does_not_follow_symlinks(tmp_path, monkeypatch):
+    audio = tmp_path / 'audio'
+    audio.mkdir()
+    _install_tts(monkeypatch, audio, ttl=1)
+    external = tmp_path / 'private.mp3'
+    external.write_bytes(b'private')
+    os.utime(external, (1, 1))
+    link = audio / 'linked.mp3'
+    link.symlink_to(external)
+    rag_pipeline.prune_audio_cache()
+    assert external.read_bytes() == b'private'
+    assert link.is_symlink()
+
+
+def test_cleanup_preserves_an_old_partial_while_synthesis_is_running(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    started, resume = Event(), Event()
+    _install_tts(monkeypatch, tmp_path)
+
+    class PausedGTTS:
+        def __init__(self, **kwargs):
+            pass
+
+        def save(self, output_path):
+            Path(output_path).write_bytes(b'partial')
+            os.utime(output_path, (1, 1))
+            started.set()
+            assert resume.wait(5)
+            assert Path(output_path).exists()
+            Path(output_path).write_bytes(b'complete mp3')
+
+    monkeypatch.setattr(rag_pipeline.gtts, 'gTTS', PausedGTTS)
+
+    def generate():
+        with app_module.app.test_request_context('/'):
+            return rag_pipeline.text_to_speech_to_static('Conseil en cours.')
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        result = pool.submit(generate)
+        try:
+            assert started.wait(5)
+            rag_pipeline.prune_audio_cache()
+            assert len(list(tmp_path.glob('.tts-*.part'))) == 1
+        finally:
+            resume.set()
+        url = result.result(timeout=5)
+    assert (tmp_path / Path(url).name).read_bytes() == b'complete mp3'
+    assert not list(tmp_path.glob('.tts-*.part'))
+
+
+def test_concurrent_same_answer_publishes_only_complete_audio(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    ready = Barrier(4)
+    _install_tts(monkeypatch, tmp_path)
+
+    class ConcurrentGTTS:
+        def __init__(self, **kwargs):
+            pass
+
+        def save(self, output_path):
+            Path(output_path).write_bytes(b'partial')
+            ready.wait(timeout=5)
+            assert not list(tmp_path.glob('*.mp3')) or all(
+                p.read_bytes() == b'complete audio' for p in tmp_path.glob('*.mp3'))
+            Path(output_path).write_bytes(b'complete audio')
+
+    monkeypatch.setattr(rag_pipeline.gtts, 'gTTS', ConcurrentGTTS)
+
+    def generate(_):
+        with app_module.app.test_request_context('/'):
+            return rag_pipeline.text_to_speech_to_static('Même conseil.')
+
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        urls = list(workers.map(generate, range(4)))
+    assert len(set(urls)) == 1
+    assert urls[0]
+    assert list(tmp_path.glob('.tts-*.part')) == []
+    assert len(list(tmp_path.glob('*.mp3'))) == 1
+    assert (tmp_path / Path(urls[0]).name).read_bytes() == b'complete audio'
+
+
+def test_concurrent_distinct_answers_converge_to_audio_budget(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    _install_tts(monkeypatch, tmp_path, ttl=0, max_bytes=100)
+
+    def generate(index):
+        with app_module.app.test_request_context('/'):
+            return rag_pipeline.text_to_speech_to_static('Conseil synthétique ' + str(index))
+
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        urls = list(workers.map(generate, range(12)))
+    assert all(urls)
+    # Current responses may temporarily exceed the soft cap; a quiescent pass converges.
+    rag_pipeline.prune_audio_cache()
+    remaining = list(tmp_path.glob('*.mp3'))
+    assert sum(path.stat().st_size for path in remaining) <= 100
+    assert all(path.read_bytes().startswith(b'fake mp3 Conseil') for path in remaining)
+    assert not list(tmp_path.glob('.tts-*.part'))

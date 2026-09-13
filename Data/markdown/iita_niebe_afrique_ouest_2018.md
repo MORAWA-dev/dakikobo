@@ -5,9 +5,10 @@ source_type: "extension_manual"
 publisher: "Institut international d'agriculture tropicale (IITA)"
 authors: "L.O. Omoigui; A.Y. Kamara; J. Batieno; T. Iorlamen; Z. Kouyate; J. Yirzagla; S. Diallo; U. Garba"
 year: "2018"
-source_url: "https://www.iita.org/wp-content/uploads/2020/05/Cowpea-manual-FRENCH_VERSION.pdf"
-source_file: "https://www.iita.org/wp-content/uploads/2020/05/Cowpea-manual-FRENCH_VERSION.pdf"
-retrieved_at: "2026-06-27"
+source_url: "https://cgspace.cgiar.org/items/26504a5f-1844-4773-ad7d-6f86b8bead17"
+source_file: "https://cgspace.cgiar.org/server/api/core/bitstreams/b8b60cb6-a792-4cfb-8ec6-28ee1e4266ae/content"
+retrieved_at: "2026-09-12"
+original_sha256: "a3c823be2a118f153bae16f6fa8d5e727beb193154c05ca9ff32a779042a47a3"
 language: "fr"
 language_original: "fr"
 language_output: "fr"
@@ -122,7 +123,7 @@ Pour le niebe, choisissez un sol sableux-limoneux bien draine et evitez les parc
 
 ## Sources
 
-- Omoigui, L.O.; Kamara, A.Y.; Batieno, J.; Iorlamen, T.; Kouyate, Z.; Yirzagla, J.; Garba, U.; Diallo, S. (2018). Guide sur la production de niebe en Afrique de l'Ouest. Institut international d'agriculture tropicale (IITA), Ibadan, Nigeria. https://www.iita.org/wp-content/uploads/2020/05/Cowpea-manual-FRENCH_VERSION.pdf
+- Omoigui, L.O.; Kamara, A.Y.; Batieno, J.; Iorlamen, T.; Kouyate, Z.; Yirzagla, J.; Garba, U.; Diallo, S. (2018). Guide sur la production de niebe en Afrique de l'Ouest. Institut international d'agriculture tropicale (IITA), Ibadan, Nigeria. https://cgspace.cgiar.org/items/26504a5f-1844-4773-ad7d-6f86b8bead17
 
 ## Notes de revue humaine
 

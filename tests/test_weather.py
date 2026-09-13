@@ -98,3 +98,23 @@ def test_resolve_weather_location_id_matches_common_names():
 def test_weather_sqlite_ttl_targets_local_midnight():
     assert weather._WEATHER_CACHE.backend == "sqlite"
     assert 1 <= weather._seconds_until_local_midnight() <= 24 * 60 * 60
+
+
+def test_weather_windows_follow_the_provider_date_at_timezone_midnight(monkeypatch):
+    """The host may be on tomorrow while Burkina and the payload are on today."""
+    payload = _sample_payload()
+    provider_today = date(2026, 9, 11)
+    days = [provider_today - timedelta(days=7) + timedelta(days=i) for i in range(10)]
+    payload["current"]["time"] = "2026-09-11T23:00"
+    payload["daily"]["time"] = [day.isoformat() for day in days]
+
+    class HostAlreadyTomorrow(weather.datetime):
+        @classmethod
+        def now(cls, timezone):
+            return weather.datetime(2026, 9, 12, 0, 5, tzinfo=timezone)
+
+    monkeypatch.setattr(weather, "datetime", HostAlreadyTomorrow)
+    result = weather.build_weather_context("ouagadougou", payload=payload)
+
+    assert result["metrics"]["rain_7d_mm"] == 21.0
+    assert result["metrics"]["rain_next_3d_mm"] == 19.0

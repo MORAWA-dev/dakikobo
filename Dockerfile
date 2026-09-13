@@ -6,6 +6,7 @@ ENV PORT=7860
 ENV HF_HOME=/home/user/.cache/huggingface
 ENV SENTENCE_TRANSFORMERS_HOME=/home/user/.cache/sentence-transformers
 ENV RAG_WARMUP_ON_START=true
+ENV APP_ENV=production
 
 RUN useradd -m -u 1000 user
 ENV PATH=/home/user/.local/bin:$PATH

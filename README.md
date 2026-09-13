@@ -138,24 +138,22 @@ pip install -r requirements.txt
 
 ### 2. Configure your API key
 
-Secrets are loaded from a `.env` file — **never put keys in source code**.
+Export secrets into the local process environment. The Flask web process does
+not load secret files:
 
 ```bash
-cp .env.example .env
-```
-
-Then edit `.env` and set your key:
-
-```dotenv
-GROQ_API_KEY=your_real_key_here
+export GROQ_API_KEY='your_real_key_here'
 ```
 
 Optional — leaf disease screening needs a Google Gemini key (from
 [Google AI Studio](https://aistudio.google.com/apikey)):
 
-```dotenv
-GEMINI_API_KEY=your_gemini_api_key_here
+```bash
+export GEMINI_API_KEY='your_gemini_api_key_here'
 ```
+
+For hosted deployments, set the same names in the provider's Secrets or
+Environment panel. Do not upload a `.env` or place one below `public_html`.
 
 Verify it works anytime with:
 
@@ -298,11 +296,15 @@ Then rebuild the vector store with `REBUILD_VECTORSTORE=true`.
 
 ## Configuration reference
 
-All tunables live in `config.py` (overridable via environment variables where shown):
+All tunables live in `config.py` (overridable via server environment variables
+where shown). The web process never loads `.env`; export variables locally or
+configure them in the hosting provider's Secrets/Variables panel. Never store a
+secret file inside `public_html` or the container build context.
 
 | Setting                | Default                                  | Purpose                                  |
 | ---------------------- | ---------------------------------------- | ---------------------------------------- |
 | `APP_VERSION`          | `0.1.0`                                  | Version string returned by `/version`    |
+| `APP_ENV`              | `development` locally, `production` in Docker | Enforces production secret/debug checks |
 | `LOG_LEVEL`            | `INFO`                                   | Structured JSON application log level    |
 | `LLM_MODEL`            | `openai/gpt-oss-120b`                    | Groq chat model                          |
 | `LLM_REASONING_FORMAT` | `hidden`                                 | Keep chain-of-thought out of answers     |
@@ -330,9 +332,11 @@ All tunables live in `config.py` (overridable via environment variables where sh
 | `BUDGET_CLIENT_PER_MINUTE` | `60`                                | Shared per-client request budget          |
 | `BUDGET_GLOBAL_PER_MINUTE` | `120`                               | Shared global minute request budget       |
 | `BUDGET_GLOBAL_PER_DAY` | `2000`                                  | Shared global daily request budget        |
+| `SEARCH_ENGINE_INDEXING_ENABLED` | `false`                         | Allow search-engine indexing only after explicit launch review |
 | `TTS_LANGUAGE`         | `fr`                                     | Voice output language                    |
 | `TTS_TIMEOUT_SECONDS`  | `8.0`                                    | Max wait for gTTS before returning no audio |
 | `TTS_CACHE_TTL_SECONDS` | `86400`                                 | Max age of a generated MP3 in `static/audio/` before it is pruned (`0` disables age-based pruning) |
+| `TTS_PARTIAL_TTL_SECONDS` | `3600` | Remove abandoned `.tts-*.part` writes after this age; active writers are locked and skipped (`0` disables partial cleanup) |
 | `TTS_CACHE_MAX_BYTES`  | `67108864`                               | Total size cap for `static/audio/`; least-recently-used MP3s are removed until it fits (`0` disables size-based pruning) |
 | `STT_MODEL`            | `whisper-large-v3-turbo`                 | Groq model for voice input transcription |
 | `STT_LANGUAGE`         | `fr`                                     | Voice input language hint                |
@@ -409,3 +413,17 @@ dakikobo/
   personal documents.
 - This tool gives general guidance; users should confirm specifics (e.g. fertilizer
   doses) with a local agricultural extension agent.
+
+Offline answer replay requires a nonempty `X-DakiKobo-Safety` revision matching
+the saved policy marker. Missing, blank, or mismatched revisions are refused;
+reconnect to obtain a current sourced answer.
+
+Audio cleanup also removes abandoned partial writes on the next cleanup pass.
+It skips symlinks and active writes using POSIX advisory locks (Linux/macOS).
+The MP3 size cap excludes active/recent partials and preserves the current
+response file; it is not a hard quota for all concurrent temporary writes.
+Source-review preparation: [five-crop coverage matrix](Data/reviews/CROP_COVERAGE_MATRIX_2026-09-09.md).
+
+If a saved audio file expires or playback fails, the replay control displays a
+French status message and keeps the text advice visible. Users can check their
+connection and retry. The browser does not regenerate the deleted recording.

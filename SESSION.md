@@ -65,6 +65,166 @@ cd - && git worktree remove "$WT" --force
 
 ## Session entries
 
+### 2026-09-09 — Kiro PR #1 third follow-up review (`5e90fa1d`)
+
+**Verified**
+
+- Reviewed only `4400f37...5e90fa1d` in an isolated worktree. Full suite: 513
+  Python tests passed, 1 credentialed live RAG test skipped; 15 JavaScript tests
+  passed. Compilation and `git diff --check` passed.
+- The deterministic fertilizer demo gate and exact hedged-rouille `/ask` test are
+  fixed as requested.
+- Do not merge yet: diagnosis classification still requires finite disease
+  morphology/vocabulary and misses firm statements such as `feu bactérien`,
+  `flétrissement bactérien`, `botrytis`, and `Ce sont des pucerons`.
+- Hedged or negated statements such as `C'est peut-être la rouille` and `Le test
+  ne confirme pas la rouille` are incorrectly redacted.
+- Dose classification exempts an entire sentence when any benign noun appears,
+  so `L'urée convient. Appliquez 100 kg/ha pour améliorer le rendement.` and
+  `Appliquez 2 g par plant.` reach `/ask`. Units such as tonnes, `%`, `unités
+  d'azote`, and `kg N/ha` also remain outside the detector.
+
+**Files changed**
+
+- `SESSION.md` only for this review; the PR/application branch was not edited.
+
+### 2026-09-09 — Webroot and HTTP security hardening prepared
+
+**Changed**
+
+- The Flask web process and maintenance diagnostics now read secrets only from
+  exported/server environment variables; automatic `.env` loading was removed.
+- Docker sets `APP_ENV=production`; production startup fails closed when
+  `FLASK_SECRET_KEY` is missing or debug mode is enabled, and session cookies are
+  marked Secure.
+- `.dockerignore` excludes `.env` variants and runtime/private files. Apache
+  `.htaccess` disables directory listings and denies dotfiles, source/config,
+  SQLite, logs, and private root directories without blocking public static data.
+- All Flask responses receive a restrictive CSP, anti-framing/MIME-sniffing,
+  referrer, cross-origin, and permissions headers; production adds HSTS.
+- Search indexing is disabled by default with `robots.txt` and `X-Robots-Tag`,
+  controlled by `SEARCH_ENGINE_INDEXING_ENABLED`.
+- Updated README, deployment guide, implementation plan, project state, agent
+  rules, environment template, and security regression tests.
+
+**Verified**
+
+- Full Python suite: 296 passed, 1 credentialed live RAG test skipped.
+- JavaScript suite: 13 passed. Dependency check and `git diff --check` passed.
+- Current tracked files and reachable Git history showed no `.env` commit and no
+  common Groq, Google, OpenAI, or private-key signature match.
+- The currently deployed Space returns 404 for `/.env`, `/.git/config`, and
+  `/config.py`, but has no `robots.txt` or new browser security headers yet; a
+  reviewed commit and deployment are required before those controls are live.
+
+**Not performed**
+
+- No commit, push, merge, deployment, hosting-dashboard change, external scan, or
+  live Apache configuration test was performed.
+
+### 2026-09-09 — Kiro PR #1 second follow-up review (`4400f37a`)
+
+**Verified**
+
+- Reviewed only `ba892cb2...4400f37a` in an isolated worktree. Full suite: 482 Python
+  tests passed, 1 live RAG test skipped without credentials; 15 JavaScript tests passed.
+- The exact adjacent-sentence dose case, named diagnosis cases, and generic-certainty
+  false positives reported in the prior review are fixed.
+- Do not merge yet: definitive diagnoses using diseases absent from the closed lexicon
+  survive through `/ask` (for example ergot and helminthosporiosis).
+- The one-sentence dose window is brittle: it falsely removes `20 litres d'eau par pied`
+  beside an urea sentence, while `100 kg/ha` survives if one neutral sentence separates
+  it from the urea sentence.
+- `/examples/fumure_sorgho` still publicly returns exact NPK/urea doses with `Fort`
+  confidence while `NUMERIC_GUIDANCE_VERIFIED` is false, contradicting the rule that
+  approved figures belong only behind the deterministic fertilizer gate.
+- The exact safe phrase `Il s'agit peut-être de la rouille.` lacks the requested
+  `redact_unsafe_text` and `/ask` regression coverage, although the current behavior passes.
+
+**Files changed**
+
+- `SESSION.md` only (review log); PR/application branch unchanged.
+
+### 2026-09-09 — Kiro PR #1 follow-up review (`ba892cb2`)
+
+**Verified**
+
+- Follow-up fixes are present for RAG diagnosis filtering, safe vision confirmation,
+  quantity chemical-context gating, bounded pesticide matching, and config documentation.
+- Branch verification: 453 Python tests passed, 1 live RAG test skipped; 15 JavaScript
+  tests passed. Targeted reproductions for the four requested cases passed.
+- Remaining merge blockers: generic non-disease phrases are falsely redacted; some
+  definitive-diagnosis phrasings survive; and a fertilizer name followed by a dose in
+  the next sentence bypasses the per-sentence detector.
+- No hard repository-standard violation remains. Non-blocking design concern:
+  `core/answer_safety.py` now combines several responsibilities in 578 lines.
+
+**Next suggested fix**
+
+- Make diagnosis detection context-aware, cover additional firm-diagnosis phrasing,
+  and preserve chemical context across adjacent sentences when checking a dose.
+- Keep live RAG/model evaluation as a pre-deployment gate.
+
+**Files changed**
+
+- `SESSION.md` only (review log); PR/application branch unchanged.
+
+### 2026-09-09 — Review of Kiro PR #1 (`bb4b444b`)
+
+**Verification**
+
+- Reviewed `origin/main...origin/fix/audit-safety-and-cache-identity` on an
+  isolated worktree; PR remains open and application branch was not checked out locally.
+- Offline branch suite: 401 Python tests passed, 1 live RAG test skipped; 15 JavaScript tests passed.
+- Do not merge yet: RAG explicitly disables definitive-diagnosis filtering, and
+  Vision passes model-controlled `a_confirmer_par` through without safety review.
+- New dose heuristic removes safe irrigation quantities such as `20 litres d'eau
+  par pied`; pesticide substring matching treats ordinary `décision` as the trade
+  name `Decis` and can replace a safe answer with a refusal.
+- New config defaults are not documented in README/IMPLEMENTATION_PLAN, contrary
+  to repository instructions.
+
+**Decision guidance**
+
+- Keep exact fertilizer doses out of model-generated RAG permanently; after
+  agronomist approval, expose approved figures only through the deterministic
+  fertilizer module. Refine the heuristic instead of weakening that boundary.
+- Require Kiro to add regression tests for the four reproduced cases and update
+  configuration documentation; run credentialed/live evaluation before deployment.
+
+**Files changed locally**
+
+- `SESSION.md` only (review log); PR/application branch unchanged.
+
+### 2026-09-09 — Exploratory bug audit (no fixes applied)
+
+**Verified**
+
+- Full local regression baseline: 291 Python tests and 13 JavaScript tests passed.
+- Vision model output is not schema/safety validated: a list-valued `reponse_courte`
+  raises `AttributeError`; model-supplied `Fort` confidence and numeric pesticide
+  instructions pass through unchanged.
+- Multipart overhead can make `/screen` reject files below the configured/advertised
+  file-size limit because Flask's whole-request ceiling equals the file ceiling.
+- RAG and browser answer cache identities cover model/corpus/context but not the
+  deployed prompt/safety-policy revision, so code-only safety changes may leave old
+  answers reusable for up to the cache TTL.
+- Source eligibility currently leaves only two active Markdown documents (CILSS and
+  MAERAH/OAPH); most crop field-practice material is excluded pending human/agronomist review.
+- Generated TTS MP3 files have no runtime cleanup or bounded cache.
+
+**Next suggested fixes**
+
+- First: validate and clamp vision JSON, reject unsafe chemical/dose instructions,
+  and add regression tests for malformed/provider-noncompliant output.
+- Then: short-circuit empty retrieval before the LLM, return truthful HTTP failure
+  statuses, version both server/browser answer caches by safety policy, separate
+  multipart request/file limits, and bound TTS storage.
+
+**Files changed**
+
+- `SESSION.md` only (audit log); application code unchanged.
+
 ### 2026-07-10 — Chat-first UI (uncrowd interface)
 
 **Decided**
@@ -1041,3 +1201,266 @@ cd - && git worktree remove "$WT" --force
 
 - Review the PR. Before any deploy, run the strict public evaluation with real credentials and confirm
   `/screen` and `/ask` status codes against the live Space.
+
+
+### 2026-09-09 — HTML improvement plan for another executor
+
+- Reviewed current working tree at HEAD `17e11922`, existing plans, source policy, key response paths and CI; preserved all existing changes.
+- Created `plans/DAKIKOBO_IMPROVEMENT_PLAN_2026-09-09.html`: ten prioritized tickets, dependencies, effort, acceptance criteria, validation gates and handoff prompt. Application code unchanged.
+- Fresh verification: 296 Python tests passed with `tests/test_rag.py` excluded; one PyPDF2 warning. JavaScript suite unavailable because npm/node were not on PATH. Local policy inventory confirms two eligible documents. HTML structure and section links checked.
+- No live provider/deployment or farmer pilot checks performed. Next executor should reconcile pending branch fixes, then follow the plan; human source review and pilot remain prerequisites.
+
+
+### 2026-09-09 — Improvement plan started: local baseline reconciliation
+
+- Completed Ticket 01 baseline identification without overwriting existing work.
+- Fetched origin: main is `40bb8a85`; safety PR and offline follow-up PR are merged.
+  Local main remains `17e11922` with all pre-existing changes preserved.
+- Independently checked origin/main in an isolated temporary worktree: 626 Python
+  tests and 20 JavaScript tests passed. Local: 296 Python and 13 JavaScript passed.
+  Real RAG test explicitly excluded; one PyPDF2 warning per Python run.
+- Offline fertilizer export unchanged; git diff --check passed.
+- Changes this pass: PROJECT_STATE.md, this log, and
+  plans/IMPLEMENTATION_STATUS_2026-09-09.md. No application behavior changed.
+- Remote reconciliation claims are not blanket acceptance: missing/empty cache
+  identity, interrupted audio writes, concurrency and expired replay still need
+  explicit acceptance checks. Source matrix and synthetic recovery drill remain
+  actionable preparation; human source approval and phone pilot remain open.
+- Next: integrate remote baseline with existing local hardening without losing
+  work, verify the combined state, then cover remaining acceptance criteria.
+- No commit, push, deployment, real provider call or human sign-off performed.
+
+
+### 2026-09-09 — Plan integration and offline policy identity regression
+
+- Fast-forwarded local main from 17e11922 to 40bb8a85 and restored local work.
+  Backup stash named codex-plan-integration-20260909 remains available.
+- Resolved SESSION by retaining both histories and app.py by retaining both
+  production Secure cookies and the multipart overhead ceiling. No merge commit
+  was needed: conflicts were from stash restoration after a fast-forward.
+- Combined offline Python suite: 632 passed, one PyPDF2 warning; real RAG excluded.
+- Reproduced missing/empty/whitespace offline policy identity and legacy empty
+  marker replay: all four tests failed before the fix (200 instead of 503).
+- static/sw.js now requires nonempty safety identity for storage and replay.
+  JavaScript suite: 24 passed. Existing successful-cache fixtures now include
+  the policy header sent by the current server.
+- Offline fertilizer export unchanged; git diff --check passed.
+- Updated README, IMPLEMENTATION_PLAN, PROJECT_STATE and dated plan status.
+- Next: complete browser migration acceptance, audio interruption/concurrency
+  checks and source-matrix preparation. Human approval and pilot remain open.
+- No new commit, push, deployment or live provider call; local edits unstaged.
+
+
+### 2026-09-09 — Plan audio cleanup, worker activation and source matrix
+
+- Ticket 06: reproduced abandoned partial-file leakage and symlink traversal in
+  cleanup. Added TTS_PARTIAL_TTL_SECONDS (default 3600 seconds), pruning only old
+  generated partial files whose POSIX advisory lock is available. Synthesis holds
+  that lock through atomic rename. Cleanup skips symlinks and non-regular MP3s.
+- Tests cover abandoned/recent/unrelated files, external symlink targets and a
+  paused writer concurrent with cleanup. Full offline Python suite: 635 passed,
+  one PyPDF2 warning; real RAG test excluded.
+- Ticket 03: shared-cache worker activation regression confirms removal of the
+  previous version's answers, then offline refusal. JavaScript: 25 passed.
+  This is a simulated worker lifecycle, not real-phone/browser acceptance.
+- Ticket 05: created Data/reviews/CROP_COVERAGE_MATRIX_2026-09-09.md with 20 cells,
+  candidate excerpts, declared zones and explicit missing PDF pages/approval.
+  Checked 20 cells and that ProSol/IITA candidates remain ineligible. No corpus
+  mutation, ingestion or benchmark changes; no agronomic approval invented.
+- Updated config, rag_pipeline, TTS/JS tests, README and IMPLEMENTATION_PLAN;
+  updated this log, PROJECT_STATE and dated plan status.
+- Remaining: user-visible handling of expired audio replay, wider concurrent MP3
+  eviction checks, real-browser lifecycle test, original-page source verification,
+  agronomist review, isolated backup/recovery drill and field pilot.
+- No commit, push, deployment or real provider call. MP3 cap preserves the current
+  file and excludes active/recent partials; it is not a hard total-disk quota.
+
+
+### 2026-09-09 — Replay recovery and isolated journal restore
+
+- Ticket 06: reproduced silent expired-audio failure through real index.js and
+  render.js in jsdom. Replay now shows a French role=status message, retains the
+  answer, clears failed playback state and allows retry. Both rejected play()
+  and media error events are tested, including a subsequent successful retry.
+- Ticket 07: tests/test_recovery.py creates two synthetic consented text cases,
+  uses fresh Flask processes with a stable synthetic production secret, carries
+  the owner cookie across restart and restore, and denies another client.
+  SQLite backup API and integrity check, isolated restore, deletion and expiry
+  passed; original database and backup still contain their original two rows.
+- Rehearsal uses Flask test clients, no live HTTP listener or device browser.
+  No real journal, photos, hosting volume or provider was touched. Original
+  photo-path preservation and actual host durability remain release checks.
+- Fresh full offline suite: 636 Python passed, one PyPDF2 warning, 57.98 seconds;
+  credentialed RAG test excluded. JavaScript: 27 passed. Offline fertilizer export
+  unchanged; git diff --check passed.
+- Files: static/js/index.js, static/css/style.css, tests/js/audio.test.js,
+  tests/test_recovery.py; README, DEPLOYMENT, IMPLEMENTATION_PLAN, PROJECT_STATE,
+  dated status report and this log. Existing changes preserved.
+- DEPLOYMENT now documents private durable paths, stable session secret,
+  WAL-consistent backups, photo path caveat, retention reconciliation and rollback.
+- Next: photo backup/restore drill, concurrent MP3 budget checks, real-browser
+  validation, source original-page verification and agronomist/pilot evidence.
+- No new commit, push, deployment or live model call.
+
+### 2026-09-12 — Photo restore, concurrent audio and Chromium acceptance
+
+- Restored a consistent synthetic journal plus two JPEG attachments at the same
+  isolated mount path. References remained readable; a second client could not
+  see or delete them. Owner deletion and expiry removed restored photos while the
+  original mount and backup snapshot stayed unchanged.
+- Concurrent TTS checks: four same-answer writers exposed one complete MP3; twelve
+  distinct writers converged to the configured soft limit after a quiescent prune,
+  with no partial files left.
+- Headless Chromium acceptance at 320 and 1280 px: expired-audio recovery visible,
+  answer text preserved, no horizontal overflow and no page errors. Artifacts are
+  under reports/browser_replay_check. This is not a physical-phone/user pilot.
+- Full-suite verification exposed a timezone-boundary weather defect: Casablanca
+  had crossed midnight while Burkina/provider data had not. The rainfall windows
+  used the system's Burkina date rather than the provider observation date, shifting
+  the fixture by one day. Added a red regression and anchored windows to the provider
+  date with Burkina time as fallback.
+- No live provider call, deployment, commit, push, agronomic approval or field pilot.
+- Fresh final verification: 640 offline Python tests passed with one PyPDF2
+  warning; credentialed RAG excluded. All 27 JavaScript tests passed. Modified
+  Python files compiled, offline fertilizer export was unchanged, and diff check
+  passed.
+
+### 2026-09-12 — Ticket 05 original-source page verification
+
+- Downloaded the current CGIAR-hosted IITA cowpea guide (67 PDF pages) and the
+  Inter-réseaux ProSol catalogue (77 PDF pages) into the ignored review workspace.
+  Recorded SHA-256 identities in both local Markdown source summaries.
+- Extracted every page and visually inspected IITA PDF pages 12, 29, 34, 60 and
+  61 plus ProSol pages 6, 9 and 10. Added physical and printed page references to
+  the 20-cell crop coverage matrix.
+- IITA candidates I1, I2 and I4 are faithful paraphrases. ProSol P1 is an
+  interpretive synthesis rather than source wording. IITA I3 (field confirmation)
+  is a prudent product rule but was not found as a recommendation in the guide.
+- Replaced the dead IITA download URL in source metadata with the CGIAR record and
+  bitstream. ProSol's recorded URL remains live.
+- Human agronomic review remains required. Both candidate summaries remain
+  ineligible, no dose or matrix cell was approved, and the vector index was not
+  rebuilt. No deployment, commit, push, provider call or field pilot performed.
+
+### 2026-09-12 — Ticket 08 local keyboard and accessibility preparation
+
+- Added a keyboard skip link and focusable main landmark. Soil-tool culture and
+  location selectors now have distinct accessible names; decorative control icons
+  are hidden from assistive technologies.
+- Added reusable focus containment for the Sources and private-journal dialogs.
+  Escape closes either dialog and restores its opener; the journal toggle exposes
+  expanded state. Link and textarea focus indicators now match other controls.
+- Verified in live Chromium's accessibility tree: skip target, dialog naming,
+  cyclic focus, Escape restoration, soil-selector names, and no horizontal
+  overflow at 320 × 900. Report saved under reports/browser_replay_check.
+- Automated frontend asset tests and all 27 JavaScript tests passed. Physical
+  phones, system screen readers, permission denial and participant usability
+  remain human/device acceptance work. No deployment, commit or push performed.
+- Fresh complete verification: 641 offline Python tests and 27 JavaScript tests
+  passed; one existing PyPDF2 deprecation warning. Browser scripts compiled and
+  `git diff --check` passed.
+
+### 2026-09-12 — Ticket 09 evaluation denominator preparation
+
+- Extended scripts/farmer_evaluation.py so development (40 cases) and held-out
+  (20 cases) scorecards can be prepared separately. Existing complete-scorecard
+  behavior remains supported.
+- Added a claim evidence ledger with exact case/split validation, unique claim ids,
+  required source/page/excerpt/reviewer evidence and a true claim-level 90% gate.
+- Added an anonymous participant/task ledger that requires all five planned tasks
+  for at least eight participant codes and applies separate 80% independent-task
+  and next-action-comprehension gates.
+- Added evaluation/RELEASE_DECISION_TEMPLATE.md. It defaults to REPORTÉ and keeps
+  critical safety, claim grounding and participant outcomes as separate gates.
+- Six focused evaluation tests pass, including denominator boundaries, incomplete
+  evidence, split isolation and missing tasks. No human results, expert identity,
+  live-model score or release decision was invented.
+- Fresh complete verification: 647 offline Python tests and 29 JavaScript tests
+  passed with one existing PyPDF2 deprecation warning. The evaluation script
+  compiled and `git diff --check` passed.
+
+### 2026-09-12 — Ticket 08 microphone permission recovery
+
+- Added a full-index.js jsdom regression for a browser `NotAllowedError` from
+  getUserMedia. The existing question remains in the input, manual controls stay
+  enabled, and the microphone button returns to its idle accessible name.
+- The regression exposed that permission guidance did not mention the immediately
+  available keyboard fallback. Both MediaRecorder and native speech-recognition
+  denial messages now explicitly offer typing while retaining permission advice.
+- Updated the local accessibility report. Fresh verification: 647 offline Python
+  tests and 30 JavaScript tests passed with one existing PyPDF2 warning;
+  `git diff --check` passed. Physical phone permission UI remains unverified.
+
+### 2026-09-12 — Independent review and improvement plan (Kimi)
+
+- Reviewed the three plans in `plans/`, PROJECT_STATE, TODO and SESSION, then
+  verified the claimed baseline: 640 offline Python tests passed, 27 JavaScript
+  tests passed (credentialed RAG excluded), both matching the status doc.
+- Found 28 modified files (+921/-81) uncommitted and the stash
+  `codex-plan-integration-20260909` still present — flagged as the top risk (R1).
+- Confirmed fertilizer doses remain withheld pending F6 agronomist review and that
+  only two sources pass `core/source_policy.py` eligibility.
+- Wrote `plans/KIMI_IMPROVEMENT_PLAN_2026-09-12.md` with phases K0 (commit/protect
+  existing work), K1 (live end-to-end verification), K2 (grow eligible corpus),
+  K3 (prepare the agronomist review packet), K4 (pilot readiness), K5 (human gates).
+- No code changes, no commits, no deployment, no provider calls in this pass.
+
+### 2026-09-12 — Kimi plan implementation (K0–K4)
+
+- K0: committed the previously uncommitted hardening/verification work as
+  `38cfbb19` on branch `chore/security-hardening-and-verification` (42 files,
+  +1984/−97), including the coverage matrix, ticket report, browser replay
+  artifacts, security/recovery/audio tests, and the Kimi plan. Added `tmp/` to
+  `.gitignore` (review-PDF workspace was untracked but not ignored). The stash
+  `codex-plan-integration-20260909` is fully merged into that commit and kept
+  as a labeled backup. No push or PR yet — held for owner confirmation.
+- K1: live verification passed — `/healthz` ok/rag ready, `/version` shows
+  deployed commit `bc0670e3`; `scripts/evaluate_rag.py` against the live Space:
+  14/14 hard-passed, 3 advisory warnings (expected thinner-corpus behavior
+  after source-eligibility tightening). Report refreshed in
+  `reports/rag_eval_results.md`.
+- K2: trusted-source probe — 6/9 up. WASCAL recovered (both hosts UP; was DOWN
+  in July), FAO AGRISurvey back up. INERA and AGRHYMET still DOWN. FAO
+  countryprofiles URL now 404 (was UP in July) — seed URL needs updating.
+  Logged in `reports/trusted_source_health.md`. No scrape/promote: human
+  review gate unchanged.
+- K3: created `Data/reviews/AGRONOMIST_REVIEW_PACKET_2026-09-12.md` (20 matrix
+  cells with sign-off columns, unblock rule: nothing approved by silence) and
+  `evaluation/BENCHMARK_APPROVAL_SHEET.md` (all 60 cases, held-out tuning ban).
+  11 cells without candidate extracts are marked "à vérifier".
+- K4: `/confidentialite` privacy policy page (French, retention from config)
+  linked from the credibility modal; `.doc-page` styles. Server answer-cache
+  hits now show a visible freshness label ("Réponse établie le …") in
+  `static/js/api.js`; the offline label keeps precedence.
+- Verification: 29 JavaScript tests passed (2 new freshness tests). Full
+  offline Python suite result recorded below after the final run.
+- Not done (human/offline gates): agronomist review session, benchmark
+  approval, real-phone pilot, corpus scrape/promote, push/PR.
+- Final verification: 643 offline Python tests passed (3 new privacy-page tests), 29 JavaScript tests passed; one PyPDF2 warning; credentialed RAG excluded.
+
+### 2026-09-12 — Kimi plan second pass (review-feedback corrections)
+
+- K1 evidence: local vector store rebuilt from the 2-source eligible corpus;
+  manifest guard verified (accept on match); live Space serves the same corpus
+  hash (x-dakikobo-corpus 828d5d06eeb22bba, pre-metadata); one complete live
+  TTS fetch (valid MP3, 174 KB); evaluator 14/14 hard-pass. Dated record in
+  reports/live_verification_2026-09-12.md. Credentialed local RAG not run.
+- K2 partial: scope metadata ingested; quarantine (rights_unclear/_quarantine)
+  always wins; FAO synthesis formally quarantined; dated eligibility audit
+  regenerated (2 eligible, 1 quarantined, 34 pending). Four-source target
+  blocked on human agronomic approval — exact remaining actions documented.
+- K3 ready for human review: packet now embeds verbatim IITA/ProSol page
+  annexes with hashes, page refs and fidelity notes; reviewer fields blank.
+- K4 blocked/partial: no physical-phone test done; five-task rehearsal
+  checklist with recording grid added under evaluation/.
+- Commits 89b2c005, 603ceb8a, 78622caf on chore/security-hardening-and-verification.
+  Verification: 650 offline Python tests, 30 JavaScript tests, git diff --check
+  clean. This entry is intentionally left uncommitted to avoid sweeping another
+  session's in-flight SESSION.md edits into these commits.
+## 2026-09-12 — PR #5 Kimi continuation
+
+- Continued Kimi's interrupted PR #5 correction pass after its provider quota ended.
+- Preserved unrelated local microphone/accessibility work without staging it.
+- Confirmed the integration stash was removed only after Kimi documented it as redundant.
+- Prepared the current-head live verification record and refreshed committed RAG evaluation evidence.
+- K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.

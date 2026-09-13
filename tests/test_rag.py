@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-import config  # triggers load_dotenv() so GROQ_API_KEY is read from .env
+import config  # reads only process/server environment variables
 
 GROQ_KEY = os.getenv("GROQ_API_KEY", "")
 

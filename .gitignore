@@ -4,8 +4,10 @@ venv/
 .venv/
 env/
 
-# Secret keys
+# Secret keys (the web process uses server-level environment variables)
 .env
+.env.*
+!.env.example
 
 # Python cache
 __pycache__/
@@ -54,12 +56,13 @@ Data/scraped/pending/*.md
 *.log
 
 # Generated evaluation reports
-reports/rag_eval_results.md
 reports/feedback_eval.csv
 reports/feedback_eval.jsonl
 reports/FEEDBACK_EVAL_PRIVACY.md
 reports/source_refresh_log.md
-reports/trusted_source_health.md
+# reports/rag_eval_results.md and reports/trusted_source_health.md are tracked
+# on purpose: they are the dated review evidence for live RAG behaviour and
+# trusted-source reachability, regenerated and committed at each review pass.
 
 # Local planning docs with prompts (optional — remove line to track)
 # suggestions/
@@ -70,3 +73,6 @@ Data/vision_eval/samples/
 # Private session identity and journal mutation locks
 data/.session_secret
 data/*.mutations.lock
+
+# Local review workspace (downloaded source PDFs, never committed)
+tmp/

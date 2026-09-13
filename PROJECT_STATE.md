@@ -1,6 +1,24 @@
 # DakiKobo Project State
 
-Last updated: 2026-07-10 (cannot-confirm + vision lab)
+Last updated: 2026-09-12 (improvement-plan verification)
+
+## Current baseline — 2026-09-12
+
+Local `main` is now at `40bb8a85`, with the pre-existing uncommitted security
+and configuration changes restored and integrated. The safety fixes and offline
+follow-up queue are present locally. The combined offline suite now passes
+647 Python tests and 30 JavaScript tests after recovery, concurrent audio,
+real Chromium, timezone-boundary weather, accessibility and evaluation-gate coverage. The
+credentialed RAG test was excluded. No live deployment or model call was verified
+in this pass.
+
+Only two documents are currently eligible under `core/source_policy.py`: CILSS
+and MAERAH/OAPH. The older corpus counts and live observations below are historical,
+not current source eligibility or deployment evidence. See
+[the dated ticket report](plans/IMPLEMENTATION_STATUS_2026-09-09.md) for acceptance
+gaps and the next integration step. Earlier capability descriptions below must
+be read against this dated baseline.
+
 
 This file is a compact state report for another model, reviewer, or engineer to
 evaluate what already exists before proposing new work.
@@ -95,15 +113,19 @@ Active source path:
 
 - `Data/markdown/`
 
-Current active Markdown file count:
+Markdown files under `Data/markdown/`:
 
-- 19 Markdown files
+- 19 files present; **2 currently eligible** for indexing under
+  `core/source_policy.py` (CILSS and MAERAH/OAPH orientations); the FAO
+  synthesis is quarantined and the IITA/ProSol syntheses await human agronomic
+  review.
 
 Important curated additions:
 
 - `Data/markdown/prosol_fertilite_sols_burkina_2020.md`
 - `Data/markdown/iita_niebe_afrique_ouest_2018.md`
 - `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`
+  (**quarantined** 2026-09-12 — FAO reuse rights unverified; excluded from RAG)
 - `Data/markdown/scraped_reviewed/maerah_oaph_orientation_burkina_2026.md`
 - `Data/markdown/scraped_reviewed/cilss_orientation_sahel_2026.md`
 
@@ -430,9 +452,11 @@ First generated pending batch:
   reviewer cleans and promotes them.
 - A short reviewed synthesis from this batch was promoted to active Markdown:
   `Data/markdown/scraped_reviewed/fao_burkina_policy_data_profile_2026.md`.
-  It is limited to policy, public expenditure, price incentives, statistics,
-  EPA data availability, and FAO country-profile context. It must not be used
-  for exact fertilizer, pesticide, disease, or crop-calendar recommendations.
+  **Reversed on 2026-09-12:** quarantined (`rights_unclear`) until FAO reuse
+  terms are confirmed. It is limited to policy, public expenditure, price
+  incentives, statistics, EPA data availability, and FAO country-profile
+  context. It must not be used for exact fertilizer, pesticide, disease, or
+  crop-calendar recommendations.
 
 ## Main Routes
 
@@ -548,11 +572,12 @@ Manual browser test still recommended:
 Required:
 
 - `GROQ_API_KEY`
+- `APP_ENV=production` (hosted deployments; set by the Docker image)
+- `FLASK_SECRET_KEY` (hosted deployments; startup fails closed when missing)
 
 Optional but used by features:
 
 - `GEMINI_API_KEY`
-- `FLASK_SECRET_KEY`
 - `APP_VERSION`
 - `LLM_MODEL`
 - `GROQ_USER_AGENT`
@@ -585,6 +610,7 @@ Optional but used by features:
 - `MAX_IMAGE_UPLOAD_MB`
 - `LOG_LEVEL`
 - `CASE_LOG_DB_PATH`
+- `SEARCH_ENGINE_INDEXING_ENABLED` (defaults to `false`)
 
 Do not commit:
 
@@ -603,7 +629,8 @@ Product:
 - The app still feels partly like a chat widget instead of a full field workflow.
 - Text questions do not yet always collect crop, commune, growth stage, or date.
 - Feedback is stored in SQLite with follow-up outcome tracking. Deferred follow-up reminders are not yet implemented.
-- A short privacy note exists, but there is no full privacy policy page yet.
+- A full French privacy policy page now exists at `/confidentialite`
+  (linked from the Sources modal), with config-backed retention.
 
 RAG and data:
 
@@ -611,9 +638,11 @@ RAG and data:
   source cards when available.
 - Retrieval source filtering exists, but needs more live evaluation and tuning.
 - Generated/scraped data should remain outside RAG until human review.
-- Firecrawl ingestion and the first FAO allowlist/seed batch exist. One curated
-  FAO synthesis is active; the raw scraped files remain ignored pending
-  artifacts. Additional trusted sources still need allowlist rows and review.
+- Firecrawl ingestion and the first FAO allowlist/seed batch exist. The curated
+  FAO synthesis is **quarantined** since 2026-09-12 (`review_status:
+  rights_unclear`) because FAO web reuse terms remain unverified; the raw
+  scraped files remain ignored pending artifacts. Additional trusted sources
+  still need allowlist rows and review.
 
 Vision:
 

@@ -16,6 +16,23 @@ body {
     margin: 0;
 }
 
+.skip-link {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 1000;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #173f20;
+    font-weight: 700;
+    transform: translateY(-160%);
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
 .chat-container {
     width: 470px;
     max-width: 100%;
@@ -623,7 +640,14 @@ body {
 /* Per-answer audio replay */
 .audio-actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     margin-top: 8px;
+}
+
+.audio-status {
+    flex-basis: 100%;
+    overflow-wrap: anywhere;
 }
 
 .audio-replay {
@@ -1813,7 +1837,7 @@ details.sources-details[open] > .sources-summary::before {
 .journal-panel button { min-height:44px; margin:5px; }
 .feedback label { display:block; font-size:0.9rem; margin:6px 0; }
 #inputHint, #offlineReady { font-size:0.8rem; margin:4px 12px; color:#385232; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid #a86400; outline-offset:2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline:3px solid #a86400; outline-offset:2px; }
 /* Local symbols keep core controls visible without an icon CDN. */
 .fas { font-style:normal; display:inline-block; }
 .fa-paper-plane::before { content:'➤'; }
@@ -1837,3 +1861,18 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:3px so
     #toolsToggle span { display:inline; }
     #offlineReady { font-size:11px; }
 }
+
+/* Standalone document pages (privacy policy) */
+.doc-page {
+    background: #ffffff;
+    color: #173f20;
+    max-width: 720px;
+    margin: 24px auto;
+    padding: 24px 28px;
+    border-radius: 12px;
+    line-height: 1.6;
+}
+.doc-page h1 { font-size: 1.6rem; margin: 0 0 12px; }
+.doc-page h2 { font-size: 1.15rem; margin: 24px 0 8px; }
+.doc-page ul { padding-left: 22px; }
+.doc-page a { color: #1c6b32; font-weight: 600; }

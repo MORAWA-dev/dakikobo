@@ -60,7 +60,7 @@ test('uploadImageForScreening conserve ses six arguments', async function() {
         request = { url: url, options: options };
         return new Response(JSON.stringify({ answer: 'ok' }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json', 'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Corpus':'test-corpus', 'X-DakiKobo-Saved-At':String(Date.now()/1000) }
+            headers: { 'Content-Type': 'application/json', 'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Safety':'policy-current', 'X-DakiKobo-Corpus':'test-corpus', 'X-DakiKobo-Saved-At':String(Date.now()/1000) }
         });
     };
     try {
@@ -81,9 +81,9 @@ test('uploadImageForScreening conserve ses six arguments', async function() {
     }
 });
 
-function loadServiceWorker(fertilizerTable, fetchImpl, clock) {
+function loadServiceWorker(fertilizerTable, fetchImpl, clock, savedBuckets, revision) {
     const handlers = {};
-    const buckets = new Map();
+    const buckets = savedBuckets || new Map();
     const externalFetches = [];
     const absoluteUrl = function(value) {
         const raw = typeof value === 'string' ? value : value.url;
@@ -156,7 +156,7 @@ function loadServiceWorker(fertilizerTable, fetchImpl, clock) {
         }
     };
     const source = fs.readFileSync(path.join(__dirname, '../../static/sw.js'), 'utf8');
-    vm.runInNewContext(source, context);
+    vm.runInNewContext(source.replace("__ASSET_REVISION__", revision || "test-revision"), context);
     return {
         Request: ScopedRequest,
         buckets: buckets,
@@ -214,7 +214,7 @@ test('installation, navigation et réponses enregistrées fonctionnent sans rés
             }
             return new Response(JSON.stringify({ answer: 'Réponse sourcée enregistrée', sources: [] }), {
                 status: 200,
-                headers: { 'Content-Type': 'application/json', 'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Corpus':'test-corpus', 'X-DakiKobo-Saved-At':String(Date.now()/1000) }
+                headers: { 'Content-Type': 'application/json', 'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Safety':'policy-current', 'X-DakiKobo-Corpus':'test-corpus', 'X-DakiKobo-Saved-At':String(Date.now()/1000) }
             });
         }
         return new Response('ressource externe');
@@ -322,7 +322,7 @@ test('les réponses expirées et la météo ne sont pas rejouées', async functi
     const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
         if (!online) { throw new Error('offline'); }
         return new Response(JSON.stringify({answer:'Ancien conseil météo'}), { headers: {
-            'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Corpus':'v1', 'X-DakiKobo-Saved-At':String(now/1000)
+            'X-DakiKobo-Cacheable':'1', 'X-DakiKobo-Safety':'policy-current', 'X-DakiKobo-Corpus':'v1', 'X-DakiKobo-Saved-At':String(now/1000)
         }});
     }, Clock);
     function request() {
@@ -338,7 +338,7 @@ test('une nouvelle version du corpus invalide les anciennes réponses', async fu
     let corpus = 'v1'; let online = true;
     const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
         if (!online) { throw new Error('offline'); }
-        return new Response(JSON.stringify({answer:'Conseil'}), {headers:{'X-DakiKobo-Cacheable':'1','X-DakiKobo-Corpus':corpus,'X-DakiKobo-Saved-At':String(Date.now()/1000)}});
+        return new Response(JSON.stringify({answer:'Conseil'}), {headers:{'X-DakiKobo-Cacheable':'1','X-DakiKobo-Safety':'policy-current','X-DakiKobo-Corpus':corpus,'X-DakiKobo-Saved-At':String(Date.now()/1000)}});
     });
     function request(text) { const form = new FormData(); form.set('messageText',text); return new runtime.Request('/ask',{method:'POST',body:form}); }
     await runtime.worker.networkFirstAsk(request('Question un'));
@@ -559,5 +559,129 @@ test('clearDeviceData vide aussi la file des suivis hors ligne', async function(
     } finally {
         delete global.localStorage;
         delete global.caches;
+    }
+});
+
+for (const identity of [null, '', '   ']) {
+    test(`une réponse sans identité de sécurité valide (${JSON.stringify(identity)}) reste indisponible hors ligne`, async function() {
+        let online = true;
+        const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
+            if (!online) { throw new Error('offline'); }
+            const headers = {
+                'X-DakiKobo-Cacheable': '1',
+                'X-DakiKobo-Corpus': 'corpus-stable',
+                'X-DakiKobo-Saved-At': String(Date.now() / 1000)
+            };
+            if (identity !== null) { headers['X-DakiKobo-Safety'] = identity; }
+            return new Response(JSON.stringify({ answer: 'Conseil sans version' }), { headers });
+        });
+        function request() {
+            const form = new FormData();
+            form.set('messageText', 'Comment conserver le niébé ?');
+            return new runtime.Request('/ask', { method: 'POST', body: form });
+        }
+        assert.equal((await runtime.worker.networkFirstAsk(request())).status, 200);
+        online = false;
+        const response = await runtime.worker.networkFirstAsk(request());
+        assert.equal(response.status, 503);
+        assert.notEqual((await response.json()).answer, 'Conseil sans version');
+    });
+}
+
+test('une ancienne entrée avec marqueur de sécurité vide est refusée', async function() {
+    let online = true;
+    const runtime = loadServiceWorker(require('../../static/data/fertilizer.json'), async function() {
+        if (!online) { throw new Error('offline'); }
+        return new Response(JSON.stringify({ answer: 'Ancien conseil' }), { headers: {
+            'X-DakiKobo-Cacheable': '1', 'X-DakiKobo-Corpus': 'corpus-stable',
+            'X-DakiKobo-Safety': 'policy-current',
+            'X-DakiKobo-Saved-At': String(Date.now() / 1000)
+        }});
+    });
+    function request() {
+        const form = new FormData();
+        form.set('messageText', 'Comment conserver le niébé ?');
+        return new runtime.Request('/ask', { method: 'POST', body: form });
+    }
+    await runtime.worker.networkFirstAsk(request());
+    for (const cache of runtime.buckets.values()) {
+        for (const key of await cache.keys()) {
+            if (new URL(key.url).pathname === '/__safety__') {
+                await cache.put(key, new Response(''));
+            } else {
+                const stored = await cache.match(key);
+                if (stored.headers.has('X-DakiKobo-Safety')) {
+                    const headers = new Headers(stored.headers);
+                    headers.delete('X-DakiKobo-Safety');
+                    await cache.put(key, new Response(await stored.text(), { headers }));
+                }
+            }
+        }
+    }
+    online = false;
+    assert.equal((await runtime.worker.networkFirstAsk(request())).status, 503);
+});
+
+
+test('une activation de nouvelle version supprime les anciens conseils avant le passage hors ligne', async function() {
+    const table = require('../../static/data/fertilizer.json');
+    const old = loadServiceWorker(table, async () => new Response(JSON.stringify({ answer: 'Ancienne politique' }), {
+        headers: { 'X-DakiKobo-Cacheable': '1', 'X-DakiKobo-Corpus': 'stable',
+            'X-DakiKobo-Safety': 'old-policy', 'X-DakiKobo-Saved-At': String(Date.now() / 1000) }
+    }), undefined, undefined, 'old-revision');
+    function request(runtime) {
+        const form = new FormData();
+        form.set('messageText', 'Comment conserver le niébé ?');
+        return new runtime.Request('/ask', { method: 'POST', body: form });
+    }
+    await old.worker.networkFirstAsk(request(old));
+    assert.ok(old.buckets.has('dakikobo-farmer-v1-old-revision-answers'));
+    const current = loadServiceWorker(table, async () => { throw new Error('offline'); },
+        undefined, old.buckets, 'new-revision');
+    let activation;
+    current.handlers.activate({ waitUntil: promise => { activation = promise; } });
+    await activation;
+    assert.equal(current.buckets.has('dakikobo-farmer-v1-old-revision-answers'), false);
+    const response = await current.worker.networkFirstAsk(request(current));
+    assert.equal(response.status, 503);
+    assert.notEqual((await response.json()).answer, 'Ancienne politique');
+});
+
+
+test('une réponse du cache serveur affiche sa date d\'établissement', async function() {
+    const originalFetch = global.fetch;
+    global.fetch = async function() {
+        return new Response(JSON.stringify({
+            answer: 'Conseil frais',
+            saved_at: '2026-09-10T08:00:00+00:00'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        const payload = await api.sendMessage({ messageText: 'Quand semer le mil ?' });
+        const date = new Date('2026-09-10T08:00:00+00:00').toLocaleDateString('fr-FR');
+        assert.ok(payload.answer.startsWith('Réponse établie le ' + date));
+        assert.ok(payload.answer.includes('Conseil frais'));
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+
+test('le libellé hors ligne prime sur le libellé du cache serveur', async function() {
+    const originalFetch = global.fetch;
+    global.fetch = async function() {
+        return new Response(JSON.stringify({
+            answer: 'Conseil hors ligne',
+            offline: true,
+            saved_at: '2026-09-10T08:00:00+00:00'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+        const payload = await api.sendMessage({ messageText: 'Quand semer le mil ?' });
+        const date = new Date('2026-09-10T08:00:00+00:00').toLocaleDateString('fr-FR');
+        assert.ok(payload.answer.startsWith('Conseil enregistré le ' + date));
+        assert.ok(!payload.answer.startsWith('Réponse établie le'));
+    } finally {
+        global.fetch = originalFetch;
     }
 });

@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {% if not search_engine_indexing_enabled %}
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    {% endif %}
 
     <link
       id="favicon"
@@ -22,10 +25,11 @@
     />
   </head>
   <body>
+    <a class="skip-link" href="#mainContent">Aller à la conversation</a>
     <div id="offlineBanner" class="offline-banner" role="status" hidden>
       Mode hors ligne — dernières réponses enregistrées
     </div>
-    <div class="chat-container">
+    <main class="chat-container" id="mainContent" tabindex="-1">
       <div class="chat-header">
         <div class="logo-title">
           <div class="logo-circle">
@@ -96,6 +100,7 @@
                 demande. DakiKobo ne les affiche pas publiquement et ne les
                 écrit pas dans les journaux. Évitez les visages, noms, numéros
                 ou documents personnels.
+                <a href="/confidentialite">Lire la politique de confidentialité</a>
               </p>
             </section>
             <section>
@@ -199,11 +204,18 @@
         <button type="button" class="farmer-task" data-question="Mon champ a un problème : ">Un problème au champ</button>
         <button type="button" class="farmer-task" data-question="Comment nourrir le sol pour ">Nourrir le sol</button>
         <button type="button" class="farmer-task" data-question="Comment récolter et conserver ">Récolter et conserver</button>
-        <button id="journalToggle" type="button" aria-controls="journalPanel">Mes conseils</button>
+        <button id="journalToggle" type="button" aria-controls="journalPanel" aria-expanded="false">Mes conseils</button>
       </nav>
-      <section id="journalPanel" class="journal-panel" aria-label="Mes conseils privés" hidden>
+      <section
+        id="journalPanel"
+        class="journal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="journalTitle"
+        hidden
+      >
         <button id="journalClose" type="button">Fermer le journal</button>
-        <h2>Mes conseils</h2>
+        <h2 id="journalTitle">Mes conseils</h2>
         <p>Privés sur ce navigateur, conservés {{ journal_retention_days }} jours sur le serveur. Sur un téléphone partagé, les autres utilisateurs du navigateur peuvent les voir. Aucune notification n’est envoyée.</p>
         <div class="journal-content"></div>
         <p id="journalStatus" role="status"></p>
@@ -321,8 +333,8 @@
         <div class="soil-panel" aria-label="Sol et engrais">
           <label class="soil-label" for="soilCrop">Sol + engrais</label>
           <div class="soil-controls">
-            <select id="soilCrop" name="soilCrop"></select>
-            <select id="soilLocation" name="soilLocation"></select>
+            <select id="soilCrop" name="soilCrop" aria-label="Culture pour le conseil sol et engrais"></select>
+            <select id="soilLocation" name="soilLocation" aria-label="Lieu pour le conseil sol et engrais"></select>
             <button id="soilBtn" type="button">Voir</button>
           </div>
         </div>
@@ -346,7 +358,7 @@
             aria-expanded="false"
             title="Outils météo et sol"
           >
-            <i class="fas fa-tools"></i>
+            <i class="fas fa-tools" aria-hidden="true"></i>
             <span>Outils</span>
           </button>
           <button
@@ -355,7 +367,7 @@
             aria-label="Envoyer la question"
             title="Envoyer la question"
           >
-            <i class="fas fa-paper-plane"></i>
+            <i class="fas fa-paper-plane" aria-hidden="true"></i>
           </button>
           <button
             id="chatbot-form-btn-voice"
@@ -363,7 +375,7 @@
             aria-label="Dicter une question"
             title="Dicter une question"
           >
-            <i class="fas fa-microphone"></i>
+            <i class="fas fa-microphone" aria-hidden="true"></i>
           </button>
           <button
             id="chatbot-form-btn-image"
@@ -371,7 +383,7 @@
             aria-label="Analyser une photo de feuille malade"
             title="Analyser une photo de feuille malade"
           >
-            <i class="fas fa-camera"></i>
+            <i class="fas fa-camera" aria-hidden="true"></i>
           </button>
           <input
             type="file"
@@ -395,7 +407,7 @@
           <label for="voiceReadingCheckbox">Activer la lecture vocale</label>
         </div>
       </div>
-    </div>
+    </main>
     <script src="{{ url_for('static', filename='vendor/jquery-3.6.0.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/render.js') }}"></script>
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>

@@ -9,7 +9,9 @@ country: "Burkina Faso"
 publisher: "FAO"
 year: "2026"
 license: "unknown; contenu FAO web a verifier avant reutilisation publique extensive"
-review_status: "reviewed_by_codex_pending_human_review"
+# Droits de réutilisation non confirmés (voir licence) : quarantaine explicite,
+# toujours perdante face à toute approbation, jusqu'à vérification des droits FAO.
+review_status: "rights_unclear"
 scraped_at: "2026-07-02T23:43:35+00:00"
 reviewed_at: "2026-07-03T00:00:00+00:00"
 topics: "politique agricole, depenses publiques, prix agricoles, statistiques agricoles, EPA, donnees agricoles, profil pays"

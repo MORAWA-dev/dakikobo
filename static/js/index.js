@@ -24,6 +24,29 @@ $(function() {
     var currentAudio = null;
     var credibilityLastFocus = null;
 
+    function trapDialogFocus($dialog, e) {
+        if (e.key !== 'Tab') { return; }
+        var focusable = $dialog
+            .find('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+            .filter(function() {
+                return !this.hidden && !$(this).closest('[hidden]').length;
+            })
+            .toArray();
+        if (!focusable.length) {
+            e.preventDefault();
+            return;
+        }
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
+
     function setCredibilityOpen(open) {
         var $modal = $('#credibilityModal');
         var $toggle = $('#credibilityToggle');
@@ -55,8 +78,14 @@ $(function() {
     });
 
     $(document).on('keydown', function(e) {
-        if (e.key === 'Escape' && !$('#credibilityModal').prop('hidden')) {
-            setCredibilityOpen(false);
+        var $credibility = $('#credibilityModal');
+        var $journal = $('#journalPanel');
+        if (!$credibility.prop('hidden')) {
+            if (e.key === 'Escape') { setCredibilityOpen(false); }
+            else { trapDialogFocus($credibility, e); }
+        } else if (!$journal.prop('hidden')) {
+            if (e.key === 'Escape') { setJournalOpen(false); }
+            else { trapDialogFocus($journal, e); }
         }
     });
 
@@ -71,18 +100,24 @@ $(function() {
         }
     }
 
-    function playAudio(audioUrl) {
+    function playAudio(audioUrl, onFailure) {
         if (!audioUrl) {
             return;
         }
         stopCurrentAudio();
-        currentAudio = new Audio(audioUrl);
-        currentAudio.addEventListener('ended', function() {
+        var audio = new Audio(audioUrl);
+        currentAudio = audio;
+        function failed() {
+            if (currentAudio !== audio) { return; }
+            audio.pause();
             currentAudio = null;
+            if (onFailure) { onFailure(); }
+        }
+        audio.addEventListener('ended', function() {
+            if (currentAudio === audio) { currentAudio = null; }
         });
-        currentAudio.play().catch(function(err) {
-            console.error("Erreur de lecture audio :", err);
-        });
+        audio.addEventListener('error', failed);
+        audio.play().catch(failed);
     }
 
     function renderAudioReplay(bubble, audioUrl, text) {
@@ -93,10 +128,16 @@ $(function() {
         var $button = $('<button type="button" class="audio-replay" aria-label="Réécouter la réponse" title="Réécouter la réponse"></button>');
         $button.append($('<i class="fas fa-volume-up" aria-hidden="true"></i>'));
         $button.append($('<span></span>').text('Écouter / arrêter'));
+        var $status = $('<span class="audio-status" role="status"></span>');
         $button.on('click', function() {
+            $status.text('');
             if (currentAudio && !currentAudio.paused) { currentAudio.pause(); return; }
             if (window.speechSynthesis && window.speechSynthesis.speaking) { stopCurrentAudio(); return; }
-            if (audioUrl) { playAudio(audioUrl); }
+            if (audioUrl) {
+                playAudio(audioUrl, function() {
+                    $status.text("L’audio est indisponible ou a expiré. Le texte reste disponible. Vérifiez votre connexion puis réessayez.");
+                });
+            }
             else {
                 stopCurrentAudio();
                 var utterance = new SpeechSynthesisUtterance(text);
@@ -104,7 +145,7 @@ $(function() {
                 window.speechSynthesis.speak(utterance);
             }
         });
-        $actions.append($button);
+        $actions.append($button, $status);
         bubble.append($actions);
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
     }
@@ -1522,8 +1563,15 @@ $(function() {
             $('#messageText').val($(this).attr('data-question')).focus();
             $('#inputHint').text('Précisez la culture et votre question, puis envoyez.');
         });
+        function setJournalOpen(open) {
+            var $panel = $('#journalPanel').prop('hidden', !open);
+            $('#journalToggle').attr('aria-expanded', open ? 'true' : 'false');
+            if (open) { $('#journalClose').focus(); }
+            else { $('#journalToggle').focus(); }
+            return $panel;
+        }
         function showJournal() {
-            var $panel = $('#journalPanel').prop('hidden', false);
+            var $panel = setJournalOpen(true);
             $('#journalClose').focus();
             $panel.find('.journal-content').text('Chargement de vos conseils…');
             DakiKoboApi.loadJournal().then(function(payload) {
@@ -1548,7 +1596,7 @@ $(function() {
             }).catch(function() { $panel.find('.journal-content').text('Le journal privé demande une connexion. Vos réponses récentes restent disponibles hors ligne en reposant la même question.'); });
         }
         $('#journalToggle').on('click', showJournal);
-        $('#journalClose').on('click', function() { $('#journalPanel').prop('hidden', true); $('#journalToggle').focus(); });
+        $('#journalClose').on('click', function() { setJournalOpen(false); });
         $('#clearDeviceData').on('click', function() {
             if (!window.confirm('Effacer les réponses et préférences enregistrées sur cet appareil ? Le journal privé sur le serveur reste disponible.')) { return; }
             DakiKoboApi.clearDeviceData().then(function() { window.location.reload(); }).catch(function() { $('#journalStatus').text('Impossible d’effacer les données locales. Réessayez.'); });

@@ -18,8 +18,16 @@
                     error.payload = payload;
                     throw error;
                 }
-                if (payload.offline && payload.saved_at) {
-                    var label = 'Conseil enregistré le ' + new Date(payload.saved_at).toLocaleDateString('fr-FR') + ' — vérifiez les conditions actuelles.';
+                if (payload.saved_at) {
+                    var savedDate = new Date(payload.saved_at).toLocaleDateString('fr-FR');
+                    var label;
+                    if (payload.offline) {
+                        label = 'Conseil enregistré le ' + savedDate + ' — vérifiez les conditions actuelles.';
+                    } else {
+                        // Server answer-cache hit: same question already treated
+                        // recently. Show the date so the farmer can judge freshness.
+                        label = 'Réponse établie le ' + savedDate + ' — question identique déjà traitée récemment.';
+                    }
                     payload.answer = label + '\n\n' + (payload.answer || '');
                     if (payload.case) { payload.case.summary = label + ' ' + (payload.case.summary || ''); }
                 }

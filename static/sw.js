@@ -226,13 +226,13 @@ async function networkFirstAsk(request) {
     var cache = await caches.open(ANSWER_CACHE);
     try {
         var response = await fetch(request.clone());
-        if (response.ok && response.headers.get('X-DakiKobo-Cacheable') === '1' && response.headers.get('X-DakiKobo-Corpus')) {
+        var safety = (response.headers.get('X-DakiKobo-Safety') || '').trim();
+        if (safety && response.ok && response.headers.get('X-DakiKobo-Cacheable') === '1' && response.headers.get('X-DakiKobo-Corpus')) {
             // Await the write so the worker lifetime includes durable persistence.
             try {
                 var corpus = response.headers.get('X-DakiKobo-Corpus');
                 // A safety-only deployment changes no document, so the corpus
                 // marker alone cannot retire answers written under looser rules.
-                var safety = response.headers.get('X-DakiKobo-Safety') || '';
                 var marker = await cache.match(CORPUS_MARKER);
                 var safetyMarker = await cache.match(SAFETY_MARKER);
                 if ((marker && (await marker.text()) !== corpus) ||
@@ -258,10 +258,11 @@ async function networkFirstAsk(request) {
             var age = Date.now() - saved;
             var marker = await cache.match(CORPUS_MARKER);
             var safetyMarker = await cache.match(SAFETY_MARKER);
-            if (saved && age >= 0 && age < ANSWER_MAX_AGE_MS && marker &&
+            var cachedSafety = (cached.headers.get('X-DakiKobo-Safety') || '').trim();
+            if (cachedSafety && saved && age >= 0 && age < ANSWER_MAX_AGE_MS && marker &&
                 (await marker.text()) === cached.headers.get('X-DakiKobo-Corpus') &&
                 safetyMarker &&
-                (await safetyMarker.text()) === (cached.headers.get('X-DakiKobo-Safety') || '')) {
+                (await safetyMarker.text()) === cachedSafety) {
                 var payload = await cached.json();
                 payload.offline = true;
                 payload.saved_at = new Date(saved).toISOString();

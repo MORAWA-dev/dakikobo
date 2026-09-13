@@ -3,16 +3,15 @@
 Usage:
     python scripts/test_gemini.py
 
-It loads GEMINI_API_KEY from your .env, calls the Gemini REST API, and prints a
-clear PASS/FAIL with the server's error message if something is wrong. No extra
-dependencies needed (uses requests).
+It reads GEMINI_API_KEY from the process environment, calls the Gemini REST API,
+and prints a clear PASS/FAIL with the server's error message if something is
+wrong. No extra dependencies needed (uses requests).
 """
 
 import os
 import sys
 
 import requests
-from dotenv import load_dotenv
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -24,12 +23,11 @@ def _mask(value: str) -> str:
 
 
 def main() -> int:
-    load_dotenv()
     key = os.getenv("GEMINI_API_KEY", "").strip()
 
     print("GEMINI_API_KEY:", _mask(key))
     if not key:
-        print("❌ No GEMINI_API_KEY found in .env")
+        print("❌ GEMINI_API_KEY is not set in the process environment")
         return 1
 
     # 1) Auth check: list available models.

@@ -20,14 +20,17 @@ Render or Railway are also good demo options if you later have a small monthly b
 
 For a longer-lived production system, use Azure App Service, Fly.io, or another provider where you can attach persistent storage or move the vector database to a managed service.
 
-## Required Environment Variables
+## Required Server Environment Variables
 
-Set these in the hosting provider dashboard. Do not commit them to Git.
+Set these in the hosting provider dashboard or service manager. The Flask web
+process intentionally does not read `.env` files. Never place a `.env` inside
+`public_html`, the repository served by Apache, or a container build context.
 
 ```text
 GROQ_API_KEY=...
 GEMINI_API_KEY=...
 FLASK_SECRET_KEY=generate-a-long-random-secret
+APP_ENV=production
 FLASK_DEBUG=false
 REBUILD_VECTORSTORE=false
 ```
@@ -47,6 +50,7 @@ MAX_RAG_SOURCES=2
 STATE_DB_PATH=data/runtime_state.sqlite3
 ANSWER_CACHE_ENABLED=true
 ANSWER_CACHE_TTL_SECONDS=86400
+SEARCH_ENGINE_INDEXING_ENABLED=false
 ```
 
 ## Hugging Face Spaces
@@ -95,6 +99,8 @@ Free Space caveats:
 - Free Spaces may sleep when inactive.
 - The runtime disk is not a production database; feedback CSV and generated audio should be treated as temporary.
 - Keep `.env`, API keys, and generated files out of Git.
+- Keep secrets in the Space **Secrets** panel, not in repository files or Docker
+  build arguments. `.dockerignore` excludes local secret files from image builds.
 - If the Space is public, source code is public, but secrets configured in the Space settings stay hidden.
 
 ## Generic Build And Start
@@ -139,3 +145,103 @@ Health check path:
 - A durable production version should move the case-log SQLite database and generated audio to
   persistent managed storage; Hugging Face free-Space disk can be replaced on rebuild.
 - If traffic grows, separate ingestion/vector-store building from the Flask web process.
+
+## Apache / `public_html` hardening
+
+Prefer placing this repository outside `public_html` and proxying only public
+requests to Gunicorn. If shared hosting forces the repository below the webroot,
+keep the included `.htaccess`: it disables directory listings and denies access
+to dotfiles, `.env` variants, Python/configuration files, SQLite data, logs, and
+private source/test directories. Confirm Apache allows `FileInfo`, `AuthConfig`,
+and `Options` overrides; otherwise move the same rules into the virtual-host
+configuration. Test that `/.env`, `/.git/config`, `/config.py`, and
+`/data/case_log.sqlite3` return 403 or 404 before making the site public.
+
+The app sends a restrictive Content Security Policy, anti-framing and MIME
+sniffing protections, a no-referrer policy, HTTPS transport security, and camera/
+microphone permissions limited to the app itself. Search indexing is disabled by
+default through `robots.txt` and `X-Robots-Tag`; enable it only with the server
+variable `SEARCH_ENGINE_INDEXING_ENABLED=true` after a deliberate public-launch
+review. These controls reduce exposure and common browser attacks but do not
+replace provider firewalls, dependency updates, monitoring, or backups.
+
+
+## Persistence and recovery rehearsal (plan ticket 07)
+
+Mount a durable private directory outside Flask static files, for example
+`/data/dakikobo`, and configure these server variables:
+
+```text
+STATE_DB_PATH=/data/dakikobo/runtime_state.sqlite3
+CASE_LOG_DB_PATH=/data/dakikobo/case_log.sqlite3
+FEEDBACK_IMAGE_DIR=/data/dakikobo/feedback_images
+APP_ENV=production
+FLASK_DEBUG=false
+```
+
+Keep `FLASK_SECRET_KEY` stable in the hosting secret manager across restarts and
+restores. Changing it invalidates browser session cookies and can prevent users
+from accessing their existing owned journal. A container filesystem alone does
+not establish durability; verify the provider's actual volume survives rebuilds.
+Audio is a disposable cache. The reviewed corpus can rebuild Chroma separately.
+
+### Consistent backup
+
+1. Choose a restricted backup location outside every served directory. Record the
+   application commit, corpus/policy revision, backup time and retention deadline.
+2. For a consistent journal **and photos** snapshot, pause journal writes on all
+   workers while snapshotting. An ordinary copy of an active SQLite main file can
+   omit committed WAL data. Use SQLite's backup API for each database, or stop all
+   workers before making a complete filesystem snapshot.
+3. With writers paused, use the following Python pattern with explicitly selected
+   source/destination paths. The destination must be a new private file; never
+   point it at the active database. Repeat for the runtime-state database if its
+   contents are needed. Copy the photo directory during the same write pause.
+
+```python
+from pathlib import Path
+import sqlite3
+
+source_path = Path('/data/dakikobo/case_log.sqlite3')
+backup_path = Path('/private-backups/SELECT_NEW_BACKUP_NAME.sqlite3')
+assert source_path.is_file()
+assert not backup_path.exists()
+with sqlite3.connect(source_path.as_uri() + '?mode=ro', uri=True) as source:
+    with sqlite3.connect(backup_path) as destination:
+        source.backup(destination)
+        assert destination.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+```
+
+4. Resume writers and check health. Protect database backups, photo copies and
+   the session secret independently; do not put them in Git or public artifacts.
+   Apply a documented retention/deletion policy to backups as well as live data.
+
+### Restore and rollback
+
+1. Restore to an isolated instance first, with outbound model calls disabled and
+   synthetic or explicitly authorized data. Use the same session secret to test
+   continuity. Keep the original snapshot unchanged for comparison.
+2. Journal photo references currently store filesystem paths. Preserve the same
+   absolute mount path in the isolated container, or perform a separately tested
+   reference migration. Moving photos to a different path alone is insufficient.
+3. Run integrity checks, then verify owner access, denial for a second browser,
+   deletion and expiry through the application. Restoring an older snapshot can
+   resurrect deleted rows: reconcile deletions and retention before reopening.
+4. Before replacing a live instance, pause writers and take a fresh rollback
+   snapshot of databases and photos. If restore verification fails, keep the
+   service closed to writes and return to that exact snapshot and application
+   version. Revalidate cache-policy identity and session access before reopening.
+
+The local synthetic rehearsal is executable with:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_recovery.py
+```
+
+It creates consented text-only cases, starts fresh Python/Flask processes,
+reuses the owner's test cookie, denies another client, backs up through SQLite,
+restores into a separate temporary directory, then verifies deletion and expiry.
+It also checks that the original and backup remain unchanged. No real user data,
+photos, provider calls, live HTTP server, device browser, host reboot or durable
+volume are involved. Photo restore and provider-volume persistence remain release
+checks; this local rehearsal cannot establish them.
