@@ -172,7 +172,7 @@ $(function() {
                 renderSources(bubble, sources);
                 renderAudioReplay(bubble, audioUrl, message);
                 if (question) {
-                    renderFeedback(bubble, question, message, journal);
+                    renderFeedback(bubble, question, message, journal, sources);
                 }
             });
         }
@@ -386,7 +386,10 @@ $(function() {
         );
         renderAudioReplay(bubble, audioUrl, answerText);
         if (question) {
-            renderFeedback(bubble, question, answerText, journal);
+            renderFeedback(bubble, question, answerText, journal,
+                caseData && caseData.sources && caseData.sources.length
+                    ? caseData.sources
+                    : sources);
         }
         $('.chat-messages').append(messageElement);
         $('.chat-messages').scrollTop($('.chat-messages')[0].scrollHeight);
@@ -1582,6 +1585,11 @@ $(function() {
                     $item.append($('<h3></h3>').text(item.question));
                     $item.append($('<p></p>').text('Enregistré le ' + new Date(item.created_at).toLocaleDateString('fr-FR') + '. Conseil historique : vérifiez les conditions actuelles.'));
                     $item.append($('<p class="journal-answer"></p>').text(item.answer));
+                    // Replay the saved source cards (with their declared scope).
+                    // Legacy cases without stored sources simply show none.
+                    if (item.sources && item.sources.length) {
+                        renderSources($item, item.sources);
+                    }
                     if (item.outcome) { $item.append($('<p></p>').text('Suivi enregistré.')); }
                     else {
                         if (item.follow_up_due_at * 1000 <= Date.now()) { $item.append($('<p></p>').text('C’est le moment de noter le résultat.')); }

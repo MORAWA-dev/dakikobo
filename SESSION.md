@@ -1476,3 +1476,65 @@ cd - && git worktree remove "$WT" --force
 - Confirmed the integration stash was removed only after Kimi documented it as redundant.
 - Prepared the current-head live verification record and refreshed committed RAG evaluation evidence.
 - K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
+
+
+### 2026-09-15 — Task A: display source scope and limits (HTML ticket 05)
+
+- Reviewed Markdown ingestion already preserved `scope` in chunk metadata
+  (core/rag_pipeline.py allow-list). The only drop point was core/retrieval.py:
+  the `SourceCard` dataclass, `_source_card_from_doc`, `_as_source_cards` and
+  `as_dict()` never carried `scope`, so it was lost before the response.
+- Added `scope` to `SourceCard` (+`as_dict()` optional-key loop), read it
+  verbatim in `_source_card_from_doc`, and passed it in `_as_source_cards`.
+  Retrieval never infers a scope, zone or approval; absent scope omits the key.
+- Because app.py, core/case.py and the answer cache pass source dicts through
+  opaquely, and the service worker caches the full `/ask` JSON, scope now rides
+  through live answers, the field-case card, the answer cache and offline
+  (saved-case) replay with no further change. Saved-journal replay is handled by
+  the 2026-09-15 review-fix pass below (schema v6 sources column).
+- Frontend: render.js renders a dedicated `.source-scope` line under the French
+  label "Portée et limites", inserted via jQuery `.text()` so HTML-like scope
+  renders literally and cannot execute markup. Added `.source-scope` CSS that
+  wraps and stays readable at 320 px. Extended the credibility modal copy to
+  mention "portée déclarée".
+- Tests: extended tests/test_ingestion.py (scope survives ingestion),
+  tests/test_retrieval.py (`as_dict` keeps scope + omits when absent),
+  tests/test_app_routes.py (scope survives /ask answer construction),
+  tests/test_frontend_assets.py (wiring), and added tests/js/source_scope.test.js
+  (jsdom regressions: scope renders, absent scope omitted, unsafe markup is
+  literal — no injected img/script node).
+- Offline checks: 653 offline Python tests passed (1 PyPDF2 warning); 33
+  JavaScript tests passed; offline fertilizer export unchanged; git diff --check
+  clean. No source promotion, new advice or fertilizer-dose change.
+- Not done: K2 corpus growth and agronomic approval remain pending.
+  Physical-phone, farmer pilot and provider durability stay pending.
+
+### 2026-09-15 — PR #7 review fix: saved-journal scope replay (schema v6)
+
+- Review finding: Task A required scope to survive saving AND reopening a
+  journal case, but the server journal stored only question/answer. Fixed with a
+  backward-compatible migration so saved cases replay their sources.
+- Schema: bumped SCHEMA_VERSION 5 -> 6 with additive `_migrate_to_v6` adding a
+  nullable `sources` TEXT column to feedback_events. Existing rows keep NULL and
+  replay as no sources; the existing v1->current migration test now also asserts
+  a pre-v6 row reads back `sources IS NULL`.
+- Persistence: `record_feedback(..., sources=...)` stores a compact JSON of the
+  answer's source cards via `normalize_sources_json` (verbatim dict/str cards,
+  20k-char cap, rejects non-lists). `save_owned` passes it through. `/feedback`
+  accepts an optional `sources` form field (JSON list, size-checked) and never
+  reconstructs or invents sources.
+- Replay: `list_owned` selects `sources` and decodes it with
+  `decode_sources_json` (NULL/corrupt -> []). The due digest still strips
+  question/answer/sources. Frontend: `renderFeedback` sends the answer's source
+  cards on save; the journal panel calls `renderSources($item, item.sources)`
+  so reopened cases show the source cards, including the French
+  "Portée et limites" line, via .text() (unsafe markup stays literal).
+- Owner isolation, retention/expiry cleanup, deletion, and French UI text are
+  unchanged; sources ride the same owner-scoped rows and are deleted with them.
+- Tests: tests/test_case_log.py (persist+decode, NULL when absent, oversized
+  rejected, corrupt-blob tolerance, pre-v6 legacy row), tests/test_app_routes.py
+  (obtain answer with scope -> save -> reopen via /journal -> scope survives; and
+  a legacy case without sources reopens as []), tests/test_frontend_assets.py
+  (renderFeedback sends sources, journal panel replays them). The JavaScript
+  tests for absent scope and literal unsafe-markup rendering are unchanged.
+- Never reconstructs missing historical sources; legacy cases stay readable.

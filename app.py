@@ -1771,6 +1771,20 @@ def feedback():
             timestamp = None
     except (ValueError, TypeError):
         timestamp = None
+    sources_field = request.form.get("sources", "").strip()
+    saved_sources = None
+    if sources_field:
+        if len(sources_field) > 20000:
+            return jsonify({"error": "Les sources du conseil sont trop volumineuses."}), 400
+        try:
+            parsed_sources = json.loads(sources_field)
+        except ValueError:
+            return jsonify({"error": "Les sources du conseil sont invalides."}), 400
+        if not isinstance(parsed_sources, list):
+            return jsonify({"error": "Les sources du conseil sont invalides."}), 400
+        # Persist the source cards verbatim (including each card's declared
+        # scope). We never reconstruct or invent sources for a saved case.
+        saved_sources = parsed_sources
     try:
         feedback_id = owned_journal.save_owned(
             CASE_LOG_DB, _journal_owner(), FEEDBACK_IMAGES, request_id=request_id,
@@ -1779,6 +1793,7 @@ def feedback():
             place_id=request.form.get("place_id", "")[:80], answer_path=answer_path,
             question_hash_value=question_hash(question), ledger_created_at=timestamp,
             research_consent=request.form.get("research_consent") == "1",
+            sources=saved_sources,
         )
         return jsonify({"ok": True, "feedback_id": feedback_id})
     except ValueError as exc:

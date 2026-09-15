@@ -77,6 +77,7 @@ class _MetadataSourceRagChain:
                         "year": "2026",
                         "country": "Burkina Faso",
                         "review_status": "reviewed_by_codex_pending_human_review",
+                        "scope": "Cadre national d'orientation ; ne pas utiliser pour des doses.",
                         "source_url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
                     },
                     page_content="La FAO signale AGRISurvey, FAOSTAT et CountrySTAT pour le Burkina Faso.",
@@ -1103,9 +1104,82 @@ def test_rag_route_exposes_source_metadata(monkeypatch):
             "year": "2026",
             "country": "Burkina Faso",
             "review_status": "Revu, validation humaine à finaliser",
+            "scope": "Cadre national d'orientation ; ne pas utiliser pour des doses.",
             "url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
         }
     ]
+    # The declared scope must survive answer construction unchanged for the UI
+    # "Portée et limites" line, without inventing zone or approval.
+    assert (
+        payload["sources"][0]["scope"]
+        == "Cadre national d'orientation ; ne pas utiliser pour des doses."
+    )
+
+
+def test_saved_journal_case_replays_source_scope(monkeypatch, tmp_path):
+    """Task A end-to-end: scope survives saving and reopening a journal case.
+
+    Obtain an answer whose source card carries a declared scope, save the case
+    through /feedback (sending the answer's sources), reopen it through /journal,
+    and assert the persisted source card still carries the exact scope. Nothing
+    is reconstructed: only the sources the answer produced are stored.
+    """
+    monkeypatch.setattr(app_module, "FEEDBACK_IMAGES", str(tmp_path / "photos"))
+    client = app_module.app.test_client()
+    _install_rag(monkeypatch, _MetadataSourceRagChain())
+    monkeypatch.setattr(
+        app_module, "text_to_speech_to_static", lambda text: ""
+    )
+
+    answered = client.post(
+        "/ask", data={"messageText": "Quelles données FAO existent ?"}
+    ).get_json()
+    sources = answered["sources"]
+    assert sources[0]["scope"] == (
+        "Cadre national d'orientation ; ne pas utiliser pour des doses."
+    )
+
+    saved = client.post("/feedback", data={
+        "rating": "up",
+        "question": "Quelles données FAO existent ?",
+        "answer": answered["answer"],
+        "consent": "1",
+        "sources": json.dumps(sources),
+    })
+    assert saved.status_code == 200
+    case_id = saved.get_json()["feedback_id"]
+
+    cases = client.get("/journal").get_json()["cases"]
+    replayed = next(case for case in cases if case["feedback_id"] == case_id)
+    assert replayed["sources"], "reopened case lost its sources"
+    assert replayed["sources"][0]["title"] == sources[0]["title"]
+    assert replayed["sources"][0]["scope"] == (
+        "Cadre national d'orientation ; ne pas utiliser pour des doses."
+    )
+
+
+def test_legacy_journal_case_without_sources_still_replays(monkeypatch, tmp_path):
+    """Backward compatibility: a case saved without sources reopens as no sources.
+
+    Old entries (pre-persistence) and rated-but-source-less answers must remain
+    readable; we never fabricate historical source cards for them.
+    """
+    monkeypatch.setattr(app_module, "FEEDBACK_IMAGES", str(tmp_path / "photos"))
+    client = app_module.app.test_client()
+
+    saved = client.post("/feedback", data={
+        "rating": "up",
+        "question": "Ancien conseil",
+        "answer": "Réponse historique.",
+        "consent": "1",
+    })
+    assert saved.status_code == 200
+    case_id = saved.get_json()["feedback_id"]
+
+    cases = client.get("/journal").get_json()["cases"]
+    replayed = next(case for case in cases if case["feedback_id"] == case_id)
+    assert replayed["answer"] == "Réponse historique."
+    assert replayed["sources"] == []
 
 
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
