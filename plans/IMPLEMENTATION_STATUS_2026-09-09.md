@@ -1,5 +1,29 @@
 # Réception initiale du plan — 9 septembre 2026
 
+## Réception actualisée — 15 septembre 2026
+
+Base intégrée : `origin/main` à `e79ebfc3` (PR #5 fusionnée). Le tableau
+ci-dessous remplace les états initiaux pour la décision actuelle. Le plan HTML
+n'est pas entièrement réceptionné ; aucune preuve humaine n'est implicite.
+
+| Ticket | État actuel | Preuve ou action restante |
+|---|---|---|
+| 01 | Réceptionné | Base, intégration et conservation des changements documentées dans SESSION. |
+| 02 | Technique implémentée ; réception partielle | Régressions Vision/RAG présentes ; revue humaine de sécurité avant pilote. |
+| 03 | Technique implémentée ; réception partielle | Identité de sécurité et invalidation testées ; migration sur téléphone physique à vérifier. |
+| 04 | Technique implémentée et testée | Refus sans génération et erreurs fournisseur couverts par les tests de routes. |
+| 05 | Partiel | Matrice et annexes prêtes ; approbation agronomique, promotion et mesure de couverture requises. |
+| 06 | Technique implémentée et testée | Limites multipart, nettoyage audio, concurrence et reprise texte couverts. |
+| 07 | Partiel | Restauration isolée et redémarrage HTTP local testés ; volume durable, secret stable et redémarrage/rebuild de la cible à démontrer. Rapport : `reports/operational_readiness_2026-09-15.md`. |
+| 08 | Partiel | Accessibilité locale et refus microphone testables ; cinq parcours sur vrais téléphones avec participants requis. |
+| 09 | Préparation implémentée ; réception ouverte | Registres et modèle de décision prêts ; jugement expert et résultats humains absents. |
+| 10 | Différé conditionnel | Ne commencer qu'après confirmation du besoin par le pilote. |
+
+Documents de travail : `evaluation/RELEASE_DECISION_TEMPLATE.md`,
+`evaluation/PILOT_REHEARSAL_CHECKLIST_2026-09-12.md`,
+`Data/reviews/AGRONOMIST_REVIEW_PACKET_2026-09-12.md` et `DEPLOYMENT.md`.
+La décision de livraison terrain reste REPORTÉE.
+
 ## Ticket 01 : base identifiée
 
 Le checkout local reste sur `main`, commit `17e11922`. Après récupération des
@@ -164,6 +188,9 @@ La livraison reste soumise aux preuves du plan, notamment revue humaine et pilot
 - Vérification complète : 641 tests Python hors RAG réel et 27 tests JavaScript
   réussis ; un avertissement PyPDF2. Compilation des scripts navigateur et contrôle
   des différences réussis.
+- Complément microphone : un refus navigateur conserve la question saisie,
+  réactive le clavier et propose explicitement de taper la question. Les chemins
+  MediaRecorder et reconnaissance vocale partagent ce message de reprise.
 
 ## Lot suivant — portes d'évaluation du ticket 09 (12 septembre 2026)
 
@@ -181,3 +208,5 @@ La livraison reste soumise aux preuves du plan, notamment revue humaine et pilot
 - Vérification complète : 647 tests Python hors RAG réel et 29 tests JavaScript
   réussis ; un avertissement PyPDF2. Compilation du script et contrôle des
   différences réussis.
+- Après le complément microphone : 647 tests Python hors RAG réel et 30 tests
+  JavaScript réussis ; contrôle des différences réussi.

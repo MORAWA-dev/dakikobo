@@ -457,6 +457,10 @@ hand-written rather than pasted.*
   restoration, and focus styling for links and text areas. Verified through the
   rendered accessibility tree and keyboard interaction at 320 px. Physical-phone,
   screen-reader and participant acceptance remain open.
+- [x] **Plan ticket 08 — microphone-denial regression:** a browser permission
+  rejection preserves the existing typed question, leaves manual input enabled
+  and gives an explicit French keyboard fallback alongside permission guidance.
+  Physical-device permission UI remains open.
 - [x] **Plan ticket 09 — evaluation-gate preparation:** development and held-out
   scorecards can be generated separately. Added strict claim-level and anonymous
   participant/task ledgers with explicit 90% and 80% denominators, completeness

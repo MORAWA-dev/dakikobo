@@ -7,6 +7,98 @@ import subprocess
 import sys
 
 
+_HTTP_SERVER = r'''
+from pathlib import Path
+import sys
+import app
+from werkzeug.serving import make_server
+# Synthetic loopback rehearsal only: HTTP cannot exercise a Secure cookie.
+app.app.config['SESSION_COOKIE_SECURE'] = False
+server = make_server('127.0.0.1', 0, app.app)
+Path(sys.argv[1]).write_text(str(server.server_port))
+server.serve_forever()
+'''
+
+
+def test_http_restart_and_restore_preserve_owner_cookie(tmp_path):
+    """Exercise real requests and cookie continuity across isolated server restarts."""
+    from contextlib import contextmanager
+    import time
+    import requests
+
+    root = Path(__file__).resolve().parents[1]
+
+    @contextmanager
+    def server(directory, run_name):
+        directory.mkdir(exist_ok=True)
+        ready = tmp_path / (run_name + '.port')
+        env = dict(os.environ, APP_ENV='production', FLASK_DEBUG='false',
+                   FLASK_SECRET_KEY='synthetic-loopback-recovery-secret',
+                   RAG_WARMUP_ON_START='false', GROQ_API_KEY='', GEMINI_API_KEY='',
+                   FIRECRAWL_API_KEY='', STATE_DB_PATH=str(directory / 'state.sqlite3'),
+                   CASE_LOG_DB_PATH=str(directory / 'journal.sqlite3'),
+                   FEEDBACK_IMAGE_DIR=str(directory / 'photos'))
+        with (tmp_path / (run_name + '.log')).open('w+') as log:
+            process = subprocess.Popen([sys.executable, '-c', _HTTP_SERVER, str(ready)],
+                                       cwd=root, env=env, stdout=log, stderr=log)
+            try:
+                deadline = time.monotonic() + 35
+                while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                if not ready.exists():
+                    log.seek(0)
+                    raise AssertionError('Loopback server did not start: ' + log.read())
+                yield 'http://127.0.0.1:' + ready.read_text().strip()
+            finally:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+
+    owner = requests.Session()
+    original = tmp_path / 'original-http'
+    with server(original, 'initial') as url:
+        saved = owner.post(url + '/feedback', data={
+            'rating': 'up', 'question': 'Exercice HTTP synthétique',
+            'answer': 'Sans valeur agronomique.', 'consent': '1'
+        }, timeout=10)
+        assert saved.status_code == 200
+        case_id = saved.json()['feedback_id']
+        expected = owner.get(url + '/journal', timeout=10).json()['cases']
+        assert len(expected) == 1
+        assert owner.cookies.get('session')
+
+    with server(original, 'restarted') as url:
+        response = owner.get(url + '/journal', timeout=10)
+        assert response.status_code == 200
+        assert response.headers['Cache-Control'] == 'no-store'
+        assert response.json()['cases'] == expected
+        assert requests.get(url + '/journal', timeout=10).json()['cases'] == []
+
+    # Writers are stopped before the consistent snapshot is taken.
+    restored = tmp_path / 'restored-http'
+    restored.mkdir()
+    with sqlite3.connect(original / 'journal.sqlite3') as source:
+        with sqlite3.connect(restored / 'journal.sqlite3') as destination:
+            source.backup(destination)
+            assert destination.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+    with server(restored, 'restored') as url:
+        assert owner.get(url + '/journal', timeout=10).json()['cases'] == expected
+        denied = requests.delete(url + '/journal/' + str(case_id), timeout=10)
+        assert denied.status_code == 200
+        assert denied.json()['deleted'] == 0
+        assert owner.get(url + '/journal', timeout=10).json()['cases'] == expected
+        deleted = owner.delete(url + '/journal/' + str(case_id), timeout=10)
+        assert deleted.status_code == 200
+        assert deleted.json()['deleted'] == 1
+        assert owner.get(url + '/journal', timeout=10).json()['cases'] == []
+    with sqlite3.connect(original / 'journal.sqlite3') as source:
+        assert source.execute('SELECT count(*) FROM feedback_events').fetchone()[0] == 1
+    owner.close()
+
+
 # Each invocation imports Flask afresh; no developer journal or provider is used.
 _PROCESS = r'''
 import json, sys

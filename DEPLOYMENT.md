@@ -238,10 +238,15 @@ The local synthetic rehearsal is executable with:
 .venv/bin/python -m pytest -q tests/test_recovery.py
 ```
 
-It creates consented text-only cases, starts fresh Python/Flask processes,
+It creates consented synthetic cases, starts fresh Python/Flask processes,
 reuses the owner's test cookie, denies another client, backs up through SQLite,
 restores into a separate temporary directory, then verifies deletion and expiry.
-It also checks that the original and backup remain unchanged. No real user data,
-photos, provider calls, live HTTP server, device browser, host reboot or durable
-volume are involved. Photo restore and provider-volume persistence remain release
-checks; this local rehearsal cannot establish them.
+A separate snapshot test restores synthetic photos at their original isolated
+path. The HTTP rehearsal uses a real loopback Werkzeug server, preserves the
+HTTP client's cookie through a restart and restore, and verifies that another
+client cannot delete the owner's case. Secure cookies are disabled only inside
+that loopback test server because it uses HTTP rather than TLS.
+The original journal and snapshots remain unchanged. No real user data, provider
+calls, device browser, host reboot or durable provider volume are involved.
+Provider-volume persistence remains a release check; this local rehearsal cannot
+establish it. See `reports/operational_readiness_2026-09-15.md` for remaining gates.
