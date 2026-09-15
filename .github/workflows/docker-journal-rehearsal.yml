@@ -1,0 +1,40 @@
+name: Docker journal continuity rehearsal
+
+# Bounded, synthetic rehearsal proving a private journal saved into a local
+# bind-mounted directory survives a container replacement (stop + remove, then
+# a fresh container from the same image, secret, and mount). This is LOCAL
+# BIND-MOUNT PERSISTENCE evidence only. It is NOT hosting-provider disk
+# durability, host-rebuild, or physical-browser/participant evidence.
+#
+# The image runs with APP_ENV=production (production Secure cookie kept intact);
+# a test-only cookie-aware harness carries the owner cookie over HTTP. No model
+# or external provider is called; one explicitly consented synthetic case is
+# saved. Containers and temp data are always cleaned up.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  journal-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build image
+        run: docker build --pull -t dakikobo:journal-rehearsal .
+
+      - name: Run Docker journal continuity rehearsal
+        env:
+          DAKIKOBO_IMAGE: dakikobo:journal-rehearsal
+        run: python tests/docker_journal_rehearsal.py --image dakikobo:journal-rehearsal
