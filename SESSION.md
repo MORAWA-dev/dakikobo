@@ -1476,3 +1476,44 @@ cd - && git worktree remove "$WT" --force
 - Confirmed the integration stash was removed only after Kimi documented it as redundant.
 - Prepared the current-head live verification record and refreshed committed RAG evaluation evidence.
 - K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
+
+
+### 2026-09-15 — Task C: Docker container replacement and journal continuity (HTML ticket 07)
+
+- Added tests/docker_journal_rehearsal.py: a bounded, synthetic rehearsal that
+  runs the production image on an isolated temporary host directory mounted at
+  /data/dakikobo, with STATE_DB_PATH, CASE_LOG_DB_PATH and FEEDBACK_IMAGE_DIR
+  set into that mount. It uses APP_ENV=production (production Secure cookie kept
+  intact), a stable test-only secret, RAG_WARMUP_ON_START=false and empty
+  provider keys, so no model or provider is called.
+- Production Secure cookies are handled without weakening production: a
+  test-only cookie-aware harness (SecureCookieClient) captures the owner cookie
+  from Set-Cookie and re-sends it over HTTP, exactly as a browser over TLS
+  would. The server keeps setting Secure cookies.
+- Flow: save one explicitly consented synthetic case in the first container,
+  keep the owner cookie, stop+remove the container, start a replacement from the
+  same image/secret/mount, and verify: owner's case survived; a second client
+  sees no case; a non-owner delete returns deleted:0 and leaves the case intact;
+  the owner delete returns deleted:1 and removes it. Negative control: a fresh
+  empty mount contains no case.
+- Every container/HTTP step has a timeout; containers run with --rm and are
+  force-removed in a finally block, so cleanup happens on success and failure.
+  The bind mount is a throwaway temp dir (chmod 0777 so the uid-1000 container
+  user can write the SQLite journal) removed at the end. The printed summary is
+  booleans only; no cookie, secret, or database content is emitted.
+- Added .github/workflows/docker-journal-rehearsal.yml (build image, run the
+  rehearsal). Documented the local-bind-mount-vs-provider-durability
+  distinction in DEPLOYMENT.md. The runner skips cleanly (exit 0) with
+  --skip-if-no-docker when Docker is unavailable.
+- Local verification: built the production image; rehearsal passed all seven
+  assertions (owner survival, other-client exclusion, non-owner delete no-op,
+  case intact, owner delete, case removed, fresh-mount empty); no lingering
+  containers afterwards. `python -m pytest -q tests/test_recovery.py` → 3
+  passed. Offline checks: 652 offline Python tests passed (1 PyPDF2 warning),
+  30 JavaScript tests passed, offline fertilizer export unchanged, git
+  diff --check clean.
+- Limitation: this is local bind-mount persistence evidence only. It is NOT
+  hosting-provider disk durability, host-rebuild/volume-migration recovery, or
+  physical-browser/participant validation, which remain explicitly pending. No
+  deployment, no production infrastructure change, no storage purchased, and no
+  live-service restart.
