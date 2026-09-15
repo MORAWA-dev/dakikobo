@@ -1459,6 +1459,13 @@ cd - && git worktree remove "$WT" --force
   session's in-flight SESSION.md edits into these commits.
 ## 2026-09-12 — PR #5 Kimi continuation
 
+### 2026-09-15 — Suite du plan HTML après fusion
+
+- Nouvelle branche `codex/html-plan-remaining-work` basée sur `origin/main` à `e79ebfc3`, sans perte des changements locaux.
+- Finalisation du message de reprise après refus microphone et de sa régression jsdom.
+- Tableau de réception daté ajouté au rapport du plan ; modèle de décision de livraison préparé.
+- Revue agronomique, volume durable de la cible, téléphone physique et pilote restent ouverts ; ticket 10 reste conditionnel.
+
 - Continued Kimi's interrupted PR #5 correction pass after its provider quota ended.
 - Preserved unrelated local microphone/accessibility work without staging it.
 - Confirmed the integration stash was removed only after Kimi documented it as redundant.

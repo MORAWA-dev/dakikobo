@@ -14,10 +14,13 @@ vrais téléphones, VoiceOver/TalkBack ou des participants.
   boutons en boucle, Échap ferme la fenêtre et rend le focus au bouton d'ouverture.
 - Les sélecteurs « Sol + engrais » annoncent séparément culture et lieu.
 - À 320 × 900 pixels, la largeur du document ne dépasse pas celle de la fenêtre.
+- Un refus de permission microphone conserve la question déjà tapée, réactive la
+  saisie et indique explicitement que l'utilisateur peut continuer au clavier.
 
 ## Limites restantes
 
 - Pas de lecteur d'écran système ni de téléphone physique dans ce contrôle.
-- Pas de permission microphone ou caméra.
+- Le refus microphone est simulé à la frontière navigateur ; le panneau de
+  permission d'un téléphone physique reste à vérifier, ainsi que la caméra.
 - Pas d'évaluation humaine de l'ordre de lecture, de la compréhension des noms
   ou de la facilité d'utilisation.

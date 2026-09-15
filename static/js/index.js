@@ -637,7 +637,7 @@ $(function() {
 
     function speechErrorMessage(errorCode) {
         if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
-            return "Le micro est bloqué. Autorisez le micro dans le navigateur, puis réessayez.";
+            return "Le micro est bloqué. Vous pouvez taper votre question, ou autoriser le micro dans le navigateur puis réessayer.";
         }
         if (errorCode === 'audio-capture') {
             return "Aucun micro n'a été détecté. Vérifiez le micro, puis réessayez.";
@@ -805,7 +805,7 @@ $(function() {
             console.error('getUserMedia failed:', err);
             var name = err && err.name ? err.name : '';
             if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-                showVoiceFailure("Le micro est bloqué. Autorisez le micro dans le navigateur, puis réessayez.");
+                showVoiceFailure("Le micro est bloqué. Vous pouvez taper votre question, ou autoriser le micro dans le navigateur puis réessayer.");
             } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
                 showVoiceFailure("Aucun micro n'a été détecté. Vérifiez le micro, puis réessayez.");
             } else {
