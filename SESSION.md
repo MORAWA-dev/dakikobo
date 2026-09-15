@@ -1476,3 +1476,47 @@ cd - && git worktree remove "$WT" --force
 - Confirmed the integration stash was removed only after Kimi documented it as redundant.
 - Prepared the current-head live verification record and refreshed committed RAG evaluation evidence.
 - K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
+
+
+### 2026-09-15 — Task B: automate headless-browser rehearsal in CI (HTML ticket 08)
+
+- Made tests/browser_replay_check.py a self-contained, reproducible runner: it
+  starts tests/browser_fixture_app.py itself, waits for readiness with a hard
+  deadline, runs the checks at 320 px and 1280 px, and always tears the fixture
+  process down (terminate then kill) even on assertion/startup/timeout failure.
+  Any failure exits non-zero. Added --port/--startup-timeout/--widths flags.
+- Checks covered: keyboard navigation (skip link -> main landmark), modal focus
+  containment + Escape restoration for both the credibility and journal dialogs,
+  no horizontal overflow at each width, and audio-failure recovery (undecodable
+  audio keeps the French text answer and shows the "indisponible" status).
+- Fixed a stale assertion: the credibility dialog now contains a second
+  focusable control (privacy link), so the trap cycles focus between controls.
+  The check now asserts focus stays *contained* in the dialog while tabbing
+  rather than pinned on one element.
+- Audio recovery is made deterministic across media stacks: full Chromium fires
+  the media 'error' from the undecodable payload; a headless build without a
+  media pipeline may not, so a context init script captures the Audio elements
+  the app creates and the runner emits the same 'error' event the browser would,
+  which drives the app's real onFailure handler. The fixture serves a synthetic
+  /broken-audio.mp3 (undecodable, no provider) and a /healthz readiness probe.
+- Declared a pinned test-only dependency in requirements-browser.txt
+  (playwright==1.55.0), kept OUT of the production requirements.txt. Added
+  .github/workflows/browser-rehearsal.yml: installs requirements +
+  requirements-browser, `playwright install --with-deps chromium`, runs the
+  rehearsal at 320/1280, then two non-fatal verification steps that prove the
+  rehearsal detects (a) an injected failed assertion and (b) a fixture-startup
+  failure, and uploads screenshots/results.json/fixture.log as CI artifacts on
+  every run. Generated screenshots and results.json are now git-ignored and were
+  untracked; the dated accessibility markdown report stays committed.
+- The deliberate-failure hook (BROWSER_REPLAY_INJECT_FAILURE) is opt-in and off
+  by default; it is exercised only by the CI failure-detection step, never left
+  enabled in the committed default run.
+- Local verification (headless-shell sandbox): rehearsal passed 320/1280 on
+  three consecutive runs (deterministic); injected-assertion run exited 1;
+  short-deadline startup run exited 1; no orphan fixture processes remained.
+  Offline checks: 652 offline Python tests passed (1 PyPDF2 warning), 30
+  JavaScript tests passed, offline fertilizer export unchanged, git diff --check
+  clean.
+- Results are headless-browser evidence only. Physical-phone testing, system
+  screen readers, real permission dialogs, and farmer/participant usability
+  remain human/device acceptance work and stay explicitly pending.

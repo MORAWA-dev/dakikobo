@@ -1,0 +1,79 @@
+name: Headless browser rehearsal
+
+# Automated headless-browser (Chromium) rehearsal of the DakiKobo frontend at
+# 320 px and 1280 px against an isolated synthetic fixture that never calls a
+# model or external provider. This is headless-browser evidence only; it is NOT
+# physical-phone testing and NOT participant/farmer usability validation.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # No provider credentials or model calls: the fixture is fully synthetic.
+      GROQ_API_KEY: ci-placeholder
+      RAG_WARMUP_ON_START: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install app and test-only browser dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-browser.txt
+
+      - name: Install Chromium for Playwright
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run headless-browser rehearsal (320 px and 1280 px)
+        run: python tests/browser_replay_check.py --widths 320,1280
+
+      - name: Verify the rehearsal detects a failed assertion
+        run: |
+          set +e
+          BROWSER_REPLAY_INJECT_FAILURE=1 python tests/browser_replay_check.py --widths 320
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the injected failure to fail the rehearsal, but it passed." >&2
+            exit 1
+          fi
+          echo "Assertion-failure detection confirmed (exit $status)."
+
+      - name: Verify the rehearsal detects a fixture-startup failure
+        run: |
+          set +e
+          # An impossibly short startup deadline forces a startup/timeout failure.
+          python tests/browser_replay_check.py --widths 320 --startup-timeout 0.001
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Expected a fixture-startup failure, but the rehearsal passed." >&2
+            exit 1
+          fi
+          echo "Fixture-startup-failure detection confirmed (exit $status)."
+
+      - name: Upload rehearsal artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-rehearsal-artifacts
+          path: |
+            reports/browser_replay_check/*.png
+            reports/browser_replay_check/results.json
+            reports/browser_replay_check/fixture.log
+          if-no-files-found: warn
