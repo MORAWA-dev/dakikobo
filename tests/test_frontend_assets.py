@@ -33,12 +33,15 @@ def test_source_cards_render_review_metadata():
     js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 
-    assert "éditeur, année et statut de revue" in html
+    assert "éditeur, année, statut de revue et portée" in html
     assert "function sourceMetaItems" in js
     assert "src.publisher" in js
     assert "src.review_status" in js
+    assert "src.scope" in js
+    assert "Portée et limites" in js
     assert "function safeSourceUrl" in js
     assert ".source-meta" in css
+    assert ".source-scope" in css
     assert ".source-title-link" in css
 
 

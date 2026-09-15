@@ -1476,3 +1476,36 @@ cd - && git worktree remove "$WT" --force
 - Confirmed the integration stash was removed only after Kimi documented it as redundant.
 - Prepared the current-head live verification record and refreshed committed RAG evaluation evidence.
 - K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
+
+
+### 2026-09-15 — Task A: display source scope and limits (HTML ticket 05)
+
+- Reviewed Markdown ingestion already preserved `scope` in chunk metadata
+  (core/rag_pipeline.py allow-list). The only drop point was core/retrieval.py:
+  the `SourceCard` dataclass, `_source_card_from_doc`, `_as_source_cards` and
+  `as_dict()` never carried `scope`, so it was lost before the response.
+- Added `scope` to `SourceCard` (+`as_dict()` optional-key loop), read it
+  verbatim in `_source_card_from_doc`, and passed it in `_as_source_cards`.
+  Retrieval never infers a scope, zone or approval; absent scope omits the key.
+- Because app.py, core/case.py and the answer cache pass source dicts through
+  opaquely, and the service worker caches the full `/ask` JSON, scope now rides
+  through live answers, the field-case card, the answer cache and offline
+  (saved-case) replay with no further change. The server journal still stores
+  only question/answer (no sources), so old saved journal cases are unaffected.
+- Frontend: render.js renders a dedicated `.source-scope` line under the French
+  label "Portée et limites", inserted via jQuery `.text()` so HTML-like scope
+  renders literally and cannot execute markup. Added `.source-scope` CSS that
+  wraps and stays readable at 320 px. Extended the credibility modal copy to
+  mention "portée déclarée".
+- Tests: extended tests/test_ingestion.py (scope survives ingestion),
+  tests/test_retrieval.py (`as_dict` keeps scope + omits when absent),
+  tests/test_app_routes.py (scope survives /ask answer construction),
+  tests/test_frontend_assets.py (wiring), and added tests/js/source_scope.test.js
+  (jsdom regressions: scope renders, absent scope omitted, unsafe markup is
+  literal — no injected img/script node).
+- Offline checks: 653 offline Python tests passed (1 PyPDF2 warning); 33
+  JavaScript tests passed; offline fertilizer export unchanged; git diff --check
+  clean. No source promotion, new advice or fertilizer-dose change.
+- Not done: K2 corpus growth and agronomic approval remain pending; carrying
+  scope onto server-journal replay would need a new schema migration (out of
+  scope). Physical-phone, farmer pilot and provider durability stay pending.

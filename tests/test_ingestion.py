@@ -83,6 +83,7 @@ country: "Burkina Faso"
 publisher: "Source officielle"
 license: "unknown"
 review_status: "reviewed_by_owner"
+scope: "Cadre d'orientation ; ne pas utiliser pour des doses précises."
 scraped_at: "2026-07-02T10:00:00+00:00"
 reviewed_at: "2026-07-02T11:00:00+00:00"
 topics: "semis, pluie"
@@ -105,6 +106,10 @@ Contenu agricole vérifié.
     assert metadata["doc_type"] == "scraped_web"
     assert metadata["review_status"] == "reviewed_by_owner"
     assert metadata["license"] == "unknown"
+    assert (
+        metadata["scope"]
+        == "Cadre d'orientation ; ne pas utiliser pour des doses précises."
+    )
     assert metadata["topics"] == "semis, pluie"
     assert metadata["crops"] == "mil, sorgho"
 

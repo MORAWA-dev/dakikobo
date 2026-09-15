@@ -186,6 +186,12 @@
                 if (snippet && snippet.length <= 160) {
                     $card.append($('<p class="source-snippet"></p>').text(snippet));
                 }
+                if (src.scope) {
+                    var $scope = $('<p class="source-scope"></p>');
+                    $scope.append($('<strong></strong>').text('Portée et limites : '));
+                    $scope.append($('<span></span>').text(src.scope));
+                    $card.append($scope);
+                }
                 $box.append($card);
             });
             bubble.append($box);

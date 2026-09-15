@@ -77,6 +77,7 @@ class _MetadataSourceRagChain:
                         "year": "2026",
                         "country": "Burkina Faso",
                         "review_status": "reviewed_by_codex_pending_human_review",
+                        "scope": "Cadre national d'orientation ; ne pas utiliser pour des doses.",
                         "source_url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
                     },
                     page_content="La FAO signale AGRISurvey, FAOSTAT et CountrySTAT pour le Burkina Faso.",
@@ -1103,9 +1104,16 @@ def test_rag_route_exposes_source_metadata(monkeypatch):
             "year": "2026",
             "country": "Burkina Faso",
             "review_status": "Revu, validation humaine à finaliser",
+            "scope": "Cadre national d'orientation ; ne pas utiliser pour des doses.",
             "url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
         }
     ]
+    # The declared scope must survive answer construction unchanged for the UI
+    # "Portée et limites" line, without inventing zone or approval.
+    assert (
+        payload["sources"][0]["scope"]
+        == "Cadre national d'orientation ; ne pas utiliser pour des doses."
+    )
 
 
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
