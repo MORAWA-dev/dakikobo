@@ -1520,3 +1520,43 @@ cd - && git worktree remove "$WT" --force
 - Results are headless-browser evidence only. Physical-phone testing, system
   screen readers, real permission dialogs, and farmer/participant usability
   remain human/device acceptance work and stay explicitly pending.
+
+
+### 2026-09-15 — PR #8 review fix: capture real browser failure evidence
+
+- Review findings addressed in tests/browser_replay_check.py and its workflow:
+  - Per-invocation artifact directory: artifacts now live under
+    reports/browser_replay_check/<run-id>/ (--run-id / BROWSER_REPLAY_RUN_ID;
+    default timestamp+pid). The normal, injected-failure, and startup-failure
+    CI runs each use a distinct run id, so failure-detection runs can no longer
+    overwrite or reuse the normal run's evidence.
+  - On any assertion/exception, `_capture_failure` writes failure-<width>.png
+    and a structured error.json (error type, message, full traceback,
+    screenshot name, partial results) BEFORE the browser context is closed;
+    the error is then re-raised. A passing run still writes replay-<width>.png
+    and results.json.
+  - results.json now records `audio_failure_mode`: "native" when full Chromium
+    raised the media error itself, or "synthetic-error-event" when the runner
+    emitted the media 'error' on the app's Audio element for a headless build
+    without a media pipeline. Both drive the app's real onFailure handler.
+  - The CI workflow gives each step a distinct --run-id, asserts the
+    injected-failure run left error.json + failure-320.png, and uploads the
+    whole reports/browser_replay_check/** tree with if: always() so failure
+    artifacts are uploaded even when a step exits non-zero.
+  - Fixture, context, and browser cleanup remain reliable (context.close in
+    finally per width; fixture terminate/kill in finally; browser.close in
+    finally).
+- Tests: tests/test_browser_replay_check.py — a browser-free unit test proving
+  `_capture_failure` writes the screenshot + error.json (with traceback), and a
+  Chromium-gated end-to-end test that runs the rehearsal with an injected early
+  failure and asserts exit 1 plus error.json + failure-320.png. The e2e test
+  skips when Chromium is not installed (e.g. the offline regression job) and
+  runs in the browser-rehearsal job.
+- Local verification (Chromium headless-shell): normal run passed 320/1280 with
+  audio_failure_mode recorded; injected-failure run exited 1 and produced
+  error.json + failure-320.png in its own dir; startup-failure run exited 1 in
+  its own dir; no cross-run overwrite; run dirs are git-ignored. Offline checks:
+  654 offline Python tests passed (1 PyPDF2 warning), 30 JavaScript tests
+  passed, offline fertilizer export unchanged, git diff --check clean.
+- Still headless-browser evidence only. Physical-phone testing, farmer pilot,
+  expert approval, and hosting-provider durability remain pending.

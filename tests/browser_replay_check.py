@@ -13,9 +13,14 @@ or an external provider:
 The runner owns the whole lifecycle: it starts ``tests/browser_fixture_app.py``,
 waits for readiness with a hard deadline, runs the checks, and always tears the
 fixture process down, even when an assertion, startup, or timeout fails. Any
-failure exits non-zero so CI fails. Screenshots and a results.json are written
-under ``reports/browser_replay_check`` for CI failure artifacts; they are not
-committed.
+failure exits non-zero so CI fails.
+
+Artifacts (screenshots, ``results.json``, ``error.json``, ``fixture.log``) are
+written under ``reports/browser_replay_check/<run-id>/``. Each invocation gets
+its own run directory so the deliberate failure-detection runs never overwrite
+or reuse a normal run's evidence. When an assertion fails, a screenshot and a
+structured ``error.json`` are captured BEFORE the browser context is closed, so
+the failing state is preserved. Artifacts are not committed.
 
 Usage (from a fresh checkout, browser deps installed separately):
 
@@ -26,10 +31,12 @@ Optional flags / env:
   --port N                 fixture port (default 5097; 0 lets the OS choose)
   --startup-timeout S      seconds to wait for fixture readiness (default 30)
   --widths 320,1280        comma-separated viewport widths
+  --run-id NAME            artifact subdirectory name (default: timestamped)
+  BROWSER_REPLAY_RUN_ID    same as --run-id (env form, for CI steps)
   BROWSER_REPLAY_INJECT_FAILURE=1
                            inject a deliberate false assertion to prove the
-                           rehearsal detects failures (used only in CI's
-                           failure-detection step; never left enabled).
+                           rehearsal detects failures and captures evidence
+                           (used only in CI's failure-detection step).
 """
 
 import argparse
@@ -39,6 +46,7 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 from contextlib import closing, contextmanager
 from pathlib import Path
 
@@ -48,9 +56,24 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "browser_fixture_app.py"
-OUTPUT = ROOT / "reports" / "browser_replay_check"
+ARTIFACT_ROOT = ROOT / "reports" / "browser_replay_check"
 
 INJECT_FAILURE = os.environ.get("BROWSER_REPLAY_INJECT_FAILURE") == "1"
+
+# The Audio-capture init script lets the audio-failure check drive a real media
+# 'error' deterministically even on a headless build with no media pipeline.
+_AUDIO_CAPTURE_SCRIPT = (
+    "(function () {"
+    "  var Original = window.Audio;"
+    "  window.__dakikoboAudios = [];"
+    "  window.Audio = function (src) {"
+    "    var element = new Original(src);"
+    "    window.__dakikoboAudios.push(element);"
+    "    return element;"
+    "  };"
+    "  window.Audio.prototype = Original.prototype;"
+    "})();"
+)
 
 
 def _free_port() -> int:
@@ -59,15 +82,23 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def default_run_id() -> str:
+    """A unique-per-invocation artifact directory name."""
+    explicit = os.environ.get("BROWSER_REPLAY_RUN_ID", "").strip()
+    if explicit:
+        return explicit
+    return f"run-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
+
+
 @contextmanager
-def fixture_server(port: int, startup_timeout: float):
+def fixture_server(port: int, startup_timeout: float, artifact_dir: Path):
     """Start the synthetic fixture app and guarantee teardown.
 
-    Raises TimeoutError if the app does not answer /healthz before the
-    deadline. The process is always terminated (then killed) on exit.
+    Raises TimeoutError if the app does not answer before the deadline. The
+    process is always terminated (then killed) on exit.
     """
-    log_path = OUTPUT / "fixture.log"
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    log_path = artifact_dir / "fixture.log"
     env = dict(os.environ, BROWSER_FIXTURE_PORT=str(port))
     with log_path.open("w+", encoding="utf-8") as log:
         process = subprocess.Popen(
@@ -78,7 +109,6 @@ def fixture_server(port: int, startup_timeout: float):
             stderr=log,
         )
         try:
-            base_url = f"http://127.0.0.1:{port}"
             deadline = time.monotonic() + startup_timeout
             while time.monotonic() < deadline:
                 if process.poll() is not None:
@@ -97,7 +127,7 @@ def fixture_server(port: int, startup_timeout: float):
                     f"Fixture did not become ready within {startup_timeout}s:\n"
                     + log.read()
                 )
-            yield base_url
+            yield f"http://127.0.0.1:{port}"
         finally:
             process.terminate()
             try:
@@ -108,13 +138,7 @@ def fixture_server(port: int, startup_timeout: float):
 
 
 def _open_dialog_via_keyboard(page, toggle: str, close: str) -> None:
-    """Activate a dialog opener from the keyboard and confirm focus moved in.
-
-    Enter on a focused button dispatches the same click handler that opens the
-    dialog. In headless Chromium the tab occasionally needs re-activation before
-    the synthesized key lands, so this retries the keyboard activation a few
-    times before asserting, rather than racing the dialog's own focus() call.
-    """
+    """Activate a dialog opener from the keyboard and confirm focus moved in."""
     for _ in range(5):
         page.bring_to_front()
         page.locator(toggle).focus()
@@ -123,9 +147,7 @@ def _open_dialog_via_keyboard(page, toggle: str, close: str) -> None:
             expect(page.locator(close)).to_be_focused(timeout=2000)
             return
         except (AssertionError, PlaywrightError):
-            # Close it if it opened but focus did not settle, then retry.
             page.keyboard.press("Escape")
-    # Final attempt surfaces the real assertion error to the caller.
     page.bring_to_front()
     page.locator(toggle).focus()
     page.keyboard.press("Enter")
@@ -133,13 +155,7 @@ def _open_dialog_via_keyboard(page, toggle: str, close: str) -> None:
 
 
 def _assert_focus_trapped(page, dialog_selector: str, tabs: int = 4) -> None:
-    """Tab several times and confirm focus never escapes the open dialog.
-
-    The credibility dialog contains more than one focusable control (close
-    button + privacy link), so the trap cycles focus between them rather than
-    pinning it on a single element. Containment is the real accessibility
-    contract, so we assert focus stays inside the dialog across Tabs.
-    """
+    """Tab several times and confirm focus never escapes the open dialog."""
     for _ in range(tabs):
         page.keyboard.press("Tab")
         inside = page.evaluate(
@@ -150,11 +166,16 @@ def _assert_focus_trapped(page, dialog_selector: str, tabs: int = 4) -> None:
 
 
 def _run_width(page, width: int) -> dict:
-    """Run every acceptance check at one viewport width."""
+    """Run every acceptance check at one viewport width.
+
+    Returns a result dict including how the audio failure was produced:
+    ``audio_failure_mode`` is ``"native"`` when the browser raised the media
+    error on its own, or ``"synthetic-error-event"`` when this runner emitted
+    the media 'error' the browser would (headless build without a media
+    pipeline). Both paths drive the app's genuine recovery handler.
+    """
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    # Bring the tab to the foreground so :focus assertions are reliable in
-    # headless Chromium.
     page.bring_to_front()
 
     # Keyboard navigation: skip link -> main landmark.
@@ -163,8 +184,7 @@ def _run_width(page, width: int) -> dict:
     page.keyboard.press("Enter")
     expect(page.locator("#mainContent")).to_be_focused()
 
-    # Credibility modal: open, focus lands on close, focus stays trapped inside
-    # while tabbing, and Escape restores focus to the opener.
+    # Credibility modal: open, focus lands on close, stays trapped, Escape restores.
     _open_dialog_via_keyboard(page, "#credibilityToggle", "#credibilityClose")
     _assert_focus_trapped(page, "#credibilityModal")
     page.keyboard.press("Escape")
@@ -177,20 +197,14 @@ def _run_width(page, width: int) -> dict:
     expect(page.locator("#journalToggle")).to_be_focused()
 
     # Audio-failure recovery: expired/missing audio must not lose the answer.
-    # Full Chromium raises the media 'error' from the undecodable payload on its
-    # own; the headless *shell* available in some environments has no media
-    # pipeline and may not, so if the recovery message has not appeared shortly
-    # we emit the same 'error' on the element the app created (captured by the
-    # context init script). Either way the app's genuine onFailure handler runs.
     page.locator("#messageText").fill("Mon mil")
     page.locator("#chatbot-form-btn").click()
     replay = page.get_by_role("button", name="Réécouter la réponse").last
     expect(replay).to_be_visible()
     status = page.locator(".audio-status").filter(has_text="indisponible")
-    # Activate replay until the app has actually constructed an Audio for the
-    # broken source (captured by the context init script). The button toggles
-    # play/pause, so on a headless click race we click again; an odd click
-    # count lands on "play".
+    # Activate replay until the app has constructed an Audio for the broken
+    # source. The button toggles play/pause, so on a headless click race we
+    # click again; an odd click count lands on "play".
     for _ in range(6):
         replay.click()
         try:
@@ -200,12 +214,14 @@ def _run_width(page, width: int) -> dict:
             break
         except PlaywrightError:
             continue
-    # Full Chromium raises the media 'error' on its own; a headless build with
-    # no media pipeline may not, so emit the same 'error' the browser would on
-    # the element the app created. Either path runs the app's real onFailure.
+    # Full Chromium raises the media 'error' natively; a headless build with no
+    # media pipeline may not, so fall back to emitting the same 'error' event on
+    # the element the app created. Record which path produced the failure.
+    audio_failure_mode = "native"
     try:
         expect(status).to_be_visible(timeout=4000)
     except AssertionError:
+        audio_failure_mode = "synthetic-error-event"
         page.evaluate(
             "(window.__dakikoboAudios || []).forEach("
             "el => el.dispatchEvent(new Event('error')))"
@@ -221,11 +237,11 @@ def _run_width(page, width: int) -> dict:
     )
     assert not overflow, f"Horizontal overflow at {width}px"
     # A deliberate, opt-in failure so CI can prove the rehearsal detects
-    # regressions. Never enabled outside the dedicated failure-detection step.
+    # regressions AND captures evidence. Never enabled outside CI's dedicated
+    # failure-detection step.
     assert not INJECT_FAILURE, f"Injected deliberate failure at {width}px"
     assert not errors, errors
 
-    page.screenshot(path=str(OUTPUT / f"replay-{width}.png"), full_page=True)
     return {
         "width": width,
         "replay_error_visible": True,
@@ -235,11 +251,35 @@ def _run_width(page, width: int) -> dict:
         "skip_link": True,
         "dialog_focus_contained": True,
         "escape_restores_focus": True,
+        "audio_failure_mode": audio_failure_mode,
     }
 
 
-def run(base_url: str, widths: list[int]) -> list[dict]:
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+def _capture_failure(page, artifact_dir: Path, width: int, error: BaseException,
+                     partial_results: list[dict]) -> None:
+    """Save a screenshot and structured error report before the context closes."""
+    screenshot = artifact_dir / f"failure-{width}.png"
+    try:
+        page.screenshot(path=str(screenshot), full_page=True)
+        screenshot_saved = screenshot.name
+    except Exception as shot_error:  # never mask the original failure
+        screenshot_saved = f"screenshot-failed: {shot_error}"
+    report = {
+        "failed_width": width,
+        "error_type": type(error).__name__,
+        "error": str(error),
+        "traceback": traceback.format_exc(),
+        "screenshot": screenshot_saved,
+        "partial_results": partial_results,
+    }
+    (artifact_dir / "error.json").write_text(
+        json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def run(base_url: str, widths: list[int], artifact_dir: Path) -> list[dict]:
+    """Run the checks at each width; on failure capture evidence, then re-raise."""
+    artifact_dir.mkdir(parents=True, exist_ok=True)
     results: list[dict] = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
@@ -249,34 +289,37 @@ def run(base_url: str, widths: list[int]) -> list[dict]:
                     viewport={"width": width, "height": 900},
                     service_workers="block",
                 )
-                # Capture the Audio elements the app creates so the audio-failure
-                # check can drive a real media 'error' deterministically even on
-                # a headless build without a media pipeline.
-                context.add_init_script(
-                    "(function () {"
-                    "  var Original = window.Audio;"
-                    "  window.__dakikoboAudios = [];"
-                    "  window.Audio = function (src) {"
-                    "    var element = new Original(src);"
-                    "    window.__dakikoboAudios.push(element);"
-                    "    return element;"
-                    "  };"
-                    "  window.Audio.prototype = Original.prototype;"
-                    "})();"
-                )
+                context.add_init_script(_AUDIO_CAPTURE_SCRIPT)
+                page = context.new_page()
                 try:
-                    page = context.new_page()
                     page.goto(base_url)
                     page.wait_for_load_state("networkidle")
-                    results.append(_run_width(page, width))
+                    result = _run_width(page, width)
+                    result["screenshot"] = f"replay-{width}.png"
+                    page.screenshot(
+                        path=str(artifact_dir / f"replay-{width}.png"),
+                        full_page=True,
+                    )
+                    results.append(result)
+                except BaseException as error:
+                    # Capture the failing state BEFORE the context is torn down.
+                    _capture_failure(page, artifact_dir, width, error, results)
+                    raise
                 finally:
                     context.close()
         finally:
             browser.close()
-    (OUTPUT / "results.json").write_text(
-        json.dumps(results, indent=2), encoding="utf-8"
+    (artifact_dir / "results.json").write_text(
+        json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     return results
+
+
+def rehearse(port: int, widths: list[int], startup_timeout: float,
+             artifact_dir: Path) -> list[dict]:
+    """Full lifecycle: start fixture, run checks, always tear the fixture down."""
+    with fixture_server(port, startup_timeout, artifact_dir) as base_url:
+        return run(base_url, widths, artifact_dir)
 
 
 def main() -> int:
@@ -284,21 +327,28 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=5097)
     parser.add_argument("--startup-timeout", type=float, default=30.0)
     parser.add_argument("--widths", default="320,1280")
+    parser.add_argument("--run-id", default=None)
     args = parser.parse_args()
 
     widths = [int(value) for value in args.widths.split(",") if value.strip()]
     port = _free_port() if args.port == 0 else args.port
+    run_id = args.run_id or default_run_id()
+    artifact_dir = ARTIFACT_ROOT / run_id
 
     try:
-        with fixture_server(port, args.startup_timeout) as base_url:
-            results = run(base_url, widths)
+        results = rehearse(port, widths, args.startup_timeout, artifact_dir)
     except (AssertionError, PlaywrightError, TimeoutError, RuntimeError) as error:
         print(f"Browser rehearsal FAILED: {error}", file=sys.stderr)
+        print(f"Evidence written under: {artifact_dir}", file=sys.stderr)
         return 1
 
     print("Browser rehearsal passed (headless-browser evidence only):")
     for result in results:
-        print(f"  - {result['width']}px: no overflow, no page errors")
+        print(
+            f"  - {result['width']}px: no overflow, no page errors, "
+            f"audio failure via {result['audio_failure_mode']}"
+        )
+    print(f"Artifacts: {artifact_dir}")
     return 0
 
 
