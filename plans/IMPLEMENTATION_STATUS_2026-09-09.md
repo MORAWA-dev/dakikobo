@@ -14,7 +14,7 @@ n'est pas entièrement réceptionné ; aucune preuve humaine n'est implicite.
 | 04 | Technique implémentée et testée | Refus sans génération et erreurs fournisseur couverts par les tests de routes. |
 | 05 | Partiel | Matrice et annexes prêtes ; approbation agronomique, promotion et mesure de couverture requises. |
 | 06 | Technique implémentée et testée | Limites multipart, nettoyage audio, concurrence et reprise texte couverts. |
-| 07 | Partiel | Restauration isolée testée ; volume durable, secret stable et redémarrage de la cible à démontrer. |
+| 07 | Partiel | Restauration isolée et redémarrage HTTP local testés ; volume durable, secret stable et redémarrage/rebuild de la cible à démontrer. Rapport : `reports/operational_readiness_2026-09-15.md`. |
 | 08 | Partiel | Accessibilité locale et refus microphone testables ; cinq parcours sur vrais téléphones avec participants requis. |
 | 09 | Préparation implémentée ; réception ouverte | Registres et modèle de décision prêts ; jugement expert et résultats humains absents. |
 | 10 | Différé conditionnel | Ne commencer qu'après confirmation du besoin par le pilote. |

@@ -1461,6 +1461,11 @@ cd - && git worktree remove "$WT" --force
 
 ### 2026-09-15 — Suite du plan HTML après fusion
 
+- Suite opérationnelle : nouveau test de reprise via serveur HTTP loopback et client conservant son cookie ; restauration isolée, exclusion d'un second client et suppression propriétaire vérifiées.
+- Vérification : 3 tests de récupération réussis, un avertissement PyPDF2. La première exécution a révélé une assertion de test incorrecte sur le contrat de suppression ; le contrat réel retourne `deleted: 0` pour un autre propriétaire et le cas reste intact.
+- Contrôles distants en lecture seule : en-têtes de confidentialité présents, chemin du journal HTTP 404 ; API runtime sans preuve de volume durable. Compte rendu `reports/operational_readiness_2026-09-15.md`.
+- Ticket 07 reste partiel ; aucun redémarrage distant, donnée réelle ou coût de stockage engagé.
+
 - Nouvelle branche `codex/html-plan-remaining-work` basée sur `origin/main` à `e79ebfc3`, sans perte des changements locaux.
 - Finalisation du message de reprise après refus microphone et de sa régression jsdom.
 - Tableau de réception daté ajouté au rapport du plan ; modèle de décision de livraison préparé.
