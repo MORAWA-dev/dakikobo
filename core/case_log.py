@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import time
@@ -12,7 +13,11 @@ from config import FOLLOW_UP_DELAY_DAYS
 from core.cache import sqlite_connection
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
+# Upper bound on the persisted per-case source-card JSON. Source cards are small
+# (title, type, short snippet, and the reviewed metadata incl. scope); this caps
+# a pathological payload without truncating real cards.
+MAX_SOURCES_JSON_CHARS = 20000
 _CASE_LOG_INITIALIZED = False
 _CASE_LOG_INITIALIZED_PATH = ""
 _CASE_LOG_INIT_LOCK = Lock()
@@ -98,6 +103,55 @@ def _migrate_to_v4(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v6(conn: sqlite3.Connection) -> None:
+    # Persist the answer's source cards (including each card's declared `scope`)
+    # so a saved journal case can be reopened with its sources intact. Additive
+    # and backward-compatible: existing rows keep NULL and replay as no sources.
+    if not _column_exists(conn, "feedback_events", "sources"):
+        conn.execute("ALTER TABLE feedback_events ADD COLUMN sources TEXT")
+
+
+def normalize_sources_json(sources) -> str | None:
+    """Return a compact JSON string for a list of source-card dicts, or None.
+
+    Only plain dict cards are stored, verbatim. Scope and other reviewed
+    metadata are never inferred here; the caller supplies exactly what the
+    answer produced. Oversized payloads are rejected so a single case cannot
+    bloat the journal.
+    """
+    if not sources:
+        return None
+    if not isinstance(sources, (list, tuple)):
+        raise ValueError("sources must be a list")
+    cards = []
+    for source in sources:
+        if isinstance(source, dict):
+            # Keep only JSON-serialisable string/simple values; drop nothing else
+            # silently — this mirrors the /ask source-card shape.
+            cards.append({str(k): v for k, v in source.items()})
+        elif isinstance(source, str):
+            cards.append(source)
+        else:
+            raise ValueError("each source must be a dict or string")
+    if not cards:
+        return None
+    encoded = json.dumps(cards, ensure_ascii=False, separators=(",", ":"))
+    if len(encoded) > MAX_SOURCES_JSON_CHARS:
+        raise ValueError("sources payload is too large to store")
+    return encoded
+
+
+def decode_sources_json(raw) -> list:
+    """Decode a stored sources JSON blob into a list; tolerate legacy NULL."""
+    if not raw:
+        return []
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    return value if isinstance(value, list) else []
+
+
 def init_case_log(db_path: str) -> None:
     """Create/apply the additive schema once per process and database path."""
     global _CASE_LOG_INITIALIZED, _CASE_LOG_INITIALIZED_PATH
@@ -143,6 +197,7 @@ def init_case_log(db_path: str) -> None:
             for column, kind in {"owner_hash": "TEXT", "expires_at": "REAL", "research_consent": "INTEGER NOT NULL DEFAULT 0", "request_id": "TEXT"}.items():
                 if not _column_exists(conn, "feedback_events", column):
                     conn.execute(f"ALTER TABLE feedback_events ADD COLUMN {column} {kind}")
+            _migrate_to_v6(conn)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_feedback_owner ON feedback_events(owner_hash, expires_at)")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_request ON feedback_events(owner_hash, request_id)")
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -168,6 +223,7 @@ def record_feedback(
     expires_at: float | None = None,
     research_consent: bool = False,
     request_id: str | None = None,
+    sources=None,
 ) -> int:
     """Persist one answer rating, link its evidence rows, and return its id."""
     if rating not in {"up", "down"}:
@@ -175,6 +231,7 @@ def record_feedback(
     clean_path = (answer_path or "").strip()
     if clean_path and clean_path not in VALID_ANSWER_PATHS:
         raise ValueError("invalid answer_path")
+    sources_json = normalize_sources_json(sources)
     due_at = (
         float(follow_up_due_at)
         if follow_up_due_at is not None
@@ -188,9 +245,9 @@ def record_feedback(
             INSERT INTO feedback_events (
                 created_at, rating, question, answer, before_image_ref,
                 place_id, crop_id, answer_path, follow_up_due_at,
-                owner_hash, expires_at, research_consent, request_id
+                owner_hash, expires_at, research_consent, request_id, sources
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 created_at or _now_iso(),
@@ -202,6 +259,7 @@ def record_feedback(
                 (crop_id or "").strip() or None,
                 clean_path or None,
                 due_at, owner_hash, expires_at, int(research_consent), request_id,
+                sources_json,
             ),
         )
         feedback_id = int(cursor.lastrowid)
@@ -367,7 +425,8 @@ def list_feedback_events(db_path: str) -> list[dict]:
             """
             SELECT id, created_at, rating, question, answer,
                    outcome, outcome_at, before_image_ref, after_image_ref,
-                   place_id, crop_id, answer_path, follow_up_due_at, research_consent
+                   place_id, crop_id, answer_path, follow_up_due_at,
+                   research_consent, sources
             FROM feedback_events
             ORDER BY id
             """

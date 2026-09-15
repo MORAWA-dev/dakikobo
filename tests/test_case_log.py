@@ -6,17 +6,60 @@ from types import SimpleNamespace
 import pytest
 
 from core.case_log import (
+    MAX_SOURCES_JSON_CHARS,
     SCHEMA_VERSION,
     VALID_OUTCOMES,
+    decode_sources_json,
     init_case_log,
     list_due_followups,
     list_evidence,
     list_feedback_events,
+    normalize_sources_json,
     record_evidence,
     record_feedback,
     record_outcome,
     set_before_image_ref,
 )
+
+
+def test_record_feedback_persists_and_decodes_sources(tmp_path):
+    """Source cards (incl. scope) are stored verbatim and decoded on read."""
+    db_path = str(tmp_path / "case_log.sqlite3")
+    cards = [
+        {
+            "title": "MAERAH/OAPH 2026",
+            "type": "Document de programme",
+            "snippet": "Orientation nationale.",
+            "scope": "Orientation nationale ; confirmer les doses avec un agent.",
+        }
+    ]
+    feedback_id = record_feedback(
+        db_path, rating="up", question="Q", answer="A", sources=cards
+    )
+    row = next(r for r in list_feedback_events(db_path) if r["id"] == feedback_id)
+    decoded = decode_sources_json(row["sources"])
+    assert decoded == cards
+    assert decoded[0]["scope"] == cards[0]["scope"]
+
+
+def test_record_feedback_without_sources_stores_null(tmp_path):
+    db_path = str(tmp_path / "case_log.sqlite3")
+    record_feedback(db_path, rating="up", question="Q", answer="A")
+    row = list_feedback_events(db_path)[0]
+    assert row["sources"] is None
+    assert decode_sources_json(row["sources"]) == []
+
+
+def test_normalize_sources_json_rejects_oversized_payload():
+    huge = [{"title": "x" * (MAX_SOURCES_JSON_CHARS + 100)}]
+    with pytest.raises(ValueError):
+        normalize_sources_json(huge)
+
+
+def test_decode_sources_json_tolerates_corrupt_blob():
+    assert decode_sources_json("not-json") == []
+    assert decode_sources_json(None) == []
+    assert decode_sources_json('{"not":"a list"}') == []
 
 
 def test_record_feedback_creates_sqlite_case_log(tmp_path):
@@ -49,6 +92,7 @@ def test_record_feedback_creates_sqlite_case_log(tmp_path):
             "answer_path": None,
             "follow_up_due_at": 123.0,
             "research_consent": 0,
+            "sources": None,
         }
     ]
 
@@ -146,6 +190,8 @@ def test_migration_adds_outcome_columns_idempotently(tmp_path):
     assert rows[0]["outcome"] is None
     assert rows[0]["outcome_at"] is None
     assert rows[0]["rating"] == "up"
+    # A pre-v6 row has no persisted sources and must read back as NULL.
+    assert rows[0]["sources"] is None
 
     # Calling init_case_log again should be idempotent.
     init_case_log(db_path)
