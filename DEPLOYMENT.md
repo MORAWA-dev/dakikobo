@@ -159,8 +159,15 @@ proves **local bind-mount persistence**: with the production image and
 consented synthetic case saved into a bind-mounted directory survives stopping
 and removing the container and starting a fresh replacement from the same image,
 secret, and mount. It also checks owner-only visibility, that a non-owner delete
-returns `deleted: 0`, that the owner can delete, and that a fresh empty mount
-holds no case. Run it locally with Docker:
+returns `deleted: 0`, and that the owner can delete. The negative control keeps
+the populated mount live and points the **same owner cookie** at a separate
+container backed by a fresh empty mount: the owner sees the case on the
+populated mount and none on the empty mount, and the populated case stays intact
+before the owner deletion runs. Container names are unique per run (a UUID
+token), so the rehearsal only ever removes the containers it started and never a
+fixed name that could belong to another run; cleanup removes each container
+independently (one slow removal cannot skip the others) and before any mount
+data is deleted. Run it locally with Docker:
 
 ```bash
 python tests/docker_journal_rehearsal.py

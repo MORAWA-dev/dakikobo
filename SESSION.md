@@ -1517,3 +1517,43 @@ cd - && git worktree remove "$WT" --force
   physical-browser/participant validation, which remain explicitly pending. No
   deployment, no production infrastructure change, no storage purchased, and no
   live-service restart.
+
+
+### 2026-09-15 — PR #9 review fix: Docker isolation, negative control, cleanup
+
+- Review findings addressed in tests/docker_journal_rehearsal.py (refactored
+  into a `Rehearsal` object that owns only the containers it starts):
+  - Unique names: each run gets a UUID token; containers are named
+    `dakikobo-journal-<token>-{a,b,control}`. The run never force-removes a
+    fixed/global name, so it cannot remove a container belonging to another run;
+    it removes only the names it recorded as started.
+  - Strengthened negative control: the positive (replacement) mount stays live
+    and still holds the case; a separate container is started on a fresh empty
+    mount; the SAME owner cookie is pointed at both. Asserts owner sees the case
+    on the positive mount, sees no case on the empty mount, the positive case is
+    intact after the control, and only THEN performs the owner deletion.
+  - Reliable cleanup: `Rehearsal.cleanup()` removes each owned container
+    independently, each with its own REMOVE_TIMEOUT, so a timeout/failure on one
+    does not skip the others; it returns a list of cleanup errors instead of
+    silently ignoring them. `rehearse()` runs the body, then in `finally`
+    removes all containers BEFORE deleting the temp mount, and preserves the
+    original error (via exception chaining) while appending any cleanup errors;
+    a clean body with failing cleanup raises CleanupError.
+  - `SecureCookieClient.retarget()` keeps the owner cookie across the port
+    change between the original, replacement, and control containers.
+- Tests: tests/test_docker_journal_rehearsal.py — seven failure-path unit tests
+  that MOCK the Docker CLI (no daemon needed): unique per-run naming, cleanup
+  removes only started containers, cleanup continues past a per-container
+  removal timeout, cleanup reports removal failures, rehearse preserves the
+  original error while reporting cleanup errors, rehearse raises CleanupError
+  when the body passes but cleanup fails, and retarget keeps the cookie.
+- Local verification: built the production image and ran the real rehearsal —
+  all 9 assertions passed (incl. owner_sees_case_on_positive_mount,
+  same_owner_sees_no_case_on_empty_mount, positive_case_intact_after_control),
+  unique container names used, no lingering containers afterwards.
+  `python -m pytest -q tests/test_recovery.py` → 3 passed. Offline checks: 659
+  offline Python tests passed (1 PyPDF2 warning), 30 JavaScript tests passed,
+  offline fertilizer export unchanged, git diff --check clean.
+- Still local bind-mount persistence evidence only. Hosting-provider disk
+  durability, host rebuild/volume migration, physical-phone testing, farmer
+  pilot, and expert approval remain explicitly pending.

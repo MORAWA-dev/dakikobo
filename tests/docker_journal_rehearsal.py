@@ -19,9 +19,14 @@ re-sends it on later requests — exactly what a browser over TLS would do. No
 model, no external provider, and no real user data are involved: one explicitly
 consented synthetic case is saved.
 
-Every container/HTTP operation has a timeout, and every container and temporary
-directory is cleaned up on success and on failure. Public logs and artifacts
-never contain the cookie, the secret, or database contents.
+Isolation and cleanup:
+  * Container names are unique per run (a UUID token), so concurrent runs never
+    collide and this rehearsal never force-removes a fixed name that could
+    belong to another run. It only removes the containers it started.
+  * Every container/HTTP operation has a timeout. Cleanup removes each owned
+    container independently (a slow removal cannot skip the others), removes all
+    containers before deleting mount data, and reports cleanup failures instead
+    of hiding them, while preserving the original error.
 
 Usage:
     python tests/docker_journal_rehearsal.py            # builds image if needed
@@ -39,7 +44,7 @@ import sys
 import tempfile
 import time
 import uuid
-from contextlib import closing, contextmanager
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -49,10 +54,15 @@ DEFAULT_IMAGE = os.environ.get("DAKIKOBO_IMAGE", "dakikobo:journal-rehearsal")
 # A stable, throwaway secret used only inside this rehearsal. Not a real secret.
 TEST_SECRET = "synthetic-docker-journal-rehearsal-secret-not-for-production"
 CONTAINER_TIMEOUT = 90  # seconds to wait for /healthz
+REMOVE_TIMEOUT = 30  # seconds to remove a single container
 
 
 class RehearsalError(RuntimeError):
     """Raised when a rehearsal step fails; mapped to a non-zero exit."""
+
+
+class CleanupError(RuntimeError):
+    """Raised when one or more owned containers could not be removed."""
 
 
 # ---------------------------------------------------------------------------
@@ -66,14 +76,21 @@ class SecureCookieClient:
     This harness stores the cookie name/value from ``Set-Cookie`` and replays it
     on subsequent requests, emulating a browser over TLS without changing the
     server's production cookie settings. It is strictly for this rehearsal.
+
+    ``base_url`` may change across container replacements (the port differs);
+    the stored cookie is preserved so the same owner identity is reused.
     """
 
     def __init__(self, base_url: str, timeout: float = 15.0):
+        self._timeout = timeout
+        self._cookie: str | None = None
+        self.retarget(base_url)
+
+    def retarget(self, base_url: str) -> None:
+        """Point the same owner (cookie kept) at a new container URL."""
         parts = urlsplit(base_url)
         self._host = parts.hostname
         self._port = parts.port
-        self._timeout = timeout
-        self._cookie: str | None = None
 
     @property
     def has_cookie(self) -> bool:
@@ -155,50 +172,6 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _force_remove(name: str) -> None:
-    _run(["docker", "rm", "-f", name], timeout=30, check=False)
-
-
-@contextmanager
-def running_container(image: str, name: str, mount: Path, port: int):
-    """Start a container on the isolated mount and always remove it.
-
-    The mount is made world-writable so the unprivileged container user (uid
-    1000 in the image) can create the SQLite journal; it is a throwaway temp
-    directory removed by the caller.
-    """
-    _force_remove(name)
-    mount.mkdir(parents=True, exist_ok=True)
-    os.chmod(mount, 0o777)
-    _run(
-        [
-            # --rm is defensive: if this process is killed before its finally
-            # block runs, the container is still auto-removed once it stops.
-            "docker", "run", "-d", "--rm", "--name", name,
-            "-p", f"127.0.0.1:{port}:7860",
-            "-e", "APP_ENV=production",
-            "-e", "FLASK_DEBUG=false",
-            "-e", f"FLASK_SECRET_KEY={TEST_SECRET}",
-            "-e", "RAG_WARMUP_ON_START=false",
-            "-e", "GROQ_API_KEY=",
-            "-e", "GEMINI_API_KEY=",
-            "-e", "FIRECRAWL_API_KEY=",
-            "-e", "STATE_DB_PATH=/data/dakikobo/state.sqlite3",
-            "-e", "CASE_LOG_DB_PATH=/data/dakikobo/journal.sqlite3",
-            "-e", "FEEDBACK_IMAGE_DIR=/data/dakikobo/photos",
-            "-v", f"{mount}:/data/dakikobo",
-            image,
-        ],
-        timeout=60,
-    )
-    base_url = f"http://127.0.0.1:{port}"
-    try:
-        _wait_healthy(name, port)
-        yield base_url
-    finally:
-        _force_remove(name)
-
-
 def _wait_healthy(name: str, port: int) -> None:
     deadline = time.monotonic() + CONTAINER_TIMEOUT
     while time.monotonic() < deadline:
@@ -220,6 +193,84 @@ def _wait_healthy(name: str, port: int) -> None:
             pass
         time.sleep(1)
     raise RehearsalError(f"Container {name} did not answer /healthz in {CONTAINER_TIMEOUT}s")
+
+
+class Rehearsal:
+    """Owns exactly the containers it starts; provides robust, isolated cleanup.
+
+    Container names carry a unique per-run token so this run can only ever
+    remove its own containers — it never force-removes a fixed name that another
+    run might own.
+    """
+
+    def __init__(self, image: str, run_docker=_run):
+        self.image = image
+        self._run = run_docker
+        self.token = uuid.uuid4().hex[:12]
+        self._started: list[str] = []
+
+    def container_name(self, role: str) -> str:
+        return f"dakikobo-journal-{self.token}-{role}"
+
+    def start(self, role: str, mount: Path, port: int) -> str:
+        """Start one container on an isolated mount and wait until healthy."""
+        name = self.container_name(role)
+        mount.mkdir(parents=True, exist_ok=True)
+        # World-writable so the unprivileged container user (uid 1000) can create
+        # the SQLite journal in the bind mount; it is a throwaway temp dir.
+        os.chmod(mount, 0o777)
+        self._run(
+            [
+                # --rm is defensive: if this process is killed before cleanup
+                # runs, the container is still auto-removed once it stops.
+                "docker", "run", "-d", "--rm", "--name", name,
+                "-p", f"127.0.0.1:{port}:7860",
+                "-e", "APP_ENV=production",
+                "-e", "FLASK_DEBUG=false",
+                "-e", f"FLASK_SECRET_KEY={TEST_SECRET}",
+                "-e", "RAG_WARMUP_ON_START=false",
+                "-e", "GROQ_API_KEY=",
+                "-e", "GEMINI_API_KEY=",
+                "-e", "FIRECRAWL_API_KEY=",
+                "-e", "STATE_DB_PATH=/data/dakikobo/state.sqlite3",
+                "-e", "CASE_LOG_DB_PATH=/data/dakikobo/journal.sqlite3",
+                "-e", "FEEDBACK_IMAGE_DIR=/data/dakikobo/photos",
+                "-v", f"{mount}:/data/dakikobo",
+                self.image,
+            ],
+            timeout=60,
+        )
+        self._started.append(name)
+        _wait_healthy(name, port)
+        return f"http://127.0.0.1:{port}"
+
+    def stop(self, role: str) -> None:
+        """Remove one owned container now (used for the deliberate replacement)."""
+        name = self.container_name(role)
+        self._remove_one(name)
+        self._started = [n for n in self._started if n != name]
+
+    def _remove_one(self, name: str) -> None:
+        # Each removal has its own timeout so a single stuck container cannot
+        # prevent the others from being cleaned up.
+        self._run(["docker", "rm", "-f", name], timeout=REMOVE_TIMEOUT, check=False)
+
+    def cleanup(self) -> list[str]:
+        """Remove every container this run started, independently.
+
+        Returns a list of human-readable cleanup errors (empty when clean). A
+        timeout or failure removing one container never skips the others.
+        """
+        errors: list[str] = []
+        for name in list(self._started):
+            try:
+                self._remove_one(name)
+                self._started.remove(name)
+            except subprocess.TimeoutExpired:
+                errors.append(f"timed out removing container {name}")
+            except Exception as exc:  # keep cleaning the rest regardless
+                errors.append(f"failed to remove container {name}: {exc}")
+        return errors
 
 
 # ---------------------------------------------------------------------------
@@ -249,73 +300,94 @@ def _owner_cases(client: SecureCookieClient) -> list:
     return response["json"].get("cases", [])
 
 
-def rehearse(image: str) -> dict:
-    """Run the full continuity rehearsal and negative control.
+def _run_checks(rehearsal: Rehearsal, mount: Path, empty_mount: Path) -> dict:
+    """The rehearsal body; assumes containers are cleaned up by the caller."""
+    summary: dict = {}
 
-    Returns a redacted summary safe for public logs (no cookies, secrets, or
-    database contents).
+    # 1) First container: save one consented synthetic case, keep the cookie.
+    base_url = rehearsal.start("a", mount, _free_port())
+    owner = SecureCookieClient(base_url)
+    case_id = _save_synthetic_case(owner)
+    if len(_owner_cases(owner)) != 1:
+        raise RehearsalError("Expected exactly one case before replacement")
+    rehearsal.stop("a")  # deliberate stop + remove before the replacement
+
+    # 2) Replacement container: same image, secret, and mount. The owner's case
+    #    must still be there; a different visitor must not see it.
+    owner.retarget(rehearsal.start("b", mount, _free_port()))
+    after = _owner_cases(owner)
+    summary["owner_case_survived_replacement"] = (
+        len(after) == 1 and after[0]["feedback_id"] == case_id
+    )
+    other = owner.clone_without_cookie()
+    summary["other_client_sees_no_case"] = _owner_cases(other) == []
+    other_delete = other.delete(f"/journal/{case_id}")
+    summary["non_owner_delete_is_noop"] = (
+        other_delete["status"] == 200 and other_delete["json"].get("deleted") == 0
+    )
+    summary["case_intact_after_non_owner_delete"] = len(_owner_cases(owner)) == 1
+
+    # 3) Negative control WITH the positive mount still holding the case: the
+    #    SAME owner cookie must see the case on the populated replacement mount
+    #    and NO case on a fresh empty mount served by a separate container.
+    positive_base = _owner_base(owner)  # the "b" replacement, still populated
+    empty_base = rehearsal.start("control", empty_mount, _free_port())
+    # Owner still sees the case on the positive (populated) mount.
+    summary["owner_sees_case_on_positive_mount"] = len(_owner_cases(owner)) == 1
+    # Same owner cookie, fresh empty mount: no case leaks across mounts.
+    owner.retarget(empty_base)
+    summary["same_owner_sees_no_case_on_empty_mount"] = _owner_cases(owner) == []
+    # Re-point at the positive mount and confirm the case is still intact.
+    owner.retarget(positive_base)
+    summary["positive_case_intact_after_control"] = len(_owner_cases(owner)) == 1
+
+    # 4) Owner deletion happens AFTER the negative-control checks.
+    owner_delete = owner.delete(f"/journal/{case_id}")
+    summary["owner_delete_succeeds"] = (
+        owner_delete["status"] == 200 and owner_delete["json"].get("deleted") == 1
+    )
+    summary["case_removed_after_owner_delete"] = _owner_cases(owner) == []
+    return summary
+
+
+def _owner_base(owner: SecureCookieClient) -> str:
+    return f"http://{owner._host}:{owner._port}"
+
+
+def rehearse(image: str, *, rehearsal: Rehearsal | None = None) -> dict:
+    """Run the full continuity rehearsal and strengthened negative control.
+
+    Containers are always cleaned up before mount data is removed; cleanup
+    errors are reported while preserving any original failure.
     """
+    rehearsal = rehearsal or Rehearsal(image)
     workspace = Path(tempfile.mkdtemp(prefix="dakikobo-docker-"))
     mount = workspace / "mount"
     empty_mount = workspace / "empty-mount"
-    port = _free_port()
+    primary_error: BaseException | None = None
     summary: dict = {}
     try:
-        # 1) First container: save one consented synthetic case, keep the cookie.
-        with running_container(image, "dakikobo-journal-a", mount, port) as base_url:
-            owner = SecureCookieClient(base_url)
-            case_id = _save_synthetic_case(owner)
-            before = _owner_cases(owner)
-            if len(before) != 1:
-                raise RehearsalError(f"Expected 1 case before replacement, got {len(before)}")
-
-        # 2) Replacement container: same image, secret, and mount. The owner's
-        #    case must still be there; a different visitor must not see it; a
-        #    non-owner deletion must be a no-op; the owner can delete it.
-        with running_container(image, "dakikobo-journal-b", mount, port) as base_url:
-            # The owner keeps the cookie captured before the replacement.
-            after = _owner_cases(owner)
-            summary["owner_case_survived_replacement"] = (
-                len(after) == 1 and after[0]["feedback_id"] == case_id
-            )
-
-            other = owner.clone_without_cookie()
-            other_view = _owner_cases(other)
-            summary["other_client_sees_no_case"] = other_view == []
-
-            other_delete = other.delete(f"/journal/{case_id}")
-            summary["non_owner_delete_is_noop"] = (
-                other_delete["status"] == 200
-                and other_delete["json"].get("deleted") == 0
-            )
-            summary["case_intact_after_non_owner_delete"] = (
-                len(_owner_cases(owner)) == 1
-            )
-
-            owner_delete = owner.delete(f"/journal/{case_id}")
-            summary["owner_delete_succeeds"] = (
-                owner_delete["status"] == 200
-                and owner_delete["json"].get("deleted") == 1
-            )
-            summary["case_removed_after_owner_delete"] = (
-                _owner_cases(owner) == []
-            )
-
-        # 3) Negative control: a fresh empty mount must contain no saved case.
-        control_port = _free_port()
-        with running_container(
-            image, "dakikobo-journal-control", empty_mount, control_port
-        ) as base_url:
-            control_owner = SecureCookieClient(base_url)
-            summary["fresh_mount_has_no_case"] = _owner_cases(control_owner) == []
+        summary = _run_checks(rehearsal, mount, empty_mount)
+    except BaseException as error:
+        primary_error = error
     finally:
+        # Remove all owned containers FIRST (independently), then mount data.
+        cleanup_errors = rehearsal.cleanup()
         shutil.rmtree(workspace, ignore_errors=True)
-        for name in (
-            "dakikobo-journal-a",
-            "dakikobo-journal-b",
-            "dakikobo-journal-control",
-        ):
-            _force_remove(name)
+
+    if primary_error is not None:
+        # Preserve the original error; attach cleanup problems as context.
+        if cleanup_errors:
+            raise RehearsalError(
+                f"{primary_error} (additional cleanup errors: "
+                f"{'; '.join(cleanup_errors)})"
+            ) from primary_error
+        if isinstance(primary_error, (RehearsalError, subprocess.TimeoutExpired)):
+            raise primary_error
+        raise RehearsalError(str(primary_error)) from primary_error
+
+    if cleanup_errors:
+        raise CleanupError("; ".join(cleanup_errors))
 
     failures = [key for key, ok in summary.items() if not ok]
     if failures:
@@ -344,7 +416,7 @@ def main() -> int:
     try:
         ensure_image(args.image)
         summary = rehearse(args.image)
-    except (RehearsalError, subprocess.TimeoutExpired) as error:
+    except (RehearsalError, CleanupError, subprocess.TimeoutExpired) as error:
         print(f"Docker journal rehearsal FAILED: {error}", file=sys.stderr)
         return 1
 
