@@ -1,0 +1,14 @@
+# Test-only browser rehearsal dependencies.
+#
+# Kept OUT of requirements.txt on purpose: Playwright and its Chromium download
+# must never ship in the production image. Install these only in CI / locally
+# to run tests/browser_replay_check.py:
+#
+#   pip install -r requirements-browser.txt
+#   python -m playwright install --with-deps chromium
+#   python tests/browser_replay_check.py
+#
+# The rehearsal is headless-browser evidence only. It is not physical-phone or
+# participant validation.
+
+playwright==1.55.0

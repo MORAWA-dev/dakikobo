@@ -1478,6 +1478,104 @@ cd - && git worktree remove "$WT" --force
 - K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
 
 
+### 2026-09-15 — Task B: automate headless-browser rehearsal in CI (HTML ticket 08)
+
+- Made tests/browser_replay_check.py a self-contained, reproducible runner: it
+  starts tests/browser_fixture_app.py itself, waits for readiness with a hard
+  deadline, runs the checks at 320 px and 1280 px, and always tears the fixture
+  process down (terminate then kill) even on assertion/startup/timeout failure.
+  Any failure exits non-zero. Added --port/--startup-timeout/--widths flags.
+- Checks covered: keyboard navigation (skip link -> main landmark), modal focus
+  containment + Escape restoration for both the credibility and journal dialogs,
+  no horizontal overflow at each width, and audio-failure recovery (undecodable
+  audio keeps the French text answer and shows the "indisponible" status).
+- Fixed a stale assertion: the credibility dialog now contains a second
+  focusable control (privacy link), so the trap cycles focus between controls.
+  The check now asserts focus stays *contained* in the dialog while tabbing
+  rather than pinned on one element.
+- Audio recovery is made deterministic across media stacks: full Chromium fires
+  the media 'error' from the undecodable payload; a headless build without a
+  media pipeline may not, so a context init script captures the Audio elements
+  the app creates and the runner emits the same 'error' event the browser would,
+  which drives the app's real onFailure handler. The fixture serves a synthetic
+  /broken-audio.mp3 (undecodable, no provider) and a /healthz readiness probe.
+- Declared a pinned test-only dependency in requirements-browser.txt
+  (playwright==1.55.0), kept OUT of the production requirements.txt. Added
+  .github/workflows/browser-rehearsal.yml: installs requirements +
+  requirements-browser, `playwright install --with-deps chromium`, runs the
+  rehearsal at 320/1280, then two non-fatal verification steps that prove the
+  rehearsal detects (a) an injected failed assertion and (b) a fixture-startup
+  failure, and uploads screenshots/results.json/fixture.log as CI artifacts on
+  every run. Generated screenshots and results.json are now git-ignored and were
+  untracked; the dated accessibility markdown report stays committed.
+- The deliberate-failure hook (BROWSER_REPLAY_INJECT_FAILURE) is opt-in and off
+  by default; it is exercised only by the CI failure-detection step, never left
+  enabled in the committed default run.
+- Local verification (headless-shell sandbox): rehearsal passed 320/1280 on
+  three consecutive runs (deterministic); injected-assertion run exited 1;
+  short-deadline startup run exited 1; no orphan fixture processes remained.
+  Offline checks: 652 offline Python tests passed (1 PyPDF2 warning), 30
+  JavaScript tests passed, offline fertilizer export unchanged, git diff --check
+  clean.
+- Results are headless-browser evidence only. Physical-phone testing, system
+  screen readers, real permission dialogs, and farmer/participant usability
+  remain human/device acceptance work and stay explicitly pending.
+
+
+### 2026-09-15 — PR #8 review fix: capture real browser failure evidence
+
+- Review findings addressed in tests/browser_replay_check.py and its workflow:
+  - Per-invocation artifact directory: artifacts now live under
+    reports/browser_replay_check/<run-id>/ (--run-id / BROWSER_REPLAY_RUN_ID;
+    default timestamp+pid). The normal, injected-failure, and startup-failure
+    CI runs each use a distinct run id, so failure-detection runs can no longer
+    overwrite or reuse the normal run's evidence.
+  - On any assertion/exception, `_capture_failure` writes failure-<width>.png
+    and a structured error.json (error type, message, full traceback,
+    screenshot name, partial results) BEFORE the browser context is closed;
+    the error is then re-raised. A passing run still writes replay-<width>.png
+    and results.json.
+  - results.json now records `audio_failure_mode`: "native" when full Chromium
+    raised the media error itself, or "synthetic-error-event" when the runner
+    emitted the media 'error' on the app's Audio element for a headless build
+    without a media pipeline. Both drive the app's real onFailure handler.
+  - The CI workflow gives each step a distinct --run-id, asserts the
+    injected-failure run left error.json + failure-320.png, and uploads the
+    whole reports/browser_replay_check/** tree with if: always() so failure
+    artifacts are uploaded even when a step exits non-zero.
+  - Fixture, context, and browser cleanup remain reliable (context.close in
+    finally per width; fixture terminate/kill in finally; browser.close in
+    finally).
+- Tests: tests/test_browser_replay_check.py — a browser-free unit test proving
+  `_capture_failure` writes the screenshot + error.json (with traceback), and a
+  Chromium-gated end-to-end test that runs the rehearsal with an injected early
+  failure and asserts exit 1 plus error.json + failure-320.png. The e2e test
+  skips when Chromium is not installed (e.g. the offline regression job) and
+  runs in the browser-rehearsal job.
+- Local verification (Chromium headless-shell): normal run passed 320/1280 with
+  audio_failure_mode recorded; injected-failure run exited 1 and produced
+  error.json + failure-320.png in its own dir; startup-failure run exited 1 in
+  its own dir; no cross-run overwrite; run dirs are git-ignored. Offline checks:
+  654 offline Python tests passed (1 PyPDF2 warning), 30 JavaScript tests
+  passed, offline fertilizer export unchanged, git diff --check clean.
+- Still headless-browser evidence only. Physical-phone testing, farmer pilot,
+  expert approval, and hosting-provider durability remain pending.
+
+
+### 2026-09-15 — PR #8 follow-up: import-safe without Playwright
+
+- The first review-fix push failed the offline `regression` CI job: that job
+  does not install the test-only Playwright dependency, and
+  tests/test_browser_replay_check.py imports tests/browser_replay_check.py,
+  which imported playwright at module top level -> ModuleNotFoundError at
+  collection.
+- Fix: import Playwright lazily via `_load_playwright()` called inside `run()`.
+  The module (and the failure-capture unit test) now import cleanly without
+  Playwright; the Chromium-gated e2e test skips where it is absent. Verified by
+  simulating a missing playwright import locally.
+- CI after the fix: regression, chromium-rehearsal, and build-and-smoke all
+  green on ci/browser-rehearsal.
+
 ### 2026-09-15 — Task A: display source scope and limits (HTML ticket 05)
 
 - Reviewed Markdown ingestion already preserved `scope` in chunk metadata
