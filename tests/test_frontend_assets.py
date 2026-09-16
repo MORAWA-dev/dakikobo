@@ -33,13 +33,29 @@ def test_source_cards_render_review_metadata():
     js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/style.css").read_text(encoding="utf-8")
 
-    assert "éditeur, année et statut de revue" in html
+    assert "éditeur, année, statut de revue et portée" in html
     assert "function sourceMetaItems" in js
     assert "src.publisher" in js
     assert "src.review_status" in js
+    assert "src.scope" in js
+    assert "Portée et limites" in js
     assert "function safeSourceUrl" in js
     assert ".source-meta" in css
+    assert ".source-scope" in css
     assert ".source-title-link" in css
+
+
+def test_journal_replays_saved_sources():
+    """renderFeedback persists source cards and the journal panel replays them."""
+    render_js = (ROOT / "static/js/render.js").read_text(encoding="utf-8")
+    index_js = (ROOT / "static/js/index.js").read_text(encoding="utf-8")
+
+    # renderFeedback accepts sources and sends them to /feedback.
+    assert "function renderFeedback(bubble, question, answer, journal, sources)" in render_js
+    assert "feedbackData.sources = JSON.stringify(structured)" in render_js
+    # The journal panel reopens saved cases with their sources.
+    assert "item.sources" in index_js
+    assert "renderSources($item, item.sources)" in index_js
 
 
 def test_media_privacy_note_is_visible():

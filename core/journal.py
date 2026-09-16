@@ -12,7 +12,12 @@ import io
 from PIL import Image, ImageOps, UnidentifiedImageError
 from core.cache import interprocess_file_lock, sqlite_connection
 from config import JOURNAL_MAX_CASES, JOURNAL_RETENTION_DAYS
-from core.case_log import init_case_log, record_feedback, VALID_OUTCOMES
+from core.case_log import (
+    init_case_log,
+    record_feedback,
+    decode_sources_json,
+    VALID_OUTCOMES,
+)
 
 
 def _remove_photo(ref, directory):
@@ -42,12 +47,19 @@ def journal_connection(db_path, image_dir):
 def list_owned(db_path, owner, image_dir, *, due=False):
     with journal_connection(db_path, image_dir) as conn:
         rows = conn.execute('''SELECT id AS feedback_id, created_at, question, answer,
-            crop_id, place_id, answer_path, follow_up_due_at, outcome, expires_at
+            crop_id, place_id, answer_path, follow_up_due_at, outcome, expires_at, sources
             FROM feedback_events WHERE owner_hash=? AND expires_at>?
             ORDER BY id DESC LIMIT ?''', (owner, time.time(), JOURNAL_MAX_CASES)).fetchall()
-        result = [dict(row) for row in rows]
+        result = []
+        for row in rows:
+            case = dict(row)
+            # Legacy rows saved before source persistence replay as no sources;
+            # we never reconstruct or infer missing historical sources.
+            case['sources'] = decode_sources_json(case.pop('sources', None))
+            result.append(case)
     if due:
-        result = [{k: v for k, v in row.items() if k not in ('question', 'answer')}
+        # The due digest stays privacy-minimized: no question, answer, or sources.
+        result = [{k: v for k, v in row.items() if k not in ('question', 'answer', 'sources')}
                   for row in result if row['outcome'] is None and row['follow_up_due_at'] <= time.time()]
     return result
 
