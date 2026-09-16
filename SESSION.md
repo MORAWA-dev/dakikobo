@@ -1621,3 +1621,184 @@ cd - && git worktree remove "$WT" --force
   git diff --check origin/main...HEAD clean.
 - Still local bind-mount persistence evidence only; provider durability, host
   rebuild, physical-phone, farmer pilot, and expert approval remain pending.
+
+### 2026-09-15 — Task B: automate headless-browser rehearsal in CI (HTML ticket 08)
+
+- Made tests/browser_replay_check.py a self-contained, reproducible runner: it
+  starts tests/browser_fixture_app.py itself, waits for readiness with a hard
+  deadline, runs the checks at 320 px and 1280 px, and always tears the fixture
+  process down (terminate then kill) even on assertion/startup/timeout failure.
+  Any failure exits non-zero. Added --port/--startup-timeout/--widths flags.
+- Checks covered: keyboard navigation (skip link -> main landmark), modal focus
+  containment + Escape restoration for both the credibility and journal dialogs,
+  no horizontal overflow at each width, and audio-failure recovery (undecodable
+  audio keeps the French text answer and shows the "indisponible" status).
+- Fixed a stale assertion: the credibility dialog now contains a second
+  focusable control (privacy link), so the trap cycles focus between controls.
+  The check now asserts focus stays *contained* in the dialog while tabbing
+  rather than pinned on one element.
+- Audio recovery is made deterministic across media stacks: full Chromium fires
+  the media 'error' from the undecodable payload; a headless build without a
+  media pipeline may not, so a context init script captures the Audio elements
+  the app creates and the runner emits the same 'error' event the browser would,
+  which drives the app's real onFailure handler. The fixture serves a synthetic
+  /broken-audio.mp3 (undecodable, no provider) and a /healthz readiness probe.
+- Declared a pinned test-only dependency in requirements-browser.txt
+  (playwright==1.55.0), kept OUT of the production requirements.txt. Added
+  .github/workflows/browser-rehearsal.yml: installs requirements +
+  requirements-browser, `playwright install --with-deps chromium`, runs the
+  rehearsal at 320/1280, then two non-fatal verification steps that prove the
+  rehearsal detects (a) an injected failed assertion and (b) a fixture-startup
+  failure, and uploads screenshots/results.json/fixture.log as CI artifacts on
+  every run. Generated screenshots and results.json are now git-ignored and were
+  untracked; the dated accessibility markdown report stays committed.
+- The deliberate-failure hook (BROWSER_REPLAY_INJECT_FAILURE) is opt-in and off
+  by default; it is exercised only by the CI failure-detection step, never left
+  enabled in the committed default run.
+- Local verification (headless-shell sandbox): rehearsal passed 320/1280 on
+  three consecutive runs (deterministic); injected-assertion run exited 1;
+  short-deadline startup run exited 1; no orphan fixture processes remained.
+  Offline checks: 652 offline Python tests passed (1 PyPDF2 warning), 30
+  JavaScript tests passed, offline fertilizer export unchanged, git diff --check
+  clean.
+- Results are headless-browser evidence only. Physical-phone testing, system
+  screen readers, real permission dialogs, and farmer/participant usability
+  remain human/device acceptance work and stay explicitly pending.
+
+
+### 2026-09-15 — PR #8 review fix: capture real browser failure evidence
+
+- Review findings addressed in tests/browser_replay_check.py and its workflow:
+  - Per-invocation artifact directory: artifacts now live under
+    reports/browser_replay_check/<run-id>/ (--run-id / BROWSER_REPLAY_RUN_ID;
+    default timestamp+pid). The normal, injected-failure, and startup-failure
+    CI runs each use a distinct run id, so failure-detection runs can no longer
+    overwrite or reuse the normal run's evidence.
+  - On any assertion/exception, `_capture_failure` writes failure-<width>.png
+    and a structured error.json (error type, message, full traceback,
+    screenshot name, partial results) BEFORE the browser context is closed;
+    the error is then re-raised. A passing run still writes replay-<width>.png
+    and results.json.
+  - results.json now records `audio_failure_mode`: "native" when full Chromium
+    raised the media error itself, or "synthetic-error-event" when the runner
+    emitted the media 'error' on the app's Audio element for a headless build
+    without a media pipeline. Both drive the app's real onFailure handler.
+  - The CI workflow gives each step a distinct --run-id, asserts the
+    injected-failure run left error.json + failure-320.png, and uploads the
+    whole reports/browser_replay_check/** tree with if: always() so failure
+    artifacts are uploaded even when a step exits non-zero.
+  - Fixture, context, and browser cleanup remain reliable (context.close in
+    finally per width; fixture terminate/kill in finally; browser.close in
+    finally).
+- Tests: tests/test_browser_replay_check.py — a browser-free unit test proving
+  `_capture_failure` writes the screenshot + error.json (with traceback), and a
+  Chromium-gated end-to-end test that runs the rehearsal with an injected early
+  failure and asserts exit 1 plus error.json + failure-320.png. The e2e test
+  skips when Chromium is not installed (e.g. the offline regression job) and
+  runs in the browser-rehearsal job.
+- Local verification (Chromium headless-shell): normal run passed 320/1280 with
+  audio_failure_mode recorded; injected-failure run exited 1 and produced
+  error.json + failure-320.png in its own dir; startup-failure run exited 1 in
+  its own dir; no cross-run overwrite; run dirs are git-ignored. Offline checks:
+  654 offline Python tests passed (1 PyPDF2 warning), 30 JavaScript tests
+  passed, offline fertilizer export unchanged, git diff --check clean.
+- Still headless-browser evidence only. Physical-phone testing, farmer pilot,
+  expert approval, and hosting-provider durability remain pending.
+
+
+### 2026-09-15 — PR #8 follow-up: import-safe without Playwright
+
+- The first review-fix push failed the offline `regression` CI job: that job
+  does not install the test-only Playwright dependency, and
+  tests/test_browser_replay_check.py imports tests/browser_replay_check.py,
+  which imported playwright at module top level -> ModuleNotFoundError at
+  collection.
+- Fix: import Playwright lazily via `_load_playwright()` called inside `run()`.
+  The module (and the failure-capture unit test) now import cleanly without
+  Playwright; the Chromium-gated e2e test skips where it is absent. Verified by
+  simulating a missing playwright import locally.
+- CI after the fix: regression, chromium-rehearsal, and build-and-smoke all
+  green on ci/browser-rehearsal.
+
+### 2026-09-15 — Task A: display source scope and limits (HTML ticket 05)
+
+- Reviewed Markdown ingestion already preserved `scope` in chunk metadata
+  (core/rag_pipeline.py allow-list). The only drop point was core/retrieval.py:
+  the `SourceCard` dataclass, `_source_card_from_doc`, `_as_source_cards` and
+  `as_dict()` never carried `scope`, so it was lost before the response.
+- Added `scope` to `SourceCard` (+`as_dict()` optional-key loop), read it
+  verbatim in `_source_card_from_doc`, and passed it in `_as_source_cards`.
+  Retrieval never infers a scope, zone or approval; absent scope omits the key.
+- Because app.py, core/case.py and the answer cache pass source dicts through
+  opaquely, and the service worker caches the full `/ask` JSON, scope now rides
+  through live answers, the field-case card, the answer cache and offline
+  (saved-case) replay with no further change. Saved-journal replay is handled by
+  the 2026-09-15 review-fix pass below (schema v6 sources column).
+- Frontend: render.js renders a dedicated `.source-scope` line under the French
+  label "Portée et limites", inserted via jQuery `.text()` so HTML-like scope
+  renders literally and cannot execute markup. Added `.source-scope` CSS that
+  wraps and stays readable at 320 px. Extended the credibility modal copy to
+  mention "portée déclarée".
+- Tests: extended tests/test_ingestion.py (scope survives ingestion),
+  tests/test_retrieval.py (`as_dict` keeps scope + omits when absent),
+  tests/test_app_routes.py (scope survives /ask answer construction),
+  tests/test_frontend_assets.py (wiring), and added tests/js/source_scope.test.js
+  (jsdom regressions: scope renders, absent scope omitted, unsafe markup is
+  literal — no injected img/script node).
+- Offline checks: 653 offline Python tests passed (1 PyPDF2 warning); 33
+  JavaScript tests passed; offline fertilizer export unchanged; git diff --check
+  clean. No source promotion, new advice or fertilizer-dose change.
+- Not done: K2 corpus growth and agronomic approval remain pending.
+  Physical-phone, farmer pilot and provider durability stay pending.
+
+### 2026-09-15 — PR #7 review fix: saved-journal scope replay (schema v6)
+
+- Review finding: Task A required scope to survive saving AND reopening a
+  journal case, but the server journal stored only question/answer. Fixed with a
+  backward-compatible migration so saved cases replay their sources.
+- Schema: bumped SCHEMA_VERSION 5 -> 6 with additive `_migrate_to_v6` adding a
+  nullable `sources` TEXT column to feedback_events. Existing rows keep NULL and
+  replay as no sources; the existing v1->current migration test now also asserts
+  a pre-v6 row reads back `sources IS NULL`.
+- Persistence: `record_feedback(..., sources=...)` stores a compact JSON of the
+  answer's source cards via `normalize_sources_json` (verbatim dict/str cards,
+  20k-char cap, rejects non-lists). `save_owned` passes it through. `/feedback`
+  accepts an optional `sources` form field (JSON list, size-checked) and never
+  reconstructs or invents sources.
+- Replay: `list_owned` selects `sources` and decodes it with
+  `decode_sources_json` (NULL/corrupt -> []). The due digest still strips
+  question/answer/sources. Frontend: `renderFeedback` sends the answer's source
+  cards on save; the journal panel calls `renderSources($item, item.sources)`
+  so reopened cases show the source cards, including the French
+  "Portée et limites" line, via .text() (unsafe markup stays literal).
+- Owner isolation, retention/expiry cleanup, deletion, and French UI text are
+  unchanged; sources ride the same owner-scoped rows and are deleted with them.
+- Tests: tests/test_case_log.py (persist+decode, NULL when absent, oversized
+  rejected, corrupt-blob tolerance, pre-v6 legacy row), tests/test_app_routes.py
+  (obtain answer with scope -> save -> reopen via /journal -> scope survives; and
+  a legacy case without sources reopens as []), tests/test_frontend_assets.py
+  (renderFeedback sends sources, journal panel replays them). The JavaScript
+  tests for absent scope and literal unsafe-markup rendering are unchanged.
+- Never reconstructs missing historical sources; legacy cases stay readable.
+
+
+### 2026-09-15 — PR #7 review round 2: French validation for malformed sources
+
+- Review finding: malformed source cards still surfaced English validation text.
+  normalize_sources_json raises English ValueErrors ("each source must be a
+  dict or string", "sources payload is too large to store") and the /feedback
+  route's `except ValueError: return {"error": str(exc)}` could return that text
+  to the user; also `sources='[1]'` passed the boundary (a JSON list) and failed
+  only inside record_feedback.
+- Fix: validate every source entry at the /feedback HTTP boundary by calling the
+  canonical normalize_sources_json there and mapping any ValueError/TypeError to
+  the stable French message « Les sources du conseil sont invalides. ». The
+  oversized-payload branch now returns the same French message (using the
+  shared MAX_SOURCES_JSON_CHARS cap). Internal validator text is never returned.
+- Valid sources and legacy (no-sources) journal behavior are unchanged; nothing
+  is persisted when the payload is rejected.
+- Tests (tests/test_app_routes.py): sources='[1]' -> 400 with the French
+  message and no English wording, nothing saved; oversized JSON -> 400 French,
+  nothing saved; valid cards still save and replay their scope.
+- Validation: full offline Python 663 passed (1 PyPDF2 warning), 33 JavaScript
+  passed, offline fertilizer export unchanged, git diff --check clean.

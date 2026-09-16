@@ -44,6 +44,7 @@ class SourceCard:
     type: str = "Base locale"
     snippet: str = ""
     country: str = ""
+    scope: str = ""
 
     def as_dict(self) -> dict:
         """Serialize without exposing internal ranking fields."""
@@ -52,7 +53,7 @@ class SourceCard:
             "type": self.type,
             "snippet": self.snippet,
         }
-        for key in ("publisher", "year", "country", "review_status", "url"):
+        for key in ("publisher", "year", "country", "review_status", "scope", "url"):
             value = getattr(self, key)
             if value:
                 card[key] = value
@@ -319,6 +320,12 @@ def _source_card_from_doc(doc) -> dict:
     if review_label:
         card["review_status"] = review_label
 
+    # Carry the reviewed source's declared scope/limits verbatim. Never infer
+    # a scope, zone, or approval that the document did not state itself.
+    scope = (metadata.get("scope") or "").strip()
+    if scope:
+        card["scope"] = scope
+
     url = _safe_source_url(metadata)
     if url:
         card["url"] = url
@@ -375,6 +382,7 @@ def _as_source_cards(sources: list[dict], scores: dict) -> list[SourceCard]:
             type=source.get("type", "Base locale"),
             snippet=source.get("snippet", ""),
             country=source.get("country", ""),
+            scope=source.get("scope", ""),
         )
         for source in sources
     ]

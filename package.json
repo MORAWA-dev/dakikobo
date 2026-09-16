@@ -1,6 +1,7 @@
 {
   "name": "dakikobo-frontend-tests",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "test:js": "node --test tests/js/*.test.js"
   },

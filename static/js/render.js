@@ -103,7 +103,7 @@
             scrollChat();
         }
 
-        function renderFeedback(bubble, question, answer, journal) {
+        function renderFeedback(bubble, question, answer, journal, sources) {
             var retentionDays = Number(document.documentElement.dataset.journalRetentionDays || 90);
             var $fb = $('<div class="feedback"></div>');
             var $up = $('<button type="button" class="fb-btn" data-rating="up" aria-label="Réponse utile">👍</button>');
@@ -132,6 +132,17 @@
                     place_id: journal && journal.place_id ? journal.place_id : '',
                     answer_path: journal && journal.answer_path ? journal.answer_path : ''
                 };
+                // Persist the answer's source cards (with their declared scope)
+                // so the case replays with sources intact. Only structured cards
+                // are sent; string chips and empty lists are skipped.
+                if (Array.isArray(sources)) {
+                    var structured = sources.filter(function(item) {
+                        return item && typeof item === 'object';
+                    });
+                    if (structured.length) {
+                        feedbackData.sources = JSON.stringify(structured);
+                    }
+                }
                 if (journal && journal.ledger_created_at !== null && journal.ledger_created_at !== undefined) {
                     feedbackData.ledger_created_at = journal.ledger_created_at;
                 }
@@ -185,6 +196,12 @@
                 var snippet = cleanDisplayText(src.snippet || '');
                 if (snippet && snippet.length <= 160) {
                     $card.append($('<p class="source-snippet"></p>').text(snippet));
+                }
+                if (src.scope) {
+                    var $scope = $('<p class="source-scope"></p>');
+                    $scope.append($('<strong></strong>').text('Portée et limites : '));
+                    $scope.append($('<span></span>').text(src.scope));
+                    $card.append($scope);
                 }
                 $box.append($card);
             });

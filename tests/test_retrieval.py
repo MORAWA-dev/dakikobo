@@ -199,6 +199,7 @@ def test_ground_answer_preserves_reviewed_source_metadata():
             year="2026",
             country="Burkina Faso",
             review_status="reviewed_by_codex_pending_human_review",
+            scope="Cadre national d'orientation ; ne pas utiliser pour des doses.",
             source_url="https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
         )
     ]
@@ -218,8 +219,39 @@ def test_ground_answer_preserves_reviewed_source_metadata():
         "year": "2026",
         "country": "Burkina Faso",
         "review_status": "Revu, validation humaine à finaliser",
+        "scope": "Cadre national d'orientation ; ne pas utiliser pour des doses.",
         "url": "https://www.fao.org/in-action/mafap/where-we-work/burkina-faso/en",
     }
+
+
+def test_source_card_scope_survives_and_is_omitted_when_absent():
+    """A reviewed document's declared scope rides through to the /ask JSON.
+
+    scope is copied verbatim from ingestion metadata; retrieval never infers a
+    scope, zone, or approval. Absent scope leaves the card key out entirely so
+    old sources without scope still render.
+    """
+    with_scope = _doc(
+        "MAERAH/OAPH 2026 - orientation Burkina",
+        "Orientation nationale pour les cultures pluviales.",
+        doc_type="program_doc",
+        scope="Orientation nationale ; confirmer les doses avec un agent.",
+    )
+    without_scope = _doc(
+        "guide_mil.pdf",
+        "Semez le mil au début de la saison des pluies.",
+    )
+    grounded = ground_answer(
+        "Orientation des cultures pluviales ?",
+        [with_scope, without_scope],
+        score_lookup=lambda: {},
+    )
+    cards = {card.title: card.as_dict() for card in grounded.sources}
+    assert (
+        cards["MAERAH/OAPH 2026 - orientation Burkina"]["scope"]
+        == "Orientation nationale ; confirmer les doses avec un agent."
+    )
+    assert "scope" not in cards["guide_mil.pdf"]
 
 
 def test_source_rank_score_demotes_weak_handbook():
