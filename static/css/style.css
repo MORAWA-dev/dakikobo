@@ -637,6 +637,20 @@ body {
     margin: 5px 0 0;
 }
 
+.source-scope {
+    color: #425542;
+    font-size: 10px;
+    line-height: 1.35;
+    margin: 5px 0 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.source-scope strong {
+    color: #2f4f2f;
+    font-weight: 700;
+}
+
 /* Per-answer audio replay */
 .audio-actions {
     display: flex;
