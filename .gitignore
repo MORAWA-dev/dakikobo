@@ -76,3 +76,14 @@ data/*.mutations.lock
 
 # Local review workspace (downloaded source PDFs, never committed)
 tmp/
+
+# Generated headless-browser rehearsal artifacts (screenshots, results, logs).
+# Produced by tests/browser_replay_check.py under a per-run subdirectory and
+# uploaded by CI on failure; never committed. The dated accessibility markdown
+# report is kept on purpose as human review evidence.
+reports/browser_replay_check/*.png
+reports/browser_replay_check/results.json
+reports/browser_replay_check/fixture.log
+reports/browser_replay_check/error.json
+# Per-invocation run directories (run-*, and any CI-supplied run id dirs).
+reports/browser_replay_check/*/
