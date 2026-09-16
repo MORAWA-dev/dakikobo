@@ -1478,6 +1478,150 @@ cd - && git worktree remove "$WT" --force
 - K2 remains partial pending human approval; K3 is ready for human review; K4 remains blocked pending the real-phone rehearsal.
 
 
+### 2026-09-15 — Task C: Docker container replacement and journal continuity (HTML ticket 07)
+
+- Added tests/docker_journal_rehearsal.py: a bounded, synthetic rehearsal that
+  runs the production image on an isolated temporary host directory mounted at
+  /data/dakikobo, with STATE_DB_PATH, CASE_LOG_DB_PATH and FEEDBACK_IMAGE_DIR
+  set into that mount. It uses APP_ENV=production (production Secure cookie kept
+  intact), a stable test-only secret, RAG_WARMUP_ON_START=false and empty
+  provider keys, so no model or provider is called.
+- Production Secure cookies are handled without weakening production: a
+  test-only cookie-aware harness (SecureCookieClient) captures the owner cookie
+  from Set-Cookie and re-sends it over HTTP, exactly as a browser over TLS
+  would. The server keeps setting Secure cookies.
+- Flow: save one explicitly consented synthetic case in the first container,
+  keep the owner cookie, stop+remove the container, start a replacement from the
+  same image/secret/mount, and verify: owner's case survived; a second client
+  sees no case; a non-owner delete returns deleted:0 and leaves the case intact;
+  the owner delete returns deleted:1 and removes it. Negative control: a fresh
+  empty mount contains no case.
+- Every container/HTTP step has a timeout; containers run with --rm and are
+  force-removed in a finally block, so cleanup happens on success and failure.
+  The bind mount is a throwaway temp dir (chmod 0777 so the uid-1000 container
+  user can write the SQLite journal) removed at the end. The printed summary is
+  booleans only; no cookie, secret, or database content is emitted.
+- Added .github/workflows/docker-journal-rehearsal.yml (build image, run the
+  rehearsal). Documented the local-bind-mount-vs-provider-durability
+  distinction in DEPLOYMENT.md. The runner skips cleanly (exit 0) with
+  --skip-if-no-docker when Docker is unavailable.
+- Local verification: built the production image; rehearsal passed all seven
+  assertions (owner survival, other-client exclusion, non-owner delete no-op,
+  case intact, owner delete, case removed, fresh-mount empty); no lingering
+  containers afterwards. `python -m pytest -q tests/test_recovery.py` → 3
+  passed. Offline checks: 652 offline Python tests passed (1 PyPDF2 warning),
+  30 JavaScript tests passed, offline fertilizer export unchanged, git
+  diff --check clean.
+- Limitation: this is local bind-mount persistence evidence only. It is NOT
+  hosting-provider disk durability, host-rebuild/volume-migration recovery, or
+  physical-browser/participant validation, which remain explicitly pending. No
+  deployment, no production infrastructure change, no storage purchased, and no
+  live-service restart.
+
+
+### 2026-09-15 — PR #9 review fix: Docker isolation, negative control, cleanup
+
+- Review findings addressed in tests/docker_journal_rehearsal.py (refactored
+  into a `Rehearsal` object that owns only the containers it starts):
+  - Unique names: each run gets a UUID token; containers are named
+    `dakikobo-journal-<token>-{a,b,control}`. The run never force-removes a
+    fixed/global name, so it cannot remove a container belonging to another run;
+    it removes only the names it recorded as started.
+  - Strengthened negative control: the positive (replacement) mount stays live
+    and still holds the case; a separate container is started on a fresh empty
+    mount; the SAME owner cookie is pointed at both. Asserts owner sees the case
+    on the positive mount, sees no case on the empty mount, the positive case is
+    intact after the control, and only THEN performs the owner deletion.
+  - Reliable cleanup: `Rehearsal.cleanup()` removes each owned container
+    independently, each with its own REMOVE_TIMEOUT, so a timeout/failure on one
+    does not skip the others; it returns a list of cleanup errors instead of
+    silently ignoring them. `rehearse()` runs the body, then in `finally`
+    removes all containers BEFORE deleting the temp mount, and preserves the
+    original error (via exception chaining) while appending any cleanup errors;
+    a clean body with failing cleanup raises CleanupError.
+  - `SecureCookieClient.retarget()` keeps the owner cookie across the port
+    change between the original, replacement, and control containers.
+- Tests: tests/test_docker_journal_rehearsal.py — seven failure-path unit tests
+  that MOCK the Docker CLI (no daemon needed): unique per-run naming, cleanup
+  removes only started containers, cleanup continues past a per-container
+  removal timeout, cleanup reports removal failures, rehearse preserves the
+  original error while reporting cleanup errors, rehearse raises CleanupError
+  when the body passes but cleanup fails, and retarget keeps the cookie.
+- Local verification: built the production image and ran the real rehearsal —
+  all 9 assertions passed (incl. owner_sees_case_on_positive_mount,
+  same_owner_sees_no_case_on_empty_mount, positive_case_intact_after_control),
+  unique container names used, no lingering containers afterwards.
+  `python -m pytest -q tests/test_recovery.py` → 3 passed. Offline checks: 659
+  offline Python tests passed (1 PyPDF2 warning), 30 JavaScript tests passed,
+  offline fertilizer export unchanged, git diff --check clean.
+- Still local bind-mount persistence evidence only. Hosting-provider disk
+  durability, host rebuild/volume migration, physical-phone testing, farmer
+  pilot, and expert approval remain explicitly pending.
+
+
+### 2026-09-15 — PR #9 review round 2: detect ordinary docker rm failures
+
+- Review finding: `_remove_one` ran `docker rm -f` with check=False but ignored
+  the return code, so a normal nonzero Docker result was treated as success and
+  the container was untracked while possibly still running, which could
+  invalidate the replacement rehearsal and leave the mount in use.
+- Fix:
+  - `_remove_one` now inspects `CompletedProcess.returncode`; a nonzero exit
+    raises `RemovalFailed` with bounded stderr (300 chars) in the internal
+    message. Timeouts still raise `TimeoutExpired`.
+  - `stop()` untracks a container from `_started` only after a confirmed
+    successful removal (the deliberate replacement no longer proceeds on an
+    unconfirmed stop).
+  - `cleanup()` attempts every owned container independently, reports all
+    failures (timeout, nonzero, or exception), and keeps any unconfirmed
+    container in `_started`. It never touches containers from another run
+    (names are per-run UUID-scoped).
+  - `rehearse()` deletes the bind-mount data only when no owned container
+    removal is unconfirmed; otherwise it withholds the deletion, leaves the
+    workspace, and reports it (`withheld mount cleanup: ...`) as a CleanupError,
+    while still preserving any primary rehearsal error.
+- Tests (tests/test_docker_journal_rehearsal.py, all mocked Docker): nonzero
+  `docker rm -f` without an exception raises RemovalFailed with stderr; stop()
+  keeps a failed container in `_started`; cleanup continues past a nonzero
+  removal and reports it while removing the healthy container; mount cleanup is
+  withheld (shutil.rmtree not called) and explicitly reported when a container
+  removal is unconfirmed.
+- Validation: 11 Docker helper unit tests passed; tests/test_recovery.py 3
+  passed; real Docker journal rehearsal passed all 9 assertions with no
+  lingering containers; full offline Python 663 passed (1 PyPDF2 warning); 30
+  JavaScript passed; offline fertilizer export unchanged; git diff --check clean.
+- Still local bind-mount persistence evidence only; hosting-provider durability,
+  host rebuild, physical-phone, farmer pilot, and expert approval remain pending.
+
+
+### 2026-09-15 — PR #9 review round 3: report workspace-deletion failures
+
+- Review finding: rehearse() deleted the temp workspace with
+  `shutil.rmtree(workspace, ignore_errors=True)`, silently hiding filesystem
+  cleanup failures that the acceptance criteria require to be reported.
+- Fix: replaced the silent call with explicit handling. On success the
+  workspace is removed as before. On OSError, a bounded message
+  (`failed to remove workspace <path>: <reason[:300]>`) is appended to
+  cleanup_errors, preserving the workspace path; the existing logic then reports
+  it as a CleanupError (clean body) or appends it to the preserved primary
+  rehearsal error (failed body). Mount data is still only deleted when no owned
+  container removal is unconfirmed (the withheld-cleanup branch is unchanged).
+  Added _CLEANUP_MESSAGE_LIMIT (300) to bound the reported detail.
+- Tests (tests/test_docker_journal_rehearsal.py, mocked): successful workspace
+  deletion reports no error; rmtree failure after clean container cleanup is
+  reported as CleanupError with the path + bounded reason; rmtree failure while
+  a primary rehearsal error already exists preserves the primary error and
+  reports the workspace failure alongside it (cause chain intact); the workspace
+  cleanup error output is bounded (a 5000-char reason is not echoed in full).
+- Validation: .venv/bin/pytest -q tests/test_docker_journal_rehearsal.py
+  tests/test_recovery.py -> 18 passed (15 docker unit incl. 4 new, 3 recovery),
+  1 PyPDF2 warning. Real Docker rehearsal passed all 9 assertions, no lingering
+  containers. Full offline Python 667 passed; 30 JavaScript passed; offline
+  fertilizer export unchanged; git diff --check clean;
+  git diff --check origin/main...HEAD clean.
+- Still local bind-mount persistence evidence only; provider durability, host
+  rebuild, physical-phone, farmer pilot, and expert approval remain pending.
+
 ### 2026-09-15 — Task B: automate headless-browser rehearsal in CI (HTML ticket 08)
 
 - Made tests/browser_replay_check.py a self-contained, reproducible runner: it

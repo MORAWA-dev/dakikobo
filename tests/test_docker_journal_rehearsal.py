@@ -1,0 +1,336 @@
+"""Failure-path unit tests for the Docker journal rehearsal.
+
+These mock the Docker CLI so they run in the normal offline suite with no
+Docker daemon. They cover the review findings: unique per-run container names,
+cleanup that continues past a per-container removal timeout, cleanup-error
+reporting, and preserving the original error while reporting cleanup problems.
+The real container rehearsal is exercised separately (see SESSION.md / CI).
+"""
+
+import subprocess
+
+import pytest
+
+import tests.docker_journal_rehearsal as rehearsal_mod
+from tests.docker_journal_rehearsal import (
+    CleanupError,
+    Rehearsal,
+    RehearsalError,
+    RemovalFailed,
+    SecureCookieClient,
+    rehearse,
+)
+
+
+def _fake_docker(record, *, timeout_names=None, fail_names=None, nonzero_names=None):
+    """Return a fake `_run` that records `docker rm` calls and can misbehave.
+
+    ``nonzero_names`` models the important case: `docker rm -f` returns a
+    NONZERO exit code WITHOUT raising (as with check=False), which the code must
+    detect rather than treat as success.
+    """
+    timeout_names = set(timeout_names or [])
+    fail_names = set(fail_names or [])
+    nonzero_names = set(nonzero_names or [])
+
+    def run(cmd, timeout=120, check=True):
+        if cmd[:3] == ["docker", "rm", "-f"]:
+            name = cmd[3]
+            record.append(name)
+            if name in timeout_names:
+                raise subprocess.TimeoutExpired(cmd, timeout)
+            if name in fail_names:
+                raise OSError(f"boom removing {name}")
+            if name in nonzero_names:
+                return subprocess.CompletedProcess(
+                    cmd, 1, "", f"Error: No such container: {name}"
+                )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    return run
+
+
+def test_container_names_are_unique_per_run():
+    a = Rehearsal("img", run_docker=lambda *a, **k: None)
+    b = Rehearsal("img", run_docker=lambda *a, **k: None)
+    assert a.token != b.token
+    assert a.container_name("a") != b.container_name("a")
+    assert a.container_name("a").startswith("dakikobo-journal-")
+    # A run only ever names containers under its own token.
+    assert a.token in a.container_name("control")
+
+
+def test_cleanup_removes_only_started_containers():
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=_fake_docker(record))
+    r._started = [r.container_name("a"), r.container_name("b")]
+    errors = r.cleanup()
+    assert errors == []
+    assert set(record) == {r.container_name("a"), r.container_name("b")}
+    assert r._started == []
+
+
+def test_cleanup_continues_after_a_removal_timeout():
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    stuck = "dakikobo-journal-x-a"
+    other = "dakikobo-journal-x-b"
+    r._run = _fake_docker(record, timeout_names={stuck})
+    r._started = [stuck, other]
+    errors = r.cleanup()
+    # The stuck container is reported, but the other is still removed.
+    assert any("timed out" in e and stuck in e for e in errors)
+    assert other in record
+    assert other not in r._started  # the removable one was cleaned up
+
+
+def test_cleanup_reports_removal_failures():
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    bad = "dakikobo-journal-y-a"
+    r._run = _fake_docker(record, fail_names={bad})
+    r._started = [bad]
+    errors = r.cleanup()
+    assert len(errors) == 1 and bad in errors[0] and "failed to remove" in errors[0]
+
+
+def test_rehearse_preserves_original_error_and_reports_cleanup(monkeypatch):
+    """A body failure is preserved; a concurrent cleanup timeout is appended."""
+    record: list[str] = []
+
+    class _StubRehearsal(Rehearsal):
+        def __init__(self):
+            super().__init__("img", run_docker=_fake_docker(record))
+            # Pretend two containers were started and one is stuck on removal.
+            self._started = [self.container_name("a"), self.container_name("b")]
+            self._run = _fake_docker(record, timeout_names={self.container_name("b")})
+
+    stub = _StubRehearsal()
+
+    def boom(*_args, **_kwargs):
+        raise RehearsalError("assertion body failed")
+
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", boom)
+
+    with pytest.raises(RehearsalError) as excinfo:
+        rehearse("img", rehearsal=stub)
+    message = str(excinfo.value)
+    # Original error preserved AND cleanup problem reported alongside it.
+    assert "assertion body failed" in message
+    assert "cleanup errors" in message
+    assert isinstance(excinfo.value.__cause__, RehearsalError)
+
+
+def test_rehearse_raises_cleanup_error_when_body_passes_but_cleanup_fails(monkeypatch):
+    record: list[str] = []
+
+    class _StubRehearsal(Rehearsal):
+        def __init__(self):
+            super().__init__("img", run_docker=_fake_docker(record))
+            self._started = [self.container_name("a")]
+            self._run = _fake_docker(record, fail_names={self.container_name("a")})
+
+    stub = _StubRehearsal()
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", lambda *a, **k: {"ok": True})
+
+    with pytest.raises(CleanupError):
+        rehearse("img", rehearsal=stub)
+
+
+def test_secure_cookie_client_retarget_keeps_cookie():
+    client = SecureCookieClient("http://127.0.0.1:5001")
+    client._cookie = "session=abc"
+    client.retarget("http://127.0.0.1:5002")
+    assert client._port == 5002
+    assert client.has_cookie and client._cookie == "session=abc"
+
+
+# --- Round 2: a nonzero `docker rm -f` exit (no exception) is a failure. ------
+
+def test_nonzero_docker_rm_is_treated_as_removal_failure():
+    """A nonzero exit without an exception must raise RemovalFailed with stderr."""
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    name = r.container_name("a")
+    r._run = _fake_docker(record, nonzero_names={name})
+    with pytest.raises(RemovalFailed) as excinfo:
+        r._remove_one(name)
+    message = str(excinfo.value)
+    assert name in message
+    assert "exited 1" in message
+    # Bounded stderr is included in the internal message.
+    assert "No such container" in message
+
+
+def test_stop_keeps_failed_container_in_started():
+    """stop() must not untrack a container whose removal was not confirmed."""
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    name = r.container_name("a")
+    r._run = _fake_docker(record, nonzero_names={name})
+    r._started = [name]
+    with pytest.raises(RemovalFailed):
+        r.stop("a")
+    # Still tracked because removal was never confirmed.
+    assert name in r._started
+    assert r.has_pending_containers
+
+
+def test_cleanup_continues_after_nonzero_removal_and_reports_it():
+    """A nonzero removal is reported; other containers are still removed."""
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    bad = r.container_name("a")
+    good = r.container_name("b")
+    r._run = _fake_docker(record, nonzero_names={bad})
+    r._started = [bad, good]
+    errors = r.cleanup()
+    assert any(bad in e and "exited 1" in e for e in errors)
+    assert good in record  # the healthy one was still attempted and removed
+    assert good not in r._started
+    assert bad in r._started  # unconfirmed removal stays tracked
+
+
+def test_mount_cleanup_withheld_when_containers_remain(monkeypatch, tmp_path):
+    """rehearse() must not delete mount data while any owned removal is unconfirmed."""
+    record: list[str] = []
+
+    class _StubRehearsal(Rehearsal):
+        def __init__(self):
+            super().__init__("img", run_docker=_fake_docker(record))
+            name = self.container_name("a")
+            self._started = [name]
+            self._run = _fake_docker(record, nonzero_names={name})
+
+    stub = _StubRehearsal()
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", lambda *a, **k: {"ok": True})
+
+    created = {}
+    real_mkdtemp = rehearsal_mod.tempfile.mkdtemp
+
+    def capture_mkdtemp(*args, **kwargs):
+        path = real_mkdtemp(*args, **kwargs)
+        created["workspace"] = path
+        return path
+
+    monkeypatch.setattr(rehearsal_mod.tempfile, "mkdtemp", capture_mkdtemp)
+
+    removed = {"called": False}
+    monkeypatch.setattr(
+        rehearsal_mod.shutil, "rmtree",
+        lambda *a, **k: removed.__setitem__("called", True),
+    )
+
+    with pytest.raises(CleanupError) as excinfo:
+        rehearse("img", rehearsal=stub)
+
+    # Mount data was NOT deleted, and the withheld cleanup is explicitly reported.
+    assert removed["called"] is False
+    message = str(excinfo.value)
+    assert "withheld mount cleanup" in message
+    assert stub.container_name("a") in message
+
+
+
+# --- Final correction: workspace deletion must never fail silently. -----------
+
+class _CleanRehearsal(Rehearsal):
+    """A rehearsal whose owned containers all remove cleanly (nothing pending)."""
+
+    def __init__(self):
+        record: list[str] = []
+        super().__init__("img", run_docker=_fake_docker(record))
+        # No started containers, so cleanup() succeeds and nothing is pending;
+        # the rehearse() finally block reaches the workspace-deletion path.
+        self._started = []
+
+
+def _run_rehearse_with_rmtree(monkeypatch, rmtree_impl):
+    """Drive rehearse() past a passing body to the workspace-deletion path.
+
+    Returns (captured_workspace_path, raised_exception_or_None).
+    """
+    stub = _CleanRehearsal()
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", lambda *a, **k: {"ok": True})
+
+    captured = {}
+    real_mkdtemp = rehearsal_mod.tempfile.mkdtemp
+
+    def capture_mkdtemp(*args, **kwargs):
+        path = real_mkdtemp(*args, **kwargs)
+        captured["workspace"] = path
+        return path
+
+    monkeypatch.setattr(rehearsal_mod.tempfile, "mkdtemp", capture_mkdtemp)
+    monkeypatch.setattr(rehearsal_mod.shutil, "rmtree", rmtree_impl)
+
+    raised = None
+    try:
+        rehearse("img", rehearsal=stub)
+    except BaseException as exc:  # noqa: BLE001 - the test inspects the error
+        raised = exc
+    return captured.get("workspace"), raised
+
+
+def test_successful_workspace_deletion_reports_no_error(monkeypatch):
+    deleted = {"path": None}
+    workspace, raised = _run_rehearse_with_rmtree(
+        monkeypatch, lambda path, *a, **k: deleted.__setitem__("path", str(path))
+    )
+    # rmtree was called on the real workspace and no cleanup error was raised.
+    assert raised is None
+    assert workspace is not None
+    assert deleted["path"] == workspace
+
+
+def test_rmtree_failure_after_clean_containers_is_reported(monkeypatch):
+    def failing_rmtree(path, *a, **k):
+        raise OSError("Device or resource busy")
+
+    workspace, raised = _run_rehearse_with_rmtree(monkeypatch, failing_rmtree)
+    # A filesystem cleanup failure is surfaced as CleanupError (containers were
+    # clean), and it preserves the workspace path plus the bounded reason.
+    assert isinstance(raised, CleanupError)
+    message = str(raised)
+    assert "failed to remove workspace" in message
+    assert workspace in message
+    assert "Device or resource busy" in message
+
+
+def test_rmtree_failure_is_reported_alongside_primary_error(monkeypatch):
+    stub = _CleanRehearsal()
+
+    def boom(*_a, **_k):
+        raise RehearsalError("assertion body failed")
+
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", boom)
+    monkeypatch.setattr(
+        rehearsal_mod.tempfile, "mkdtemp",
+        lambda *a, **k: rehearsal_mod.tempfile.gettempdir(),
+    )
+
+    def failing_rmtree(path, *a, **k):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(rehearsal_mod.shutil, "rmtree", failing_rmtree)
+
+    with pytest.raises(RehearsalError) as excinfo:
+        rehearse("img", rehearsal=stub)
+    message = str(excinfo.value)
+    # Primary error preserved AND the workspace cleanup failure reported with it.
+    assert "assertion body failed" in message
+    assert "failed to remove workspace" in message
+    assert isinstance(excinfo.value.__cause__, RehearsalError)
+
+
+def test_workspace_cleanup_error_is_bounded(monkeypatch):
+    long_reason = "x" * 5000
+
+    def failing_rmtree(path, *a, **k):
+        raise OSError(long_reason)
+
+    _workspace, raised = _run_rehearse_with_rmtree(monkeypatch, failing_rmtree)
+    assert isinstance(raised, CleanupError)
+    # The reported reason is bounded (does not echo the whole 5000-char detail).
+    assert len(str(raised)) < 1000
+    assert long_reason not in str(raised)
