@@ -1560,3 +1560,18 @@ cd - && git worktree remove "$WT" --force
   passed, offline fertilizer export unchanged, git diff --check clean.
 - Still headless-browser evidence only. Physical-phone testing, farmer pilot,
   expert approval, and hosting-provider durability remain pending.
+
+
+### 2026-09-15 — PR #8 follow-up: import-safe without Playwright
+
+- The first review-fix push failed the offline `regression` CI job: that job
+  does not install the test-only Playwright dependency, and
+  tests/test_browser_replay_check.py imports tests/browser_replay_check.py,
+  which imported playwright at module top level -> ModuleNotFoundError at
+  collection.
+- Fix: import Playwright lazily via `_load_playwright()` called inside `run()`.
+  The module (and the failure-capture unit test) now import cleanly without
+  Playwright; the Chromium-gated e2e test skips where it is absent. Verified by
+  simulating a missing playwright import locally.
+- CI after the fix: regression, chromium-rehearsal, and build-and-smoke all
+  green on ci/browser-rehearsal.
