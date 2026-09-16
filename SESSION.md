@@ -1538,3 +1538,25 @@ cd - && git worktree remove "$WT" --force
   (renderFeedback sends sources, journal panel replays them). The JavaScript
   tests for absent scope and literal unsafe-markup rendering are unchanged.
 - Never reconstructs missing historical sources; legacy cases stay readable.
+
+
+### 2026-09-15 — PR #7 review round 2: French validation for malformed sources
+
+- Review finding: malformed source cards still surfaced English validation text.
+  normalize_sources_json raises English ValueErrors ("each source must be a
+  dict or string", "sources payload is too large to store") and the /feedback
+  route's `except ValueError: return {"error": str(exc)}` could return that text
+  to the user; also `sources='[1]'` passed the boundary (a JSON list) and failed
+  only inside record_feedback.
+- Fix: validate every source entry at the /feedback HTTP boundary by calling the
+  canonical normalize_sources_json there and mapping any ValueError/TypeError to
+  the stable French message « Les sources du conseil sont invalides. ». The
+  oversized-payload branch now returns the same French message (using the
+  shared MAX_SOURCES_JSON_CHARS cap). Internal validator text is never returned.
+- Valid sources and legacy (no-sources) journal behavior are unchanged; nothing
+  is persisted when the payload is rejected.
+- Tests (tests/test_app_routes.py): sources='[1]' -> 400 with the French
+  message and no English wording, nothing saved; oversized JSON -> 400 French,
+  nothing saved; valid cards still save and replay their scope.
+- Validation: full offline Python 663 passed (1 PyPDF2 warning), 33 JavaScript
+  passed, offline fertilizer export unchanged, git diff --check clean.

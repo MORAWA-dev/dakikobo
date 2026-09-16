@@ -66,9 +66,11 @@ from core.examples import get_demo_example
 from core.case import build_advice_case
 from core.case_log import (
     SCHEMA_VERSION as CASE_LOG_SCHEMA_VERSION,
+    MAX_SOURCES_JSON_CHARS,
     VALID_ANSWER_PATHS,
     clone_evidence_batch,
     list_due_followups,
+    normalize_sources_json,
     record_evidence,
     record_feedback,
     record_outcome,
@@ -1774,13 +1776,19 @@ def feedback():
     sources_field = request.form.get("sources", "").strip()
     saved_sources = None
     if sources_field:
-        if len(sources_field) > 20000:
-            return jsonify({"error": "Les sources du conseil sont trop volumineuses."}), 400
+        if len(sources_field) > MAX_SOURCES_JSON_CHARS:
+            return jsonify({"error": "Les sources du conseil sont invalides."}), 400
         try:
             parsed_sources = json.loads(sources_field)
         except ValueError:
             return jsonify({"error": "Les sources du conseil sont invalides."}), 400
-        if not isinstance(parsed_sources, list):
+        # Validate every entry at the HTTP boundary using the canonical
+        # validator, so malformed cards (e.g. `[1]`) or an oversized payload are
+        # rejected here with a stable French message. Internal ValueError text
+        # from normalize_sources_json is never surfaced to the user.
+        try:
+            normalize_sources_json(parsed_sources)
+        except (ValueError, TypeError):
             return jsonify({"error": "Les sources du conseil sont invalides."}), 400
         # Persist the source cards verbatim (including each card's declared
         # scope). We never reconstruct or invent sources for a saved case.

@@ -1182,6 +1182,76 @@ def test_legacy_journal_case_without_sources_still_replays(monkeypatch, tmp_path
     assert replayed["sources"] == []
 
 
+def test_feedback_rejects_malformed_sources_with_french_message(monkeypatch, tmp_path):
+    """Malformed source cards are rejected at the boundary with French text.
+
+    A JSON list whose entries are not dict/string (e.g. `[1]`) must not leak the
+    internal English ValueError; the user sees the stable French message and no
+    case is saved.
+    """
+    monkeypatch.setattr(app_module, "FEEDBACK_IMAGES", str(tmp_path / "photos"))
+    client = app_module.app.test_client()
+
+    response = client.post("/feedback", data={
+        "rating": "up",
+        "question": "Q",
+        "answer": "A",
+        "consent": "1",
+        "sources": "[1]",
+    })
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "Les sources du conseil sont invalides."
+    # No internal validation wording leaks to the client.
+    assert "each source" not in payload["error"]
+    assert "dict" not in payload["error"]
+    # Nothing was persisted for this owner.
+    assert client.get("/journal").get_json()["cases"] == []
+
+
+def test_feedback_rejects_oversized_sources_with_french_message(monkeypatch, tmp_path):
+    """An oversized source JSON payload is rejected with the French message."""
+    monkeypatch.setattr(app_module, "FEEDBACK_IMAGES", str(tmp_path / "photos"))
+    client = app_module.app.test_client()
+
+    huge = json.dumps([{"title": "x" * 30000}])
+    response = client.post("/feedback", data={
+        "rating": "up",
+        "question": "Q",
+        "answer": "A",
+        "consent": "1",
+        "sources": huge,
+    })
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "Les sources du conseil sont invalides."
+    assert "too large" not in payload["error"]
+    assert client.get("/journal").get_json()["cases"] == []
+
+
+def test_feedback_accepts_valid_sources_after_validation(monkeypatch, tmp_path):
+    """Valid source cards still save and replay (no regression from validation)."""
+    monkeypatch.setattr(app_module, "FEEDBACK_IMAGES", str(tmp_path / "photos"))
+    client = app_module.app.test_client()
+
+    cards = [{"title": "Source", "type": "Base locale", "snippet": "Extrait.",
+              "scope": "Portée déclarée."}]
+    saved = client.post("/feedback", data={
+        "rating": "up",
+        "question": "Q",
+        "answer": "A",
+        "consent": "1",
+        "sources": json.dumps(cards),
+    })
+    assert saved.status_code == 200
+    case_id = saved.get_json()["feedback_id"]
+    replayed = next(
+        case for case in client.get("/journal").get_json()["cases"]
+        if case["feedback_id"] == case_id
+    )
+    assert replayed["sources"][0]["scope"] == "Portée déclarée."
+
+
 def test_rag_route_filters_and_ranks_sources_by_relevance_score(monkeypatch):
     client = app_module.app.test_client()
 
