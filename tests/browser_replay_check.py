@@ -50,8 +50,29 @@ import traceback
 from contextlib import closing, contextmanager
 from pathlib import Path
 
-from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import expect, sync_playwright
+# Playwright is a TEST-ONLY dependency (requirements-browser.txt) and is not
+# installed in the offline regression job. Import it lazily so this module can
+# be imported (e.g. by the unit test for the failure-capture helper) without
+# Playwright present. ``_load_playwright`` populates the module globals used by
+# the browser-driving functions and raises a clear error if it is missing.
+expect = None  # type: ignore[assignment]
+sync_playwright = None  # type: ignore[assignment]
+
+
+class PlaywrightError(Exception):
+    """Placeholder until the real Playwright error type is loaded."""
+
+
+def _load_playwright() -> None:
+    """Bind the real Playwright symbols into module globals (lazy import)."""
+    global expect, sync_playwright, PlaywrightError
+    from playwright.sync_api import Error as _PlaywrightError
+    from playwright.sync_api import expect as _expect
+    from playwright.sync_api import sync_playwright as _sync_playwright
+
+    expect = _expect
+    sync_playwright = _sync_playwright
+    PlaywrightError = _PlaywrightError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -279,6 +300,7 @@ def _capture_failure(page, artifact_dir: Path, width: int, error: BaseException,
 
 def run(base_url: str, widths: list[int], artifact_dir: Path) -> list[dict]:
     """Run the checks at each width; on failure capture evidence, then re-raise."""
+    _load_playwright()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     results: list[dict] = []
     with sync_playwright() as playwright:
