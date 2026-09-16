@@ -65,6 +65,13 @@ class CleanupError(RuntimeError):
     """Raised when one or more owned containers could not be removed."""
 
 
+class RemovalFailed(RuntimeError):
+    """Raised when `docker rm -f` returns a nonzero exit for one container."""
+
+
+_STDERR_LIMIT = 300  # bounded stderr kept in internal failure messages
+
+
 # ---------------------------------------------------------------------------
 # Test-only cookie-aware HTTP harness
 # ---------------------------------------------------------------------------
@@ -245,29 +252,52 @@ class Rehearsal:
         return f"http://127.0.0.1:{port}"
 
     def stop(self, role: str) -> None:
-        """Remove one owned container now (used for the deliberate replacement)."""
+        """Remove one owned container now (used for the deliberate replacement).
+
+        Only untracks the container after `docker rm -f` is confirmed
+        successful; a nonzero exit or timeout raises so the caller does not
+        proceed with a container that may still be running.
+        """
         name = self.container_name(role)
         self._remove_one(name)
         self._started = [n for n in self._started if n != name]
 
     def _remove_one(self, name: str) -> None:
         # Each removal has its own timeout so a single stuck container cannot
-        # prevent the others from being cleaned up.
-        self._run(["docker", "rm", "-f", name], timeout=REMOVE_TIMEOUT, check=False)
+        # prevent the others from being cleaned up. `docker rm -f` can return a
+        # nonzero exit WITHOUT raising (check=False), so we must inspect the
+        # return code: a nonzero result means the container was not confirmed
+        # removed and may still be running.
+        result = self._run(
+            ["docker", "rm", "-f", name], timeout=REMOVE_TIMEOUT, check=False
+        )
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()[:_STDERR_LIMIT]
+            raise RemovalFailed(
+                f"docker rm -f {name} exited {result.returncode}: {stderr}"
+            )
+
+    @property
+    def has_pending_containers(self) -> bool:
+        """True while any started container has not been confirmed removed."""
+        return bool(self._started)
 
     def cleanup(self) -> list[str]:
         """Remove every container this run started, independently.
 
         Returns a list of human-readable cleanup errors (empty when clean). A
-        timeout or failure removing one container never skips the others.
+        timeout, nonzero exit, or exception removing one container never skips
+        the others, and a container is untracked only after confirmed removal.
         """
         errors: list[str] = []
         for name in list(self._started):
             try:
                 self._remove_one(name)
-                self._started.remove(name)
+                self._started.remove(name)  # only after confirmed success
             except subprocess.TimeoutExpired:
                 errors.append(f"timed out removing container {name}")
+            except RemovalFailed as exc:
+                errors.append(str(exc))
             except Exception as exc:  # keep cleaning the rest regardless
                 errors.append(f"failed to remove container {name}: {exc}")
         return errors
@@ -371,9 +401,18 @@ def rehearse(image: str, *, rehearsal: Rehearsal | None = None) -> dict:
     except BaseException as error:
         primary_error = error
     finally:
-        # Remove all owned containers FIRST (independently), then mount data.
+        # Remove all owned containers FIRST (independently). Only delete the
+        # bind-mount data once every owned container removal is confirmed: a
+        # container still running could hold the mount in use, so withhold the
+        # deletion and report it rather than deleting data under a live mount.
         cleanup_errors = rehearsal.cleanup()
-        shutil.rmtree(workspace, ignore_errors=True)
+        if rehearsal.has_pending_containers:
+            cleanup_errors.append(
+                "withheld mount cleanup: unconfirmed containers still owned "
+                f"({', '.join(rehearsal._started)}); left {workspace}"
+            )
+        else:
+            shutil.rmtree(workspace, ignore_errors=True)
 
     if primary_error is not None:
         # Preserve the original error; attach cleanup problems as context.
@@ -416,7 +455,7 @@ def main() -> int:
     try:
         ensure_image(args.image)
         summary = rehearse(args.image)
-    except (RehearsalError, CleanupError, subprocess.TimeoutExpired) as error:
+    except (RehearsalError, CleanupError, RemovalFailed, subprocess.TimeoutExpired) as error:
         print(f"Docker journal rehearsal FAILED: {error}", file=sys.stderr)
         return 1
 

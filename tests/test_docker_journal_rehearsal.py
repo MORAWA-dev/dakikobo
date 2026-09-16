@@ -16,15 +16,22 @@ from tests.docker_journal_rehearsal import (
     CleanupError,
     Rehearsal,
     RehearsalError,
+    RemovalFailed,
     SecureCookieClient,
     rehearse,
 )
 
 
-def _fake_docker(record, *, timeout_names=None, fail_names=None):
-    """Return a fake `_run` that records `docker rm` calls and can misbehave."""
+def _fake_docker(record, *, timeout_names=None, fail_names=None, nonzero_names=None):
+    """Return a fake `_run` that records `docker rm` calls and can misbehave.
+
+    ``nonzero_names`` models the important case: `docker rm -f` returns a
+    NONZERO exit code WITHOUT raising (as with check=False), which the code must
+    detect rather than treat as success.
+    """
     timeout_names = set(timeout_names or [])
     fail_names = set(fail_names or [])
+    nonzero_names = set(nonzero_names or [])
 
     def run(cmd, timeout=120, check=True):
         if cmd[:3] == ["docker", "rm", "-f"]:
@@ -34,6 +41,10 @@ def _fake_docker(record, *, timeout_names=None, fail_names=None):
                 raise subprocess.TimeoutExpired(cmd, timeout)
             if name in fail_names:
                 raise OSError(f"boom removing {name}")
+            if name in nonzero_names:
+                return subprocess.CompletedProcess(
+                    cmd, 1, "", f"Error: No such container: {name}"
+                )
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     return run
@@ -132,3 +143,89 @@ def test_secure_cookie_client_retarget_keeps_cookie():
     client.retarget("http://127.0.0.1:5002")
     assert client._port == 5002
     assert client.has_cookie and client._cookie == "session=abc"
+
+
+# --- Round 2: a nonzero `docker rm -f` exit (no exception) is a failure. ------
+
+def test_nonzero_docker_rm_is_treated_as_removal_failure():
+    """A nonzero exit without an exception must raise RemovalFailed with stderr."""
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    name = r.container_name("a")
+    r._run = _fake_docker(record, nonzero_names={name})
+    with pytest.raises(RemovalFailed) as excinfo:
+        r._remove_one(name)
+    message = str(excinfo.value)
+    assert name in message
+    assert "exited 1" in message
+    # Bounded stderr is included in the internal message.
+    assert "No such container" in message
+
+
+def test_stop_keeps_failed_container_in_started():
+    """stop() must not untrack a container whose removal was not confirmed."""
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    name = r.container_name("a")
+    r._run = _fake_docker(record, nonzero_names={name})
+    r._started = [name]
+    with pytest.raises(RemovalFailed):
+        r.stop("a")
+    # Still tracked because removal was never confirmed.
+    assert name in r._started
+    assert r.has_pending_containers
+
+
+def test_cleanup_continues_after_nonzero_removal_and_reports_it():
+    """A nonzero removal is reported; other containers are still removed."""
+    record: list[str] = []
+    r = Rehearsal("img", run_docker=None)
+    bad = r.container_name("a")
+    good = r.container_name("b")
+    r._run = _fake_docker(record, nonzero_names={bad})
+    r._started = [bad, good]
+    errors = r.cleanup()
+    assert any(bad in e and "exited 1" in e for e in errors)
+    assert good in record  # the healthy one was still attempted and removed
+    assert good not in r._started
+    assert bad in r._started  # unconfirmed removal stays tracked
+
+
+def test_mount_cleanup_withheld_when_containers_remain(monkeypatch, tmp_path):
+    """rehearse() must not delete mount data while any owned removal is unconfirmed."""
+    record: list[str] = []
+
+    class _StubRehearsal(Rehearsal):
+        def __init__(self):
+            super().__init__("img", run_docker=_fake_docker(record))
+            name = self.container_name("a")
+            self._started = [name]
+            self._run = _fake_docker(record, nonzero_names={name})
+
+    stub = _StubRehearsal()
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", lambda *a, **k: {"ok": True})
+
+    created = {}
+    real_mkdtemp = rehearsal_mod.tempfile.mkdtemp
+
+    def capture_mkdtemp(*args, **kwargs):
+        path = real_mkdtemp(*args, **kwargs)
+        created["workspace"] = path
+        return path
+
+    monkeypatch.setattr(rehearsal_mod.tempfile, "mkdtemp", capture_mkdtemp)
+
+    removed = {"called": False}
+    monkeypatch.setattr(
+        rehearsal_mod.shutil, "rmtree",
+        lambda *a, **k: removed.__setitem__("called", True),
+    )
+
+    with pytest.raises(CleanupError) as excinfo:
+        rehearse("img", rehearsal=stub)
+
+    # Mount data was NOT deleted, and the withheld cleanup is explicitly reported.
+    assert removed["called"] is False
+    message = str(excinfo.value)
+    assert "withheld mount cleanup" in message
+    assert stub.container_name("a") in message

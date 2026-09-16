@@ -166,8 +166,12 @@ populated mount and none on the empty mount, and the populated case stays intact
 before the owner deletion runs. Container names are unique per run (a UUID
 token), so the rehearsal only ever removes the containers it started and never a
 fixed name that could belong to another run; cleanup removes each container
-independently (one slow removal cannot skip the others) and before any mount
-data is deleted. Run it locally with Docker:
+independently (one slow removal cannot skip the others) and inspects the
+`docker rm -f` exit code, so a nonzero result is treated as a cleanup failure
+rather than silent success. A container is untracked only after its removal is
+confirmed, and the bind-mount data is deleted only once every owned container is
+confirmed removed; otherwise the deletion is withheld and reported so data is
+never removed under a still-running mount. Run it locally with Docker:
 
 ```bash
 python tests/docker_journal_rehearsal.py

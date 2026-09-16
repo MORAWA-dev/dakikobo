@@ -1557,3 +1557,38 @@ cd - && git worktree remove "$WT" --force
 - Still local bind-mount persistence evidence only. Hosting-provider disk
   durability, host rebuild/volume migration, physical-phone testing, farmer
   pilot, and expert approval remain explicitly pending.
+
+
+### 2026-09-15 — PR #9 review round 2: detect ordinary docker rm failures
+
+- Review finding: `_remove_one` ran `docker rm -f` with check=False but ignored
+  the return code, so a normal nonzero Docker result was treated as success and
+  the container was untracked while possibly still running, which could
+  invalidate the replacement rehearsal and leave the mount in use.
+- Fix:
+  - `_remove_one` now inspects `CompletedProcess.returncode`; a nonzero exit
+    raises `RemovalFailed` with bounded stderr (300 chars) in the internal
+    message. Timeouts still raise `TimeoutExpired`.
+  - `stop()` untracks a container from `_started` only after a confirmed
+    successful removal (the deliberate replacement no longer proceeds on an
+    unconfirmed stop).
+  - `cleanup()` attempts every owned container independently, reports all
+    failures (timeout, nonzero, or exception), and keeps any unconfirmed
+    container in `_started`. It never touches containers from another run
+    (names are per-run UUID-scoped).
+  - `rehearse()` deletes the bind-mount data only when no owned container
+    removal is unconfirmed; otherwise it withholds the deletion, leaves the
+    workspace, and reports it (`withheld mount cleanup: ...`) as a CleanupError,
+    while still preserving any primary rehearsal error.
+- Tests (tests/test_docker_journal_rehearsal.py, all mocked Docker): nonzero
+  `docker rm -f` without an exception raises RemovalFailed with stderr; stop()
+  keeps a failed container in `_started`; cleanup continues past a nonzero
+  removal and reports it while removing the healthy container; mount cleanup is
+  withheld (shutil.rmtree not called) and explicitly reported when a container
+  removal is unconfirmed.
+- Validation: 11 Docker helper unit tests passed; tests/test_recovery.py 3
+  passed; real Docker journal rehearsal passed all 9 assertions with no
+  lingering containers; full offline Python 663 passed (1 PyPDF2 warning); 30
+  JavaScript passed; offline fertilizer export unchanged; git diff --check clean.
+- Still local bind-mount persistence evidence only; hosting-provider durability,
+  host rebuild, physical-phone, farmer pilot, and expert approval remain pending.
