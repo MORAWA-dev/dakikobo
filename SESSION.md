@@ -1592,3 +1592,32 @@ cd - && git worktree remove "$WT" --force
   JavaScript passed; offline fertilizer export unchanged; git diff --check clean.
 - Still local bind-mount persistence evidence only; hosting-provider durability,
   host rebuild, physical-phone, farmer pilot, and expert approval remain pending.
+
+
+### 2026-09-15 — PR #9 review round 3: report workspace-deletion failures
+
+- Review finding: rehearse() deleted the temp workspace with
+  `shutil.rmtree(workspace, ignore_errors=True)`, silently hiding filesystem
+  cleanup failures that the acceptance criteria require to be reported.
+- Fix: replaced the silent call with explicit handling. On success the
+  workspace is removed as before. On OSError, a bounded message
+  (`failed to remove workspace <path>: <reason[:300]>`) is appended to
+  cleanup_errors, preserving the workspace path; the existing logic then reports
+  it as a CleanupError (clean body) or appends it to the preserved primary
+  rehearsal error (failed body). Mount data is still only deleted when no owned
+  container removal is unconfirmed (the withheld-cleanup branch is unchanged).
+  Added _CLEANUP_MESSAGE_LIMIT (300) to bound the reported detail.
+- Tests (tests/test_docker_journal_rehearsal.py, mocked): successful workspace
+  deletion reports no error; rmtree failure after clean container cleanup is
+  reported as CleanupError with the path + bounded reason; rmtree failure while
+  a primary rehearsal error already exists preserves the primary error and
+  reports the workspace failure alongside it (cause chain intact); the workspace
+  cleanup error output is bounded (a 5000-char reason is not echoed in full).
+- Validation: .venv/bin/pytest -q tests/test_docker_journal_rehearsal.py
+  tests/test_recovery.py -> 18 passed (15 docker unit incl. 4 new, 3 recovery),
+  1 PyPDF2 warning. Real Docker rehearsal passed all 9 assertions, no lingering
+  containers. Full offline Python 667 passed; 30 JavaScript passed; offline
+  fertilizer export unchanged; git diff --check clean;
+  git diff --check origin/main...HEAD clean.
+- Still local bind-mount persistence evidence only; provider durability, host
+  rebuild, physical-phone, farmer pilot, and expert approval remain pending.

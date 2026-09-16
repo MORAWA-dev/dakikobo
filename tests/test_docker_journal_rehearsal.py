@@ -229,3 +229,108 @@ def test_mount_cleanup_withheld_when_containers_remain(monkeypatch, tmp_path):
     message = str(excinfo.value)
     assert "withheld mount cleanup" in message
     assert stub.container_name("a") in message
+
+
+
+# --- Final correction: workspace deletion must never fail silently. -----------
+
+class _CleanRehearsal(Rehearsal):
+    """A rehearsal whose owned containers all remove cleanly (nothing pending)."""
+
+    def __init__(self):
+        record: list[str] = []
+        super().__init__("img", run_docker=_fake_docker(record))
+        # No started containers, so cleanup() succeeds and nothing is pending;
+        # the rehearse() finally block reaches the workspace-deletion path.
+        self._started = []
+
+
+def _run_rehearse_with_rmtree(monkeypatch, rmtree_impl):
+    """Drive rehearse() past a passing body to the workspace-deletion path.
+
+    Returns (captured_workspace_path, raised_exception_or_None).
+    """
+    stub = _CleanRehearsal()
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", lambda *a, **k: {"ok": True})
+
+    captured = {}
+    real_mkdtemp = rehearsal_mod.tempfile.mkdtemp
+
+    def capture_mkdtemp(*args, **kwargs):
+        path = real_mkdtemp(*args, **kwargs)
+        captured["workspace"] = path
+        return path
+
+    monkeypatch.setattr(rehearsal_mod.tempfile, "mkdtemp", capture_mkdtemp)
+    monkeypatch.setattr(rehearsal_mod.shutil, "rmtree", rmtree_impl)
+
+    raised = None
+    try:
+        rehearse("img", rehearsal=stub)
+    except BaseException as exc:  # noqa: BLE001 - the test inspects the error
+        raised = exc
+    return captured.get("workspace"), raised
+
+
+def test_successful_workspace_deletion_reports_no_error(monkeypatch):
+    deleted = {"path": None}
+    workspace, raised = _run_rehearse_with_rmtree(
+        monkeypatch, lambda path, *a, **k: deleted.__setitem__("path", str(path))
+    )
+    # rmtree was called on the real workspace and no cleanup error was raised.
+    assert raised is None
+    assert workspace is not None
+    assert deleted["path"] == workspace
+
+
+def test_rmtree_failure_after_clean_containers_is_reported(monkeypatch):
+    def failing_rmtree(path, *a, **k):
+        raise OSError("Device or resource busy")
+
+    workspace, raised = _run_rehearse_with_rmtree(monkeypatch, failing_rmtree)
+    # A filesystem cleanup failure is surfaced as CleanupError (containers were
+    # clean), and it preserves the workspace path plus the bounded reason.
+    assert isinstance(raised, CleanupError)
+    message = str(raised)
+    assert "failed to remove workspace" in message
+    assert workspace in message
+    assert "Device or resource busy" in message
+
+
+def test_rmtree_failure_is_reported_alongside_primary_error(monkeypatch):
+    stub = _CleanRehearsal()
+
+    def boom(*_a, **_k):
+        raise RehearsalError("assertion body failed")
+
+    monkeypatch.setattr(rehearsal_mod, "_run_checks", boom)
+    monkeypatch.setattr(
+        rehearsal_mod.tempfile, "mkdtemp",
+        lambda *a, **k: rehearsal_mod.tempfile.gettempdir(),
+    )
+
+    def failing_rmtree(path, *a, **k):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(rehearsal_mod.shutil, "rmtree", failing_rmtree)
+
+    with pytest.raises(RehearsalError) as excinfo:
+        rehearse("img", rehearsal=stub)
+    message = str(excinfo.value)
+    # Primary error preserved AND the workspace cleanup failure reported with it.
+    assert "assertion body failed" in message
+    assert "failed to remove workspace" in message
+    assert isinstance(excinfo.value.__cause__, RehearsalError)
+
+
+def test_workspace_cleanup_error_is_bounded(monkeypatch):
+    long_reason = "x" * 5000
+
+    def failing_rmtree(path, *a, **k):
+        raise OSError(long_reason)
+
+    _workspace, raised = _run_rehearse_with_rmtree(monkeypatch, failing_rmtree)
+    assert isinstance(raised, CleanupError)
+    # The reported reason is bounded (does not echo the whole 5000-char detail).
+    assert len(str(raised)) < 1000
+    assert long_reason not in str(raised)

@@ -70,6 +70,7 @@ class RemovalFailed(RuntimeError):
 
 
 _STDERR_LIMIT = 300  # bounded stderr kept in internal failure messages
+_CLEANUP_MESSAGE_LIMIT = 300  # bounded detail kept in filesystem cleanup errors
 
 
 # ---------------------------------------------------------------------------
@@ -412,7 +413,16 @@ def rehearse(image: str, *, rehearsal: Rehearsal | None = None) -> dict:
                 f"({', '.join(rehearsal._started)}); left {workspace}"
             )
         else:
-            shutil.rmtree(workspace, ignore_errors=True)
+            # Delete the temp workspace, but never silently: a filesystem
+            # cleanup failure is reported (bounded) with the preserved path so
+            # a leftover mount is visible, and any primary error still wins.
+            try:
+                shutil.rmtree(workspace)
+            except OSError as exc:
+                cleanup_errors.append(
+                    f"failed to remove workspace {workspace}: "
+                    f"{str(exc)[:_CLEANUP_MESSAGE_LIMIT]}"
+                )
 
     if primary_error is not None:
         # Preserve the original error; attach cleanup problems as context.
