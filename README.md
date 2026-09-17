@@ -79,7 +79,10 @@ remplacement de l'agent agricole.
   classes combined with deterministic fertilizer guidance.
 - **Private field journal** — explicit consent, anonymous browser ownership, 90-day retention,
   deletion, optional re-encoded follow-up photos, and a seven-day in-app follow-up date. Legacy
-  unowned records are never exposed through public journal routes.
+  unowned records are never exposed through public journal routes. A saved case also retains and
+  replays its source cards, including each source's declared scope shown under the French label
+  « Portée et limites »; cases saved before this feature simply replay without sources (their
+  sources are never reconstructed).
 - **Français simple** — plain-language mode is enabled by default, with a field glossary (NPK,
   microdose, OAPH, etc.).
 - **Reviewed-source ingestion** — Markdown and PDF candidates fail closed unless their metadata
@@ -246,6 +249,20 @@ The same evaluator is wired into GitHub Actions as
 also runs daily on schedule, uploading the Markdown report as an artifact.
 The Docker image is checked by `.github/workflows/docker-build.yml`, which builds
 the Space container and smoke-tests `/healthz` without pushing an image.
+
+Two further workflows exercise acceptance rehearsals in CI:
+
+- `.github/workflows/browser-rehearsal.yml` runs a headless-browser (Chromium)
+  rehearsal of the UI at 320 px and 1280 px against a synthetic fixture that
+  calls no model or provider, and uploads screenshots and results as artifacts.
+  Playwright is a test-only dependency (`requirements-browser.txt`) and is kept
+  out of the production requirements. This is headless-browser evidence only, not
+  physical-phone or participant testing.
+- `.github/workflows/docker-journal-rehearsal.yml` builds the production image and
+  runs a bounded synthetic rehearsal proving a private journal saved into a local
+  bind mount survives a container replacement. This is local bind-mount
+  persistence evidence only, not hosting-provider disk durability or a real
+  browser.
 
 Useful options:
 

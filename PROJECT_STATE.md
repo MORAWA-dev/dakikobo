@@ -1,8 +1,52 @@
 # DakiKobo Project State
 
-Last updated: 2026-09-12 (improvement-plan verification)
+Last updated: 2026-09-17 (post-merge documentation sync for PRs #7, #8, #9)
 
-## Current baseline — 2026-09-12
+## Current baseline — 2026-09-17
+
+The application baseline before this documentation-only sync was
+`698571bbb2d5bcb229ccc727a0b6754458f41624`, after merging three reviewed pull
+requests. This entry records what those merges changed. The older 2026-09-12
+section below is retained as historical context and includes figures that were
+current only when it was written.
+
+- **PR #7 — Task A: source scope display and saved-journal replay.** Reviewed
+  source metadata `scope` now flows from ingestion through retrieval to the
+  `/ask` response, the field-case card, the answer cache, and offline replay,
+  and is shown in source cards under the French label "Portée et limites"
+  (rendered as text, so HTML-like scope cannot execute). The private field
+  journal was migrated additively to **schema v6**: saved cases persist their
+  source cards (including `scope`) and replay them when reopened. Legacy rows
+  without stored sources remain readable and replay as no sources; historical
+  sources are never reconstructed. Malformed or oversized source payloads are
+  rejected at the `/feedback` boundary with a stable French message.
+- **PR #8 — Task B: automated headless-browser rehearsal in CI.** A reproducible
+  Chromium rehearsal (`tests/browser_replay_check.py`) runs at 320 px and
+  1280 px against a synthetic fixture, capturing a screenshot and structured
+  error report before teardown on failure. Playwright is a test-only dependency
+  (`requirements-browser.txt`), kept out of production requirements.
+- **PR #9 — Task C: Docker journal continuity rehearsal.** A bounded synthetic
+  rehearsal (`tests/docker_journal_rehearsal.py`) proves a private journal
+  saved into a local bind mount survives a container replacement, with unique
+  per-run container names and cleanup that reports (never silently ignores)
+  removal and workspace-deletion failures.
+
+Successful GitHub Actions workflows on this main head: **regression**,
+**build-and-smoke**, **chromium-rehearsal**, and **journal-continuity** (all
+completed successfully).
+
+Verification for this documentation sync completed with **679 Python tests
+passed, 1 skipped**, and **33 JavaScript tests passed**. The credentialed live
+RAG test was excluded.
+
+These are **automated** completions only. They do not change the outstanding
+human gates: agronomist source approval and dose enablement, physical-phone
+testing, the farmer/agent pilot and its evaluation decision, and
+hosting-provider disk durability all remain **pending**. In particular, the
+Docker rehearsal is local bind-mount persistence evidence only and is not
+hosting-provider durability, host-rebuild, or physical-browser evidence.
+
+## Historical baseline — 2026-09-12
 
 Local `main` is now at `40bb8a85`, with the pre-existing uncommitted security
 and configuration changes restored and integrated. The safety fixes and offline
@@ -390,7 +434,10 @@ The project includes a repeatable public demo evaluator.
 Implementation:
 
 - `scripts/evaluate_rag.py`
-- `.github/workflows/docker-build.yml`
+- `.github/workflows/offline-tests.yml` (regression)
+- `.github/workflows/docker-build.yml` (build-and-smoke)
+- `.github/workflows/browser-rehearsal.yml` (chromium-rehearsal, added by PR #8)
+- `.github/workflows/docker-journal-rehearsal.yml` (journal-continuity, added by PR #9)
 - `.github/workflows/hf-smoke.yml`
 - Default target: `https://kimcomehome-dakikobo.hf.space`
 - Default output: `reports/rag_eval_results.md`
@@ -483,7 +530,11 @@ Application:
 - `app.py`
 - `config.py`
 - `requirements.txt`
-- `.github/workflows/docker-build.yml`
+- `requirements-browser.txt` (test-only Playwright, added by PR #8)
+- `.github/workflows/offline-tests.yml` (regression)
+- `.github/workflows/docker-build.yml` (build-and-smoke)
+- `.github/workflows/browser-rehearsal.yml` (chromium-rehearsal, added by PR #8)
+- `.github/workflows/docker-journal-rehearsal.yml` (journal-continuity, added by PR #9)
 - `.github/workflows/hf-smoke.yml`
 
 Core modules:
