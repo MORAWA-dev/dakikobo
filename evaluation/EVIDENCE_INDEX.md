@@ -2,8 +2,10 @@
 
 Index d'une page des artefacts canoniques de preuve. Il pointe vers les
 rapports et workflows faisant autorité ; il ne copie aucun résultat, aucun
-relecteur, aucune date d'approbation. Les fichiers datés sont des
-instantanés historiques : seuls les fichiers canoniques non datés font foi.
+relecteur, aucune date d'approbation. L'autorité de chaque preuve est
+indiquée dans son entrée ci-dessous. Les inventaires SOURCE_ELIGIBILITY
+datés sont des instantanés historiques ; SOURCE_ELIGIBILITY.md reste
+l'inventaire canonique régénérable.
 
 Légende des statuts : `automated` · `human pending` · `phone pending` ·
 `agronomist pending` · `hosting pending`.
