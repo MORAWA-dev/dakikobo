@@ -4,9 +4,11 @@ Last updated: 2026-09-17 (post-merge documentation sync for PRs #7, #8, #9)
 
 ## Current baseline — 2026-09-17
 
-`origin/main` is at `698571bbb2d5bcb229ccc727a0b6754458f41624`, after merging
-three reviewed pull requests. This entry records only what those merges changed;
-the 2026-09-12 baseline below remains valid for everything else.
+The application baseline before this documentation-only sync was
+`698571bbb2d5bcb229ccc727a0b6754458f41624`, after merging three reviewed pull
+requests. This entry records what those merges changed. The older 2026-09-12
+section below is retained as historical context and includes figures that were
+current only when it was written.
 
 - **PR #7 — Task A: source scope display and saved-journal replay.** Reviewed
   source metadata `scope` now flows from ingestion through retrieval to the
@@ -33,6 +35,10 @@ Successful GitHub Actions workflows on this main head: **regression**,
 **build-and-smoke**, **chromium-rehearsal**, and **journal-continuity** (all
 completed successfully).
 
+Verification for this documentation sync completed with **679 Python tests
+passed, 1 skipped**, and **33 JavaScript tests passed**. The credentialed live
+RAG test was excluded.
+
 These are **automated** completions only. They do not change the outstanding
 human gates: agronomist source approval and dose enablement, physical-phone
 testing, the farmer/agent pilot and its evaluation decision, and
@@ -40,7 +46,7 @@ hosting-provider disk durability all remain **pending**. In particular, the
 Docker rehearsal is local bind-mount persistence evidence only and is not
 hosting-provider durability, host-rebuild, or physical-browser evidence.
 
-## Current baseline — 2026-09-12
+## Historical baseline — 2026-09-12
 
 Local `main` is now at `40bb8a85`, with the pre-existing uncommitted security
 and configuration changes restored and integrated. The safety fixes and offline

@@ -346,9 +346,12 @@ Status legend: `[ ]` todo · `[x]` done.
     ensure only the explicit shell is cached; weather, health, ops, version, and journal GETs remain live.
 
 - [x] **32. Farmer-safety engineering baseline** — September 2026 follow-up plan
-  - Migrated the journal additively to schema v5 with anonymous browser ownership, explicit consent,
+  - The journal's schema-v5 migration introduced anonymous browser ownership, explicit consent,
     90-day expiry, idempotent saves, owned reads/writes/deletion, attachment re-encoding, and
-    research-export consent filtering. Legacy unowned rows remain operator-only.
+    research-export consent filtering. Schema v5 is now a superseded historical intermediate;
+    the current additive schema is **v6**, which persists and replays saved source cards and their
+    declared scope. Legacy unowned rows remain operator-only, and rows without saved sources remain
+    readable without reconstructing historical citations.
   - Aligned offline crop precedence with the server, rejected ambiguous/unsupported crop requests,
     added cache age/corpus checks, excluded dynamic context from answer caching, and made chat reset
     clear the prior-question state and active playback.
