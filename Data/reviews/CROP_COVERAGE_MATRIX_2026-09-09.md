@@ -35,15 +35,15 @@ total de pages déclaré dans les métadonnées.
 | Culture | Besoin | Extrait candidat | Preuve approuvée | Page originale | Revue agronomique |
 |---|---|---|---|---|---|
 | mil | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| mil | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
+| mil | Fertilité | P1 (général) ; P2 (humidité du sol, céréales) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) ; section « humidité du sol » (page à relever) | En attente |
 | mil | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | mil | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | sorgho | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| sorgho | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
+| sorgho | Fertilité | P1 (général) ; P2 (humidité du sol, céréales) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) ; section « humidité du sol » (page à relever) | En attente |
 | sorgho | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | sorgho | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | maïs | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| maïs | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
+| maïs | Fertilité | P1 (général) ; P2 (humidité du sol, céréales) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) ; section « humidité du sol » (page à relever) | En attente |
 | maïs | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | maïs | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | niébé | Semis | I1 | Non établie | IITA PDF 12 (p. 6) | En attente |
@@ -55,6 +55,32 @@ total de pages déclaré dans les métadonnées.
 | arachide | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 | arachide | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
 
+## Cellules encore sans extrait candidat (refus conservé) — passe du 17 septembre 2026
+
+Les cellules ci-dessous restent « Aucun extrait sélectionné » parce qu'aucune
+source du dépôt ne les appuie honnêtement ; le refus est conservé pour ces
+besoins. Cet état n'est pas une lacune à combler par invention : il reflète le
+contenu réel des deux seules synthèses candidates et des deux sources éligibles.
+
+- **Semis** (mil, sorgho, maïs, arachide) : le guide IITA ne couvre que le
+  niébé ; le catalogue ProSol porte sur la fertilité et la conservation de
+  l'eau, pas sur les dates ou densités de semis ; CILSS et MAERAH/OAPH sont des
+  orientations institutionnelles dont la portée déclarée interdit les
+  calendriers de culture par parcelle.
+- **Ravageurs** (mil, sorgho, arachide) : aucune source candidate ne décrit
+  l'identification ou la gestion des ravageurs pour ces cultures (IITA = niébé
+  seulement ; ProSol exclut explicitement sa section pesticides). Le thème
+  ravageurs du maïs n'est pas au périmètre pilote listé plus bas.
+- **Stockage** (mil, sorgho, maïs, arachide) : seul IITA décrit le stockage, et
+  uniquement pour le niébé (I4, sacs PICS). Aucune source ne couvre le stockage
+  de ces quatre autres cultures.
+
+Ajout de cette passe : un candidat **P2** (conservation de l'humidité du sol
+pour les céréales mil, sorgho, maïs) tiré d'une section ProSol explicitement
+destinée à ces céréales, rattaché aux cellules Fertilité correspondantes. Il
+reste **non établi** et **en attente** de revue agronomique ; aucune source n'a
+été rendue éligible et aucune dose n'a été activée.
+
 ## Résultat du rapprochement avec les originaux
 
 Ces formulations sont reprises des synthèses locales. Le statut des deux
@@ -64,6 +90,7 @@ inéligibles au RAG.
 | ID | Formulation locale | Page contrôlée | Nature du rapprochement | Zone déclarée ; limite |
 |---|---|---|---|---|
 | P1 | « La fumure organique est un levier central » | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | **Synthèse interprétative, non textuelle.** Le catalogue présente la fumure organique parmi cinq thèmes et décrit le parc amélioré comme moyen de produire du fumier et d'amender les champs. Il n'emploie pas « levier central ». | Burkina Faso ; données économiques notamment Houet/Tuy, transposition à chaque culture et sol à examiner |
+| P2 | « Conserver l'humidité du sol : labour suivant les courbes de niveau, fumure organique/compost, ouvrages CES et paillage limitent le ruissellement et l'évaporation pour les céréales (mil, sorgho, maïs) » | Section « Garder l'humidité du sol (céréales: mil, sorgho, mais) » ; page PDF imprimée à relever par le relecteur (non vérifiée dans cette passe) | **Paraphrase fidèle d'une section explicitement destinée aux céréales.** Le catalogue nomme mil, sorgho et maïs pour la conservation de l'eau du sol ; le paillage n'y est pas détaillé dose par dose et reste conditionné à la disponibilité de paille et à l'avis local. Aucune dose n'est reprise. | Burkina Faso ; pente, type de sol, pluie et moyens à confirmer ; ne s'applique pas aux thèmes semis, ravageurs ou stockage |
 | I1 | « Les semences doivent être en bon état » | IITA PDF 12 (p. 6) | **Paraphrase fidèle.** Le passage demande de choisir des semences en bon état, sans trous d'infestation ni rides. | Afrique de l'Ouest ; niébé, variété et commune à préciser |
 | I2 | « Le phosphore est important pour la nodulation » | IITA PDF 29 (p. 23) | **Paraphrase fidèle.** Le passage relie l'apport de phosphore à la production de nodules et à la fixation de l'azote, tout en indiquant que l'analyse du sol détermine les besoins. Les doses du tableau ne sont pas validées ici. | Afrique de l'Ouest ; besoins de la parcelle non établis |
 | I3 | « Les maladies et ravageurs doivent être confirmés au champ » | IITA PDF 34 (p. 28), puis chapitres maladies et ravageurs | **Règle de prudence ajoutée par la synthèse, non trouvée dans l'original.** Le guide établit seulement qu'un large éventail d'organismes peut attaquer le niébé. Garder cette phrase comme règle produit, sans la citer comme recommandation IITA. | Aucune identification certaine ni traitement validé ; homologation actuelle non vérifiée |
