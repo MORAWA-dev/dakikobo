@@ -1852,4 +1852,4 @@ cd - && git worktree remove "$WT" --force
   (2) approbation propriétaire/agronome avant toute promotion d'IITA ou ProSol
   (les deux restent en attente et inéligibles) ; (3) validation des zones,
   conditions d'application et doses avant tout déblocage numérique. Décision de
-  publication : REPORTÉE. Aucune promotion, aucun déploiement, aucun push ici.
+  publication : REPORTÉE. Aucune promotion de source ni aucun déploiement.
