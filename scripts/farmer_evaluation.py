@@ -94,10 +94,40 @@ def assess_claims(path):
             return False, 'Incomplete claim evidence: text, source, page, excerpt and reviewer are required.'
         if row['supported'] not in ('yes', 'no'):
             return False, 'Each claim must be explicitly marked supported yes or no.'
-    supported = sum(row['supported'] == 'yes' for row in rows)
-    total = len(rows)
-    rate = supported / total
-    return rate >= .9, f'Claim grounding {supported}/{total} ({rate:.0%}). Denominator: substantive claims reviewed.'
+    # Compute the >=90% grounding threshold INDEPENDENTLY per split so strong
+    # development evidence can never mask a failing held_out split. Passing
+    # requires EVERY split present to independently meet the threshold.
+    splits = {}
+    for row in rows:
+        bucket = splits.setdefault(row['split'], {'supported': 0, 'total': 0})
+        bucket['total'] += 1
+        bucket['supported'] += row['supported'] == 'yes'
+    per_split = {}
+    for split_name, bucket in splits.items():
+        per_split[split_name] = bucket['supported'] / bucket['total']
+
+    if len(splits) > 1:
+        # Combined mode: report every split's supported/total and percentage;
+        # pass only when each split independently meets the threshold.
+        passed = all(rate >= .9 for rate in per_split.values())
+        parts = ', '.join(
+            f"{name} {splits[name]['supported']}/{splits[name]['total']} ({per_split[name]:.0%})"
+            for name in sorted(splits)
+        )
+        summary = (
+            f'Claim grounding (combined mode, per-split): {parts}. '
+            'Each split must independently reach >= 90%. '
+            'Denominator: substantive claims reviewed per split.'
+        )
+        return passed, summary
+
+    (split_name,) = splits
+    bucket = splits[split_name]
+    rate = per_split[split_name]
+    return rate >= .9, (
+        f"Claim grounding {bucket['supported']}/{bucket['total']} ({rate:.0%}). "
+        'Denominator: substantive claims reviewed.'
+    )
 
 
 def prepare_tasks(path):
@@ -336,19 +366,33 @@ def release_decision_scaffold(*, commit, generated_on, corpus, models, policy_re
     return '\n'.join(lines)
 
 
-def generate_release_decision(target=None, *, commit=None, generated_on=None):
+def generate_release_decision(target=None, *, commit=None, generated_on=None, output_dir=None):
     """Write the dated release-decision scaffold and return its path.
 
     ``target`` may be a full output path or a date string (YYYY-MM-DD); when a
-    bare date (or nothing) is given the artifact is written under evaluation/
-    following the repo's dated-artifact convention. ``commit`` and
-    ``generated_on`` may be injected for deterministic tests.
+    bare date (or nothing) is given the artifact is written under ``output_dir``
+    (defaulting to EVALUATION_DIR) following the repo's dated-artifact
+    convention. ``commit`` and ``generated_on`` may be injected for
+    deterministic tests; ``output_dir`` isolates bare-date/default writes so
+    tests never touch the real evaluation/ tree.
+
+    Reproducibility: the scaffold identity is the EVALUATED CODE COMMIT and the
+    generation date, both passed explicitly. The default (current HEAD + today)
+    does NOT reproduce a previously committed artifact. To regenerate the
+    committed evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md byte-for-byte,
+    pass its declared inputs:
+
+        .venv/bin/python scripts/farmer_evaluation.py \\
+            --generate-decision 2026-09-17 \\
+            --commit a41c842d6febbdf38d1cf771875ed59102094a2b \\
+            --date 2026-09-17
     """
     if generated_on is None:
         from datetime import timezone as _tz, datetime as _dt
         generated_on = _dt.now(_tz.utc).date().isoformat()
     if commit is None:
         commit = _current_commit()
+    base_dir = EVALUATION_DIR if output_dir is None else Path(output_dir)
 
     out_path = None
     if target:
@@ -359,7 +403,7 @@ def generate_release_decision(target=None, *, commit=None, generated_on=None):
         else:
             generated_on = target
     if out_path is None:
-        out_path = EVALUATION_DIR / f'RELEASE_DECISION_SCAFFOLD_{generated_on}.md'
+        out_path = base_dir / f'RELEASE_DECISION_SCAFFOLD_{generated_on}.md'
 
     import config
     body = release_decision_scaffold(
@@ -396,9 +440,26 @@ def main():
              '(defaults to today; pass a YYYY-MM-DD date or an output path).',
     )
     parser.add_argument('--split', choices=('all', 'development', 'held_out'), default='all')
+    parser.add_argument(
+        '--commit',
+        metavar='SHA',
+        help='Evaluated code commit recorded in the scaffold. Pass explicitly to '
+             'reproduce a previously committed artifact; defaults to current HEAD '
+             'only for a fresh dated draft.',
+    )
+    parser.add_argument(
+        '--date',
+        metavar='YYYY-MM-DD',
+        help='Generation date recorded in the scaffold; defaults to today (UTC). '
+             'Pass explicitly to reproduce a previously committed artifact.',
+    )
     args = parser.parse_args()
     if args.generate_decision is not None:
-        path = generate_release_decision(args.generate_decision or None)
+        path = generate_release_decision(
+            args.generate_decision or None,
+            commit=args.commit,
+            generated_on=args.date,
+        )
         print(f'Release-decision scaffold written to {path}. Decision stays REPORTÉE; '
               'no human, agronomic, or live-run evidence has been recorded.')
         return 0

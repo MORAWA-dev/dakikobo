@@ -175,6 +175,28 @@ def _claim_rows(supported_count, total):
     return rows
 
 
+# Real case ids per split from evaluation/farmer_benchmark.json.
+_DEV_CASE_ID = 'agronomy_01'
+_HELD_OUT_CASE_ID = 'agronomy_03'
+
+
+def _split_claim_rows(case_id, split, supported_count, total):
+    """Return claim rows tied to a real ``case_id`` in ``split``.
+
+    ``supported_count`` of ``total`` rows are marked supported=yes.
+    """
+    rows = []
+    for index in range(total):
+        supported = 'yes' if index < supported_count else 'no'
+        rows.append(_claim_row(
+            f'{case_id}-claim-{index + 1}',
+            supported=supported,
+            case_id=case_id,
+            split=split,
+        ))
+    return rows
+
+
 def _task_row(participant, task_id, completed='yes', understood='yes', **overrides):
     row = {
         'participant_code': participant,
@@ -393,3 +415,67 @@ def test_missing_evidence_never_yields_release_pass(tmp_path):
     prepare_claims(claims)
     prepare_tasks(tasks)
     assert not (assess(scores)[0] or assess_claims(claims)[0] or assess_tasks(tasks)[0])
+
+
+# --- Category 6: split isolation (development must never mask held_out) ----
+
+
+def test_strong_development_cannot_conceal_failing_held_out(tmp_path):
+    # Development is 100% supported, held_out is below 90%. Because the threshold
+    # is applied INDEPENDENTLY per split, the combined ledger must FAIL: strong
+    # development evidence cannot mask a failing held_out split.
+    path = tmp_path / 'claims.csv'
+    prepare_claims(path)
+    rows = (
+        _split_claim_rows(_DEV_CASE_ID, 'development', 10, 10)  # 100%
+        + _split_claim_rows(_HELD_OUT_CASE_ID, 'held_out', 8, 10)  # 80%
+    )
+    _write_rows(path, rows)
+    passed, summary = assess_claims(path)
+    assert passed is False
+    # Combined mode is named and each split's per-split rate is reported.
+    assert 'combined mode' in summary
+    assert 'development 10/10 (100%)' in summary
+    assert 'held_out 8/10 (80%)' in summary
+
+
+def test_combined_mode_summary_names_each_split_and_rate(tmp_path):
+    path = tmp_path / 'claims.csv'
+    prepare_claims(path)
+    rows = (
+        _split_claim_rows(_DEV_CASE_ID, 'development', 9, 10)  # 90%
+        + _split_claim_rows(_HELD_OUT_CASE_ID, 'held_out', 9, 10)  # 90%
+    )
+    _write_rows(path, rows)
+    passed, summary = assess_claims(path)
+    assert passed is True
+    assert 'combined mode' in summary
+    assert 'development 9/10 (90%)' in summary
+    assert 'held_out 9/10 (90%)' in summary
+    assert 'per split' in summary
+
+
+def test_combined_ledger_passes_when_both_splits_meet_threshold(tmp_path):
+    path = tmp_path / 'claims.csv'
+    prepare_claims(path)
+    rows = (
+        _split_claim_rows(_DEV_CASE_ID, 'development', 10, 10)  # 100%
+        + _split_claim_rows(_HELD_OUT_CASE_ID, 'held_out', 9, 10)  # 90%
+    )
+    _write_rows(path, rows)
+    assert assess_claims(path)[0] is True
+
+
+def test_combined_ledger_fails_when_development_below_threshold(tmp_path):
+    # Symmetry check: a failing development split cannot be rescued by a strong
+    # held_out split either.
+    path = tmp_path / 'claims.csv'
+    prepare_claims(path)
+    rows = (
+        _split_claim_rows(_DEV_CASE_ID, 'development', 8, 10)  # 80%
+        + _split_claim_rows(_HELD_OUT_CASE_ID, 'held_out', 10, 10)  # 100%
+    )
+    _write_rows(path, rows)
+    passed, summary = assess_claims(path)
+    assert passed is False
+    assert 'development 8/10 (80%)' in summary

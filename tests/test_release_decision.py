@@ -9,6 +9,7 @@ import re
 import config
 from core.answer_safety import safety_policy_revision
 from scripts.farmer_evaluation import (
+    EVALUATION_DIR,
     LIVE_EVALUATION_COMMAND,
     _corpus_identity,
     generate_release_decision,
@@ -17,6 +18,12 @@ from scripts.farmer_evaluation import (
 
 FIXED_COMMIT = '0123456789abcdef0123456789abcdef01234567'
 FIXED_DATE = '2026-09-18'
+
+# Declared inputs of the committed scaffold artifact (see the module docstring
+# of scripts.farmer_evaluation and SESSION.md for the exact regen command).
+COMMITTED_SCAFFOLD = EVALUATION_DIR / 'RELEASE_DECISION_SCAFFOLD_2026-09-17.md'
+COMMITTED_COMMIT = 'a41c842d6febbdf38d1cf771875ed59102094a2b'
+COMMITTED_DATE = '2026-09-17'
 
 
 def _fixed_body():
@@ -45,14 +52,46 @@ def test_generate_writes_dated_file(tmp_path):
 
 
 def test_bare_date_target_uses_dated_convention(tmp_path):
-    # A bare date routes into evaluation/ with the dated naming convention.
-    path = generate_release_decision(FIXED_DATE, commit=FIXED_COMMIT)
-    try:
-        assert path.name == f'RELEASE_DECISION_SCAFFOLD_{FIXED_DATE}.md'
-        assert path.parent.name == 'evaluation'
-    finally:
-        if path.exists():
-            path.unlink()
+    # A bare date routes to the injected output dir with the dated naming
+    # convention. Writing under tmp_path keeps the real evaluation/ tree untouched.
+    path = generate_release_decision(FIXED_DATE, commit=FIXED_COMMIT, output_dir=tmp_path)
+    assert path.name == f'RELEASE_DECISION_SCAFFOLD_{FIXED_DATE}.md'
+    assert path.parent == tmp_path
+    assert path.is_file()
+
+
+# --- (a') reproducible parity with the committed artifact ------------------
+
+
+def test_regenerates_committed_scaffold_byte_for_byte(tmp_path):
+    # Regenerate the checked-in artifact from its DECLARED inputs into tmp_path
+    # and assert exact-byte equality against the committed file. This proves the
+    # documented regen command reproduces the artifact byte-for-byte.
+    committed_bytes = COMMITTED_SCAFFOLD.read_bytes()
+    generated = generate_release_decision(
+        COMMITTED_DATE,
+        commit=COMMITTED_COMMIT,
+        generated_on=COMMITTED_DATE,
+        output_dir=tmp_path,
+    )
+    assert generated.parent == tmp_path
+    assert generated.name == 'RELEASE_DECISION_SCAFFOLD_2026-09-17.md'
+    assert generated.read_bytes() == committed_bytes
+
+
+def test_generation_never_touches_committed_artifact(tmp_path):
+    # Protection: a generation run directed at an injected output dir must not
+    # overwrite or delete the committed scaffold on disk.
+    before = COMMITTED_SCAFFOLD.read_bytes()
+    generate_release_decision(
+        COMMITTED_DATE,
+        commit=FIXED_COMMIT,
+        generated_on=COMMITTED_DATE,
+        output_dir=tmp_path,
+    )
+    generate_release_decision(FIXED_DATE, commit=FIXED_COMMIT, output_dir=tmp_path)
+    assert COMMITTED_SCAFFOLD.is_file()
+    assert COMMITTED_SCAFFOLD.read_bytes() == before
 
 
 # --- (b) reproducible identity fields -------------------------------------

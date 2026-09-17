@@ -1956,3 +1956,53 @@ cd - && git worktree remove "$WT" --force
 - Contraintes respectées : aucun changement à `core/fertilizer.py`,
   `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
   d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED` inchangé. P2 non restauré.
+
+## K2 — Corrections PR #16 (partie 1 : code + tests)
+
+- Correction 1 (isolement des splits) : `assess_claims` dans
+  `scripts/farmer_evaluation.py` calcule désormais le seuil de fondement de 90 %
+  INDÉPENDAMMENT par split présent dans le registre. En mode combiné (plusieurs
+  splits), le résumé nomme explicitement le « combined mode » et rapporte le
+  supported/total et le pourcentage de CHAQUE split ; la réussite exige que
+  chaque split atteigne indépendamment ≥ 90 %. Une preuve development à 100 % ne
+  peut plus masquer un held_out en échec. Le comportement mono-split (résumé
+  `Claim grounding N/T (P%). Denominator: substantive claims reviewed.`) est
+  préservé.
+- Régressions ajoutées (`tests/test_farmer_evaluation.py`, catégorie 6) avec de
+  vrais ids held_out du benchmark (`agronomy_03`) : development 100 % + held_out
+  80 % ÉCHOUE ; le résumé du mode combiné nomme chaque split et son taux ; un
+  registre combiné où chaque split atteint ≥ 90 % PASSE ; un development en échec
+  n'est pas sauvé par un held_out fort.
+- Correction 2 (régénération reproductible) : ajout des entrées CLI explicites
+  `--commit SHA` et `--date YYYY-MM-DD` qui alimentent
+  `generate_release_decision(commit=..., generated_on=...)`. L'identité du
+  scaffold est le COMMIT DE CODE ÉVALUÉ, passé explicitement ; le défaut (HEAD
+  courant + aujourd'hui) ne reproduit PAS un artefact déjà committé. Commande
+  exacte de régénération byte-for-byte de
+  `evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md` :
+  `.venv/bin/python scripts/farmer_evaluation.py --generate-decision 2026-09-17 --commit a41c842d6febbdf38d1cf771875ed59102094a2b --date 2026-09-17`.
+  Test de parité `test_regenerates_committed_scaffold_byte_for_byte` : régénère
+  l'artefact depuis ses entrées déclarées dans `tmp_path` et compare les octets
+  exacts avec le fichier committé.
+- Correction 3 (isolement des tests) : `generate_release_decision` accepte un
+  paramètre `output_dir` (défaut `EVALUATION_DIR`) rendant le répertoire de
+  sortie injectable. `test_bare_date_target_uses_dated_convention` écrit
+  désormais sous `tmp_path` et le `.unlink()` touchant le vrai arbre
+  `evaluation/` est supprimé. Test de protection
+  `test_generation_never_touches_committed_artifact` : capture les octets du
+  scaffold 2026-09-17 committé, génère dans `tmp_path`, puis vérifie qu'il est
+  inchangé et toujours présent.
+- Format de rendu du scaffold INCHANGÉ ; l'artefact committé (a41c842 /
+  2026-09-17, décision REPORTÉE, toutes portes en attente) reste reproductible
+  byte-for-byte. `git diff --exit-code -- evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md`
+  => propre après exécution de la commande documentée.
+- Totaux de tests (exacts) : `rm -rf scripts/__pycache__ tests/__pycache__ &&
+  .venv/bin/pytest -q -p no:cacheprovider tests/test_farmer_evaluation.py tests/test_release_decision.py`
+  => 36 passed, 1 warning (PyPDF2) ; suite complète
+  `tests --ignore=tests/test_rag.py` => 709 passed, 1 skipped, 1 warning.
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED` inchangé. P2 non
+  restauré. Textes utilisateur en français préservés. (Corrections 4-6 —
+  suppression métadonnées, fusion origin/main, régénération finale et docs PR —
+  traitées séparément.)
