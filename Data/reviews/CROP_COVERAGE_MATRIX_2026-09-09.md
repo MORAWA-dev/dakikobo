@@ -7,6 +7,14 @@ ci-dessous vérifiées par extraction et rendu visuel. Cette vérification étab
 provenance des passages ; elle ne remplace pas une revue agronomique. Aucun statut
 de revue, index ou cas réservé du benchmark n'a été modifié.
 
+Reconfirmation du 17 septembre 2026 : les deux PDF ont été de nouveau récupérés
+depuis les URL pérennes, leurs empreintes SHA-256 revérifiées (identiques à
+celles enregistrées ci-dessous) et les passages cités des candidats I1, I2, I3,
+I4 et P1 re-extraits page par page. Les cinq extraits concordent avec les pages
+citées ; aucune modification de texte n'a été nécessaire. Les 12 cellules
+restées sans candidat portent désormais un manque documenté explicite (liste des
+sources examinées) au lieu d'un simple « à relever ».
+
 ## Originaux contrôlés le 12 septembre 2026
 
 | Code | Document contrôlé | Provenance | Empreinte SHA-256 | Résultat |
@@ -26,6 +34,29 @@ pratiques pour une culture et une parcelle. Pour les 20 cellules ci-dessous,
 aucune preuve pratique approuvée n'a été établie dans cette passe. Cela ne
 constitue pas un inventaire exhaustif de tous les PDF candidats.
 
+### Sources examinées du dépôt pour chaque cellule
+
+Quatre sources du dépôt ont été examinées pour rattacher un candidat à chaque
+cellule. Aucune ne fournit d'extrait vérifié spécifique à la fois à la culture
+et au thème pour les 12 cellules restées sans candidat :
+
+- **CILSS** (`cilss_orientation_sahel_2026.md`, éligible) : synthèse
+  d'orientation régionale Sahel ; pas de pratique de semis, de lutte contre les
+  ravageurs ni de stockage propre à une culture.
+- **MAERAH / OAPH** (`maerah_oaph_orientation_burkina_2026.md`, éligible) :
+  synthèse d'orientation gouvernementale Burkina Faso ; niveau politique et
+  filières, sans pratique culture-par-thème.
+- **IITA** (`iita_niebe_afrique_ouest_2018.md`, en attente de revue humaine,
+  inéligible) : guide **niébé uniquement** ; ne couvre pas le mil, le sorgho,
+  le maïs ni l'arachide.
+- **ProSol** (`prosol_fertilite_sols_burkina_2020.md`, en attente de revue
+  humaine, inéligible) : catalogue **fertilité des sols en général** ; aucun
+  contenu de semis, de ravageurs ni de stockage propre à une culture.
+
+Le libellé « aucun candidat vérifié » ci-dessous renvoie à cette liste : ce
+n'est pas un simple placeholder mais un manque documenté après examen des
+quatre sources.
+
 ## Cinq cultures × quatre thèmes
 
 La colonne « preuve approuvée » concerne le besoin pratique, pas la réputation
@@ -34,26 +65,26 @@ total de pages déclaré dans les métadonnées.
 
 | Culture | Besoin | Extrait candidat | Preuve approuvée | Page originale | Revue agronomique |
 |---|---|---|---|---|---|
-| mil | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
+| mil | Semis | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans pratique de semis par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
 | mil | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
-| mil | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| mil | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| sorgho | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
+| mil | Ravageurs | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans lutte contre ravageurs par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
+| mil | Stockage | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans stockage par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
+| sorgho | Semis | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans pratique de semis par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
 | sorgho | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
-| sorgho | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| sorgho | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| maïs | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
+| sorgho | Ravageurs | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans lutte contre ravageurs par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
+| sorgho | Stockage | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans stockage par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
+| maïs | Semis | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans pratique de semis par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
 | maïs | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
-| maïs | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| maïs | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
+| maïs | Ravageurs | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans lutte contre ravageurs par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
+| maïs | Stockage | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans stockage par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
 | niébé | Semis | I1 | Non établie | IITA PDF 12 (p. 6) | En attente |
-| niébé | Fertilité | I2 ; P1 | Non établie | IITA PDF 29 (p. 23) ; ProSol PDF 6, 9–10 | En attente |
+| niébé | Fertilité | I2 ; P1 | Non établie | IITA PDF 29 (p. 23) ; ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
 | niébé | Ravageurs | I3 (règle éditoriale, pas un passage source) | Non établie | IITA PDF 34 (p. 28) décrit la diversité des contraintes ; confirmation au champ non trouvée | En attente |
 | niébé | Stockage | I4 | Non établie | IITA PDF 60–61 (p. 54–55) | En attente |
-| arachide | Semis | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
+| arachide | Semis | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans pratique de semis par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
 | arachide | Fertilité | P1 (général ; applicabilité à confirmer) | Non établie | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | En attente |
-| arachide | Ravageurs | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
-| arachide | Stockage | Aucun extrait sélectionné | Non établie | À relever dans le PDF | En attente |
+| arachide | Ravageurs | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans lutte contre ravageurs par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
+| arachide | Stockage | Aucun candidat vérifié (voir sources examinées) | Non établie | Sans objet : CILSS et MAERAH/OAPH sans stockage par culture ; IITA niébé seulement ; ProSol fertilité seulement | En attente |
 
 ## Résultat du rapprochement avec les originaux
 

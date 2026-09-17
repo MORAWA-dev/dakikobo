@@ -1,6 +1,6 @@
 # Source eligibility inventory
 
-Generated 2026-09-12 from the local candidate files. Eligibility is not a new expert review or proof of deployed index contents.
+Generated 2026-09-17 from the local candidate files. Eligibility is not a new expert review or proof of deployed index contents.
 
 | File | Review status | Rights / license | Quarantined | Eligible |
 |---|---|---|---|---|
@@ -27,7 +27,7 @@ Generated 2026-09-12 from the local candidate files. Eligibility is not a new ex
 | `Data/markdown/New Folder With Items/bf_profile_fr.md` | missing | unknown | no | no |
 | `Data/markdown/New Folder With Items/bl068f.md` | missing | unknown | no | no |
 | `Data/markdown/New Folder With Items/burkina_agri_report_nllm.md` | missing | unknown | no | no |
-| `Data/markdown/New Folder With Items/giz2023-fr-burkina-faso-programme-développement-de-l’agriculture.md` | missing | unknown | no | no |
+| `Data/markdown/New Folder With Items/giz2023-fr-burkina-faso-programme-développement-de-l’agriculture.md` | missing | unknown | no | no |
 | `Data/markdown/iita_niebe_afrique_ouest_2018.md` | reviewed_by_codex_pending_human_review | unknown | no | no |
 | `Data/markdown/knowledge_base/burkina_climate_adaptation_state_report.md` | missing | unknown | no | no |
 | `Data/markdown/knowledge_base/csa_investment_plan_burkina_draft.md` | missing | unknown | no | no |

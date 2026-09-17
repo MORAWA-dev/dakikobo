@@ -48,6 +48,14 @@ planer 20.
 Convention : « PDF » = page physique du fichier, « p. » = numéro imprimé
 (le décalage vient des pages liminaires en chiffres romains).
 
+Reconfirmation technique du 17 septembre 2026 : les deux PDF ont été de nouveau
+récupérés depuis les URL pérennes ci-dessus, leurs empreintes SHA-256
+revérifiées (identiques aux valeurs enregistrées) et les passages verbatim
+annexés (I1, I2, I3, I4, P1) re-extraits page par page. Les cinq extraits
+concordent avec les pages citées ; aucun texte n'a été modifié et aucune mention
+« à reconfirmer » n'est requise. Cette étape établit la provenance ; la validité
+agronomique reste votre décision.
+
 Notes de fidélité établies par la vérification technique (à confirmer par vous) :
 
 - **I1, I2, I4** : paraphrases fidèles des passages IITA cités.
@@ -66,26 +74,26 @@ inscrivez la correction ou la limite si la décision est « Corrigé ».
 
 | # | Culture | Thème | Extrait candidat | Source et pages | Note de fidélité | Approuvé | Corrigé (correction ci-dessous) | Rejeté | Initiales |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | mil | Semis | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
+| 1 | mil | Semis | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
 | 2 | mil | Fertilité | P1 (général ; applicabilité à confirmer) | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | Synthèse interprétative | ☐ | ☐ | ☐ | ＿＿ |
-| 3 | mil | Ravageurs | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
-| 4 | mil | Stockage | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
-| 5 | sorgho | Semis | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
+| 3 | mil | Ravageurs | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
+| 4 | mil | Stockage | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
+| 5 | sorgho | Semis | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
 | 6 | sorgho | Fertilité | P1 (général ; applicabilité à confirmer) | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | Synthèse interprétative | ☐ | ☐ | ☐ | ＿＿ |
-| 7 | sorgho | Ravageurs | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
-| 8 | sorgho | Stockage | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
-| 9 | maïs | Semis | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
+| 7 | sorgho | Ravageurs | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
+| 8 | sorgho | Stockage | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
+| 9 | maïs | Semis | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
 | 10 | maïs | Fertilité | P1 (général ; applicabilité à confirmer) | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | Synthèse interprétative | ☐ | ☐ | ☐ | ＿＿ |
-| 11 | maïs | Ravageurs | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
-| 12 | maïs | Stockage | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
+| 11 | maïs | Ravageurs | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
+| 12 | maïs | Stockage | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
 | 13 | niébé | Semis | I1 | IITA PDF 12 (p. 6) | Paraphrase fidèle | ☐ | ☐ | ☐ | ＿＿ |
 | 14 | niébé | Fertilité | I2 ; P1 | IITA PDF 29 (p. 23) ; ProSol PDF 6 (p. v), 9–10 (p. 1–2) | I2 paraphrase fidèle ; P1 interprétatif ; doses du tableau non validées | ☐ | ☐ | ☐ | ＿＿ |
 | 15 | niébé | Ravageurs | I3 (règle éditoriale, pas un passage source) | IITA PDF 34 (p. 28) décrit la diversité des contraintes ; confirmation au champ non trouvée | **Non trouvé dans l'original** — règle produit, pas une citation IITA | ☐ | ☐ | ☐ | ＿＿ |
 | 16 | niébé | Stockage | I4 | IITA PDF 60–61 (p. 54–55) | Paraphrase fidèle de deux pages | ☐ | ☐ | ☐ | ＿＿ |
-| 17 | arachide | Semis | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
+| 17 | arachide | Semis | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
 | 18 | arachide | Fertilité | P1 (général ; applicabilité à confirmer) | ProSol PDF 6 (p. v), 9–10 (p. 1–2) | Synthèse interprétative | ☐ | ☐ | ☐ | ＿＿ |
-| 19 | arachide | Ravageurs | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
-| 20 | arachide | Stockage | Aucun extrait sélectionné | à vérifier | — | ☐ | ☐ | ☐ | ＿＿ |
+| 19 | arachide | Ravageurs | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
+| 20 | arachide | Stockage | Aucun candidat vérifié | Sources examinées : CILSS, MAERAH/OAPH, IITA (niébé), ProSol (fertilité) | Manque documenté, voir « Cellules sans extrait candidat » | ☐ | ☐ | ☐ | ＿＿ |
 
 ## Formulations locales rattachées aux extraits (pour mémoire)
 
@@ -229,7 +237,26 @@ champs.
 
 ### Cellules sans extrait candidat
 
-Les 12 cellules « À relever dans le PDF » — semis, ravageurs et stockage du
-mil, du sorgho, du maïs et de l'arachide — n'ont **aucun extrait identifié** à
-ce jour : il n'existe donc rien à annexer pour elles. Le relecteur peut soit
-les laisser en attente, soit indiquer un document de référence à acquérir.
+Les 12 cellules (semis, ravageurs et stockage du mil, du sorgho, du maïs et de
+l'arachide) n'ont **aucun candidat vérifié** à ce jour. Ce n'est pas un oubli :
+les quatre sources du dépôt susceptibles de contenir un candidat ont été
+examinées et aucune ne fournit d'extrait vérifié propre à la fois à la culture
+et au thème :
+
+- **CILSS** (`cilss_orientation_sahel_2026.md`, éligible) : synthèse
+  d'orientation régionale Sahel, sans pratique de semis, de ravageurs ni de
+  stockage par culture.
+- **MAERAH / OAPH** (`maerah_oaph_orientation_burkina_2026.md`, éligible) :
+  synthèse d'orientation gouvernementale (filières, politique), sans pratique
+  culture-par-thème.
+- **IITA** (`iita_niebe_afrique_ouest_2018.md`, en attente de revue humaine,
+  inéligible) : guide **niébé uniquement** ; ne couvre pas le mil, le sorgho,
+  le maïs ni l'arachide.
+- **ProSol** (`prosol_fertilite_sols_burkina_2020.md`, en attente de revue
+  humaine, inéligible) : catalogue **fertilité des sols en général**, sans
+  section de semis, de ravageurs ni de stockage propre à une culture.
+
+Il n'existe donc rien de vérifié à annexer pour ces 12 cellules. Le relecteur
+peut soit les laisser en attente, soit indiquer un document de référence à
+acquérir (par exemple un guide de production propre au mil, au sorgho, au maïs
+ou à l'arachide). Aucun extrait n'est inventé pour combler ces manques.
