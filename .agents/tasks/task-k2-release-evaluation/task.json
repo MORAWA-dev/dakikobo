@@ -1,0 +1,14 @@
+{
+  "task_id": "task-k2-release-evaluation",
+  "task_description": "Task K2 from plans/KIRO_IMPROVEMENT_PLAN_2026-09-17.md: make the Ticket 09 offline release evaluation reproducible. Audit split/claim/task ledgers and the release-decision generator; add tests for missing evidence, duplicate identifiers, denominator calculations, threshold boundaries, and fail-closed release decisions; generate a dated decision scaffold with commit, corpus identity, model config, policy revision, and every unresolved gate; document the live evaluation command for an authorized target without credentials and without claiming it ran. Keep all human/live gates pending, decision REPORTEE. Branch k2-release-evaluation off e2fc384. Draft PR title: 'Harden reproducible release-evaluation evidence'. Do NOT push/merge (orchestrator publishes).",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "K2-targeted suites (test_farmer_evaluation.py test_evidence_ledger.py test_evaluate_rag.py) = 40 passed; including tests/test_release_decision.py = 49 passed. Full offline suite (tests --ignore=tests/test_rag.py) = 703 passed, 1 skipped, 1 warning (PyPDF2 deprecation). pnpm test:js = 33 pass, 0 fail. git diff --check clean. Test quality verified: reverting the >=90% grounding threshold to >=80% makes test_claim_grounding_just_below_ninety_percent_fails fail, confirming the boundary tests exercise real code. The dated scaffold generator is deterministic and reproduces the committed evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md exactly. No forbidden files (core/fertilizer.py, core/source_policy.py, static/data/fertilizer.json, Data/reviews/*) changed. Docker build skipped: no evaluation-relevant Dockerfile path and offline verification is the project's declared gate for this task. Nothing pushed or merged."
+  }
+}
