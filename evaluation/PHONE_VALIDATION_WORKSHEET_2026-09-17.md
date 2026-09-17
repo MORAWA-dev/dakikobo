@@ -30,7 +30,6 @@ fiche ne peut être rempli sans exécution réelle sur l'appareil.
 | Version d'Android | |
 | Navigateur et version | |
 | Condition de connexion | |
-| Facilitateur (initiales) | |
 | Date de la session | |
 
 ## Les cinq tâches pilote
@@ -42,30 +41,35 @@ Le critère de réussite de chaque tâche est défini dans la
 ### T1 — Poser une question de semis
 
 - Résultat : ☐ sans aide ☐ avec aide ☐ échec
+- Temps approximatif :
 - Intervention du facilitateur :
 - Notes :
 
 ### T2 — Clarifier un problème de culture
 
 - Résultat : ☐ sans aide ☐ avec aide ☐ échec
+- Temps approximatif :
 - Intervention du facilitateur :
 - Notes :
 
 ### T3 — Comprendre une recommandation d'engrais
 
 - Résultat : ☐ sans aide ☐ avec aide ☐ échec
+- Temps approximatif :
 - Intervention du facilitateur :
 - Notes :
 
 ### T4 — Retrouver un conseil hors ligne
 
 - Résultat : ☐ sans aide ☐ avec aide ☐ échec
+- Temps approximatif :
 - Intervention du facilitateur :
 - Notes :
 
 ### T5 — Noter un conseil puis enregistrer un résultat
 
 - Résultat : ☐ sans aide ☐ avec aide ☐ échec
+- Temps approximatif :
 - Intervention du facilitateur :
 - Notes :
 
