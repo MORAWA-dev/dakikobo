@@ -1853,3 +1853,39 @@ cd - && git worktree remove "$WT" --force
   (les deux restent en attente et inéligibles) ; (3) validation des zones,
   conditions d'application et doses avant tout déblocage numérique. Décision de
   publication : REPORTÉE. Aucune promotion de source ni aucun déploiement.
+
+## 2026-09-17 — Tâche K2 (Ticket 09) — FEAT-001 : base verte et audit
+
+- Branche `k2-release-evaluation` (worktree dédié, basée sur origin/main
+  e2fc384). Environnement : venv Python 3.11.15 (`python3 3.9` trop ancien pour
+  les unions `str | None`) + Node 22 / pnpm 10. Réseau OPEN_INTERNET.
+- Base de référence (aucun changement de code, audit en lecture seule) :
+  `.venv/bin/pytest -q tests/test_farmer_evaluation.py tests/test_evidence_ledger.py
+  tests/test_evaluate_rag.py` = 25 passed ; `.venv/bin/pytest -q tests
+  --ignore=tests/test_rag.py` = 679 passed / 1 skipped / 1 avertissement
+  (PyPDF2 déprécié) ; `pnpm test:js` = 33 passed / 0 fail ; `git diff --check`
+  propre. `tests/test_rag.py` exclu (nécessite Groq/HF en ligne).
+- Audit `scripts/farmer_evaluation.py` : `assess()` sépare les splits
+  (development seul, held_out seul, ou benchmark complet development+held_out)
+  et refuse un scorecard partiel ; screening seul, preuves de niveau
+  affirmation/participant conservées séparément. `assess_claims()` utilise les
+  affirmations comme dénominateur avec seuil ≥ 90 % et rejette doublons
+  (case_id, claim_id), cas inconnu, mismatch de split, preuve incomplète.
+  `assess_tasks()` exige ≥ 8 participants × 5 tâches (`PILOT_TASKS`), applique
+  deux portes séparées ≥ 80 % (`completed_independently` et
+  `understood_next_action`) sur les observations participant × tâche, rejette
+  doublons et tâche inconnue. Générateurs `prepare*/prepare_claims/prepare_tasks`
+  créent des gabarits vides (aucune preuve inventée).
+- Aucun générateur de scaffold de décision de livraison n'existe encore : seul
+  le gabarit statique `evaluation/RELEASE_DECISION_TEMPLATE.md` (défaut REPORTÉ)
+  est présent. FEAT-003 devra ajouter le générateur.
+- Aides d'identité réutilisables confirmées : `core.rag_pipeline.build_source_manifest`
+  (identité du corpus : sha256/octets par fichier + embedding_model, chunk),
+  `core.answer_safety.safety_policy_revision()` renvoie
+  `safety-2026-09-09.1f0345c393fd`, `config.LLM_MODEL` (openai/gpt-oss-120b) /
+  `config.GEMINI_MODEL` (gemini-2.5-flash) / `config.EMBEDDING_MODEL`
+  (paraphrase-multilingual-MiniLM-L12-v2), commit via `git rev-parse HEAD`.
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+  Aucune évaluation en direct exécutée. Décision de publication : REPORTÉE.
