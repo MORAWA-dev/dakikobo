@@ -466,3 +466,47 @@ hand-written rather than pasted.*
   participant/task ledgers with explicit 90% and 80% denominators, completeness
   checks and a release-decision template that defaults to postponed. Human review,
   authorized live-model execution and the pilot remain open.
+
+
+- [x] **Plan ticket 05 (display portion) — source scope in cards and saved
+  journal (PR #7, merged):** reviewed source `scope` metadata now propagates from
+  ingestion through retrieval to the `/ask` response, the field-case card, the
+  answer cache, and offline replay, and is shown in source cards under the French
+  label "Portée et limites" (inserted as text, so HTML-like scope cannot execute;
+  absent scope is omitted, never inferred). The private field journal was migrated
+  additively from schema v5 to **schema v6** (`core/case_log.py`,
+  `SCHEMA_VERSION = 6`, additive nullable `sources` column): saved cases persist
+  their source cards including `scope` and replay them when reopened. Legacy rows
+  without stored sources remain readable and replay as no sources; historical
+  sources are never reconstructed. Malformed or oversized source payloads are
+  rejected at the `/feedback` boundary with the stable French message
+  « Les sources du conseil sont invalides. » (no internal validator text leaks).
+  Agronomist source approval and dose enablement remain open (unchanged;
+  `NUMERIC_GUIDANCE_VERIFIED` still `False`).
+- [x] **Plan ticket 08 (automation portion) — headless-browser rehearsal in CI
+  (PR #8, merged):** `tests/browser_replay_check.py` is a reproducible runner that
+  starts its synthetic fixture, checks keyboard navigation, modal focus/Escape,
+  320 px overflow and audio-failure recovery at 320 px and 1280 px, and on failure
+  captures a screenshot and structured `error.json` before teardown; each run
+  writes to its own artifact directory. Playwright is a test-only dependency
+  (`requirements-browser.txt`), kept out of production `requirements.txt`. The
+  `.github/workflows/browser-rehearsal.yml` job (**chromium-rehearsal**) installs
+  Chromium, runs the rehearsal, proves it detects injected-assertion and
+  fixture-startup failures, and uploads artifacts. This is headless-browser
+  evidence only; physical-phone, screen-reader and participant acceptance remain
+  open.
+- [x] **Plan ticket 07 (automation portion) — Docker journal continuity
+  rehearsal (PR #9, merged):** `tests/docker_journal_rehearsal.py` runs the
+  production image on an isolated bind mount at `/data/dakikobo`
+  (`APP_ENV=production`, Secure cookie kept intact via a test-only cookie-aware
+  harness), saves one consented synthetic case, replaces the container from the
+  same image/secret/mount, and verifies owner survival, other-client exclusion,
+  a non-owner delete returning `deleted: 0`, owner deletion, and a fresh-mount
+  negative control. Container names are unique per run; cleanup removes each
+  container independently, inspects the `docker rm -f` exit code, and reports
+  (never silently ignores) removal and workspace-deletion failures. The
+  `.github/workflows/docker-journal-rehearsal.yml` job (**journal-continuity**)
+  builds the image and runs the rehearsal. This is **local bind-mount persistence
+  evidence only** — hosting-provider disk durability, host rebuild/volume
+  migration, and physical-browser evidence remain open, as do production
+  persistence verification and live RAG evaluation.
