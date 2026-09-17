@@ -2006,3 +2006,18 @@ cd - && git worktree remove "$WT" --force
   restauré. Textes utilisateur en français préservés. (Corrections 4-6 —
   suppression métadonnées, fusion origin/main, régénération finale et docs PR —
   traitées séparément.)
+
+### 2026-09-17 : Index des preuves (tâche légère L1)
+
+- Créé `evaluation/EVIDENCE_INDEX.md` : index d'une page pointant vers les
+  artefacts canoniques des six catégories de preuve (revue des sources,
+  répétition navigateur, continuité du journal, répétition téléphone,
+  approbation du benchmark, décision de livraison) avec leur statut
+  (`automated`, `human pending`, `phone pending`, `agronomist pending`,
+  `hosting pending`). Aucun résultat copié, aucun relecteur ni date
+  inventés ; seuls des liens vers les fichiers faisant autorité.
+- Travail documentaire uniquement, en worktree séparé sur la branche
+  `docs/evidence-index` depuis `origin/main`. Aucun code applicatif, aucune
+  promotion de source, aucun déploiement.
+- Vérification : script de résolution des liens relatifs du plan L1 et
+  `git diff --check` — résultats rapportés dans la PR brouillon.
