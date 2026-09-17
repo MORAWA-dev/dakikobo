@@ -2021,3 +2021,51 @@ cd - && git worktree remove "$WT" --force
   promotion de source, aucun déploiement.
 - Vérification : script de résolution des liens relatifs du plan L1 et
   `git diff --check` — résultats rapportés dans la PR brouillon.
+
+## K2 — Corrections PR #16 (partie 2 : intégration et finalisation)
+
+- Implémentation finale résumée fidèlement (corrections 1 à 6 de la PR #16) :
+  1. Isolement des splits (option b) : `assess_claims` calcule le seuil de
+     fondement de 90 % INDÉPENDAMMENT par split présent dans le registre ; en
+     mode combiné, le résumé identifie explicitement le « combined mode » et
+     rapporte supported/total et pourcentage de CHAQUE split ; la réussite exige
+     que chaque split (development ET held_out) atteigne ≥ 90 % de façon
+     indépendante. Une preuve development à 100 % ne peut plus masquer un
+     held_out en échec. Régressions ajoutées le prouvant.
+  2. Scaffold reproductible : entrées CLI explicites `--commit SHA` et
+     `--date YYYY-MM-DD` alimentant `generate_release_decision`. L'identité est
+     le COMMIT DE CODE ÉVALUÉ passé explicitement (le défaut HEAD/aujourd'hui ne
+     prétend PAS reproduire un artefact committé). Test de parité
+     `test_regenerates_committed_scaffold_byte_for_byte` comparant les octets
+     exacts. Commande documentée byte-for-byte :
+     `.venv/bin/python scripts/farmer_evaluation.py --generate-decision 2026-09-17 --commit a41c842d6febbdf38d1cf771875ed59102094a2b --date 2026-09-17`.
+  3. Isolement des tests : `generate_release_decision` accepte `output_dir`
+     (défaut `EVALUATION_DIR`) ; tous les tests écrivent sous `tmp_path`, le
+     `.unlink()` touchant le vrai arbre `evaluation/` est supprimé ; test de
+     protection `test_generation_never_touches_committed_artifact`.
+  4. Métadonnées internes retirées : `git rm -r
+     .agents/tasks/task-k2-release-evaluation/` (context.json, task.json,
+     features/FEAT-001..003.json, 2026-09-18-000000-review.md). Artefacts
+     d'orchestration, pas des livrables projet.
+  5. Intégration `origin/main` (31041731) par FUSION (pas rebase, pour préserver
+     le SHA `a41c842` enregistré comme identité on-branch du scaffold). Seul
+     conflit : `SESSION.md` (ajouts des deux côtés) résolu en PRÉSERVANT LES DEUX
+     HISTORIQUES (toutes les entrées K2 ET l'entrée PR #17 « Index des preuves »).
+     `evaluation/EVIDENCE_INDEX.md` (nouveau de PR #17) inchangé, byte-identique
+     à main.
+  6. Régénération finale du scaffold via la commande documentée : aucun
+     changement d'octet (parité prouvée). Décision globale REPORTÉE
+     (`[x] REPORTER`, `[ ] LIVRER`, `[ ] RÉDUIRE`) ; toutes les portes
+     humaine/agronomique/téléphone/pilote/modèle-en-direct/hébergement restent
+     « en attente » (résultats « À mesurer »).
+- Totaux de tests (exacts) : (1) `tests/test_farmer_evaluation.py
+  tests/test_evidence_ledger.py tests/test_evaluate_rag.py test_release_decision.py`
+  => 36 passed, 1 warning (PyPDF2) ; (2) `tests --ignore=tests/test_rag.py` =>
+  709 passed, 1 skipped, 1 warning ; (3) `pnpm test:js` => 33 pass ;
+  (4) `git diff --check` => propre. `tests/test_rag.py` exclu (Groq/HF en ligne).
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+  P2 (attribution ProSol de PR #13) non restauré. Aucun relecteur, participant,
+  approbation, résultat ou preuve en direct inventé. Formulation française et
+  refus de sécurité préservés. PR reste brouillon ; aucun push ni déploiement.
