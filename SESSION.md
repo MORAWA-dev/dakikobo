@@ -1802,3 +1802,54 @@ cd - && git worktree remove "$WT" --force
   nothing saved; valid cards still save and replay their scope.
 - Validation: full offline Python 663 passed (1 PyPDF2 warning), 33 JavaScript
   passed, offline fertilizer export unchanged, git diff --check clean.
+
+
+### 2026-09-17 : Ticket 05 dossier de revue agronomique complété (K1)
+
+- Objet : rendre décidables les 20 cellules pilotes (5 cultures x 4 thèmes) sans
+  fouiller le dépôt. Travail documentaire uniquement : aucun code applicatif,
+  aucune promotion de source, aucune preuve humaine inventée.
+- Fichiers modifiés :
+  - `Data/reviews/CROP_COVERAGE_MATRIX_2026-09-09.md` : les 12 cellules restées
+    « Aucun extrait sélectionné » / « À relever dans le PDF » (semis, ravageurs,
+    stockage du mil, sorgho, maïs, arachide) portent désormais un manque
+    documenté explicite « aucun candidat vérifié » listant les 4 sources
+    examinées (CILSS et MAERAH/OAPH éligibles ; IITA niébé seulement ; ProSol
+    fertilité seulement). Ajout d'une note de reconfirmation des originaux.
+  - `Data/reviews/AGRONOMIST_REVIEW_PACKET_2026-09-12.md` : tableau des 20
+    cellules et annexe « Cellules sans extrait candidat » alignés sur le même
+    manque documenté ; note de reconfirmation technique du 17 septembre 2026.
+    Champs humains, bloc signature « modèle vierge » et décision REPORTÉE
+    laissés vierges.
+  - `Data/reviews/SOURCE_ELIGIBILITY.md` : régénéré via
+    `scripts/audit_source_eligibility.py`. Seuls changements : ligne
+    « Generated 2026-09-17 » et normalisation Unicode NFC d'un nom de fichier.
+    Lignes d'éligibilité inchangées (2 éligibles CILSS + MAERAH/OAPH ; 1 en
+    quarantaine FAO ; IITA/ProSol en attente + Eligible=no).
+- Décomptes des candidats : 8 cellules avec candidat (P1 pour les 5 cellules
+  Fertilité mil/sorgho/maïs/niébé/arachide ; I1 semis niébé, I2 fertilité niébé,
+  I3 ravageurs niébé, I4 stockage niébé) ; 12 cellules avec manque documenté
+  explicite. Total 20/20 décidables.
+- Vérification des extraits (STEP 3) : les deux PDF originaux ont été récupérés
+  depuis les URL pérennes sous OPEN_INTERNET. Empreintes SHA-256 confirmées
+  identiques (IITA a3c823be… ; ProSol e0e45222…). Les cinq passages annexés
+  (I1 PDF 12/p.6, I2 PDF 29/p.23, I3 PDF 34/p.28, I4 PDF 60-61/p.54-55, P1
+  ProSol PDF 6/p.v et 9-10/p.1-2) concordent verbatim avec leurs pages. Aucune
+  mention « à reconfirmer » nécessaire. Fidélité confirmée : I1/I2/I4 =
+  paraphrase fidèle ; P1 = synthèse interprétative (« levier central » absent de
+  l'original) ; I3 = règle produit ajoutée, non trouvée dans l'original IITA.
+- Sources maintenues inéligibles : IITA et ProSol restent
+  `reviewed_by_codex_pending_human_review`. Aucun statut de revue modifié ;
+  `core/source_policy.py`, `core/fertilizer.py` et `static/data/fertilizer.json`
+  non touchés ; `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+- Validation : `.venv/bin/pytest -q tests/test_source_policy.py
+  tests/test_ingestion.py` 14 passed ; `.venv/bin/pytest -q tests
+  --ignore=tests/test_rag.py` 679 passed / 1 skipped (1 avertissement PyPDF2) ;
+  `pnpm test:js` 33 passed ; export offline fertilizer sans diff ; `git diff
+  --check` propre.
+- Bloqueurs humains restants : (1) signature agronomique des 20 cellules du
+  dossier (champs relecteur, initiales, date, décision toujours vierges) ;
+  (2) approbation propriétaire/agronome avant toute promotion d'IITA ou ProSol
+  (les deux restent en attente et inéligibles) ; (3) validation des zones,
+  conditions d'application et doses avant tout déblocage numérique. Décision de
+  publication : REPORTÉE. Aucune promotion de source ni aucun déploiement.
