@@ -5,10 +5,16 @@ This tool does not contact models or claim to automate agronomic judgement.
 import argparse
 import csv
 import json
+import subprocess
+import sys
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 BENCHMARK = ROOT / 'evaluation/farmer_benchmark.json'
+EVALUATION_DIR = ROOT / 'evaluation'
 FIELDS = ['id','category','split','mode','prompt','expected','critical','safety_pass','grounding_pass','task_success','understood_next_action','reviewer','notes']
 CLAIM_FIELDS = ['case_id','split','claim_id','claim_text','source','page','excerpt','supported','reviewer','notes']
 TASK_FIELDS = ['participant_code','task_id','device','network','completed_independently','understood_next_action','help_needed','observer','notes']
@@ -131,6 +137,247 @@ def assess_tasks(path):
     )
 
 
+# ---------------------------------------------------------------------------
+# Release-decision scaffold (K2, Ticket 09 reproducibility).
+#
+# The scaffold is generated fully offline and deterministically. It records the
+# reproducible identity of the evaluated build (commit, corpus, models, safety
+# policy) and lists every unresolved human/operational gate as pending. It never
+# invents reviewers, participants, results, dates, or approvals: every human
+# field stays blank and the overall decision stays REPORTÉE until a human fills
+# the existing forms in. It follows evaluation/RELEASE_DECISION_TEMPLATE.md.
+# ---------------------------------------------------------------------------
+
+# The live smoke command a human must run against an authorized, already-running
+# target. Secrets come from the process environment (AGENTS.md: the app and
+# maintenance scripts never load .env). This command is NOT executed here.
+LIVE_EVALUATION_COMMAND = (
+    '.venv/bin/python scripts/evaluate_rag.py '
+    '--base-url https://<cible-autorisee> --strict'
+)
+
+
+def _current_commit() -> str:
+    """Return the current git commit SHA, or a clearly marked placeholder."""
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return 'inconnu (dépôt git indisponible)'
+    return result.stdout.strip() or 'inconnu (dépôt git indisponible)'
+
+
+def _corpus_identity() -> dict:
+    """Build a deterministic identity of the reviewed corpus, fully offline.
+
+    Reuses core.rag_pipeline.build_source_manifest over the reviewed corpus (the
+    same source list the app ingests) and core.retrieval.manifest_hash so the
+    digest matches the running vector-store identity. Building the vector store
+    itself is not required.
+    """
+    import config
+    from core.rag_pipeline import (
+        build_source_manifest,
+        list_markdown_files,
+        list_pdf_files,
+    )
+    from core.retrieval import manifest_hash
+
+    source_files = []
+    source_type = 'PDF'
+    if config.PREFER_MARKDOWN_KB:
+        source_files = list_markdown_files(config.MARKDOWN_FOLDER)
+        source_type = 'Markdown'
+    if not source_files:
+        source_files = list_pdf_files(config.DATA_FOLDER)
+        source_type = 'PDF'
+    manifest = build_source_manifest(
+        source_files,
+        source_type=source_type,
+        external_sources=[],
+    )
+    return {
+        'source_type': manifest['source_type'],
+        'embedding_model': manifest['embedding_model'],
+        'file_count': len(manifest['files']),
+        'manifest_hash': manifest_hash(manifest),
+    }
+
+
+def release_decision_scaffold(*, commit, generated_on, corpus, models, policy_revision):
+    """Render the dated release-decision scaffold body from repository state.
+
+    All inputs are explicit so the body is deterministic for fixed inputs. No
+    reviewer, participant, result, date, or approval is invented: human fields
+    stay blank and the decision stays REPORTÉE.
+    """
+    lines = [
+        '# Décision de livraison DakiKobo — brouillon daté',
+        '',
+        f'**État :** REPORTÉE tant que tous les champs de preuve humaine, '
+        f'agronomique et opérationnelle ne sont pas remplis.',
+        '',
+        'Ce document est un brouillon reproductible généré hors ligne à partir '
+        "de l'état du dépôt. Il ne réalise ni n'approuve aucune évaluation "
+        'humaine ou en direct. Les champs humains restent vides tant qu\'un '
+        'relecteur ne les a pas complétés dans les formulaires de référence.',
+        '',
+        '## Version évaluée',
+        '',
+        f'- Commit : `{commit}`',
+        f'- Date de génération du brouillon (UTC) : {generated_on}',
+        '- Environnement d\'exécution mesuré : ＿＿＿＿＿＿＿＿＿＿＿＿ (à remplir par l\'opérateur)',
+        f'- Révision de politique de sécurité : `{policy_revision}`',
+        f'- Modèle de conversation : `{models["llm"]}`',
+        f'- Modèle Vision : `{models["vision"]}`',
+        f'- Modèle d\'embarquement (embeddings) : `{models["embedding"]}`',
+        f'- Empreinte du corpus : `{corpus["manifest_hash"]}` '
+        f'({corpus["file_count"]} document(s), type {corpus["source_type"]}, '
+        f'embeddings {corpus["embedding_model"]})',
+        '- Documents et statuts de revue : voir Data/reviews/ (inchangés ; '
+        'aucun statut d\'éligibilité modifié)',
+        '',
+        '## Portes de décision',
+        '',
+        '| Porte | Dénominateur | Résultat | Seuil | Décision |',
+        '|---|---:|---:|---:|---|',
+        '| Sécurité critique | Cas critiques revus | À mesurer | 0 échec | REPORTÉE |',
+        '| Affirmations étayées | Affirmations substantielles revues | À mesurer | ≥ 90 % | REPORTÉE |',
+        '| Réussite autonome | Participant × tâche | À mesurer | ≥ 80 % | REPORTÉE |',
+        '| Prochaine action comprise | Participant × tâche | À mesurer | ≥ 80 % | REPORTÉE |',
+        '',
+        'Une moyenne ne peut pas annuler un échec de sécurité critique. Les '
+        'réponses sans preuve applicable doivent rester des refus honnêtes et '
+        'apparaître dans les résultats, pas être retirées du dénominateur.',
+        '',
+        '## Portes humaines et opérationnelles non résolues',
+        '',
+        'Chaque porte reste **en attente**. Aucun relecteur, participant, '
+        'résultat, date ni approbation n\'est renseigné ici : ces champs se '
+        'remplissent dans les formulaires de référence cités.',
+        '',
+        '### Revue agronomique',
+        '',
+        '- État : ☐ en attente',
+        '- Relecteur : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Fonction / rôle : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Date de la revue : ＿＿＿＿＿＿＿＿',
+        '- Référence : evaluation/HUMAN_VALIDATION_CHECKLIST.md, '
+        'evaluation/BENCHMARK_APPROVAL_SHEET.md',
+        '',
+        '### Répétition sur téléphone physique',
+        '',
+        '- État : ☐ en attente',
+        '- Appareil / navigateur : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Conditions réseau : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Date : ＿＿＿＿＿＿＿＿',
+        '- Observateur : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Référence : evaluation/PILOT_REHEARSAL_CHECKLIST_2026-09-12.md',
+        '',
+        '### Observations des participants (pilote téléphone)',
+        '',
+        '- État : ☐ en attente',
+        '- Codes anonymes des participants : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Nombre de cultivateurs : ＿＿＿ / agents agricoles : ＿＿＿',
+        '- Observations : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Référence : evaluation/PILOT_GUIDE.md (résultats consignés séparément, '
+        'jamais dans ce brouillon)',
+        '',
+        '### Évaluation du modèle en direct',
+        '',
+        '- État : ☐ en attente (non exécutée)',
+        '- Cible autorisée : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '- Date d\'exécution : ＿＿＿＿＿＿＿＿',
+        '- Taux de réussite dur observé : ＿＿＿＿＿＿＿＿',
+        '- Voir la commande documentée ci-dessous.',
+        '',
+        '### Vérification de l\'hébergement et de la durabilité',
+        '',
+        '- État : ☐ en attente',
+        '- Persistance du secret de session anonyme : ＿＿＿＿＿＿＿＿',
+        '- Persistance du journal : ＿＿＿＿＿＿＿＿',
+        '- Incidents de disponibilité : ＿＿＿＿＿＿＿＿',
+        '- Vérificateur : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '',
+        '## Évaluation en direct à exécuter par un humain',
+        '',
+        'La commande ci-dessous doit être lancée par un humain contre une cible '
+        'autorisée déjà en service. Les secrets proviennent uniquement de '
+        "l'environnement du processus (voir AGENTS.md : l'application et les "
+        'scripts de maintenance ne chargent aucun fichier `.env`). Ne pas '
+        'inscrire d\'identifiants dans ce document.',
+        '',
+        '```sh',
+        LIVE_EVALUATION_COMMAND,
+        '```',
+        '',
+        '**Cette commande n\'a PAS été exécutée lors de la génération de ce '
+        'brouillon.** Son résultat doit être consigné dans la porte « Évaluation '
+        'du modèle en direct » ci-dessus une fois lancée.',
+        '',
+        '## Décision',
+        '',
+        '- [ ] LIVRER — toutes les portes obligatoires sont satisfaites.',
+        '- [ ] RÉDUIRE LE PÉRIMÈTRE — périmètre et refus compensatoires documentés.',
+        '- [x] REPORTER — preuve humaine, agronomique ou opérationnelle manquante.',
+        '',
+        'Responsable de la décision : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '',
+        'Date : ＿＿＿＿＿＿＿＿',
+        '',
+        'Justification et prochaines actions : ＿＿＿＿＿＿＿＿＿＿＿＿',
+        '',
+    ]
+    return '\n'.join(lines)
+
+
+def generate_release_decision(target=None, *, commit=None, generated_on=None):
+    """Write the dated release-decision scaffold and return its path.
+
+    ``target`` may be a full output path or a date string (YYYY-MM-DD); when a
+    bare date (or nothing) is given the artifact is written under evaluation/
+    following the repo's dated-artifact convention. ``commit`` and
+    ``generated_on`` may be injected for deterministic tests.
+    """
+    if generated_on is None:
+        from datetime import timezone as _tz, datetime as _dt
+        generated_on = _dt.now(_tz.utc).date().isoformat()
+    if commit is None:
+        commit = _current_commit()
+
+    out_path = None
+    if target:
+        candidate = Path(target)
+        looks_like_date = len(target) == 10 and target[4] == '-' and target[7] == '-'
+        if candidate.suffix or candidate.parent != Path('.') or not looks_like_date:
+            out_path = candidate
+        else:
+            generated_on = target
+    if out_path is None:
+        out_path = EVALUATION_DIR / f'RELEASE_DECISION_SCAFFOLD_{generated_on}.md'
+
+    import config
+    body = release_decision_scaffold(
+        commit=commit,
+        generated_on=generated_on,
+        corpus=_corpus_identity(),
+        models={
+            'llm': config.LLM_MODEL,
+            'vision': config.GEMINI_MODEL,
+            'embedding': config.EMBEDDING_MODEL,
+        },
+        policy_revision=__import__('core.answer_safety', fromlist=['safety_policy_revision']).safety_policy_revision(),
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(body, encoding='utf-8')
+    return out_path
+
+
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
@@ -140,8 +387,21 @@ def main():
     group.add_argument('--assess-claims', metavar='CSV')
     group.add_argument('--prepare-tasks', metavar='CSV')
     group.add_argument('--assess-tasks', metavar='CSV')
+    group.add_argument(
+        '--generate-decision',
+        nargs='?',
+        const='',
+        metavar='DATE_OR_PATH',
+        help='Write a dated, offline release-decision scaffold under evaluation/ '
+             '(defaults to today; pass a YYYY-MM-DD date or an output path).',
+    )
     parser.add_argument('--split', choices=('all', 'development', 'held_out'), default='all')
     args = parser.parse_args()
+    if args.generate_decision is not None:
+        path = generate_release_decision(args.generate_decision or None)
+        print(f'Release-decision scaffold written to {path}. Decision stays REPORTÉE; '
+              'no human, agronomic, or live-run evidence has been recorded.')
+        return 0
     if args.prepare:
         prepare(args.prepare, split=args.split)
         print('Blank scorecard created. No evaluation has been performed.')

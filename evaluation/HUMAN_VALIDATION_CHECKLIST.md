@@ -75,3 +75,24 @@ Portes existantes (rappel, sans modification) :
 Toute preuve manquante signifie **REPORTER**. La persistance de l'hébergement
 (secret de session anonyme, journal) doit être vérifiée séparément avant toute
 décision de livraison.
+
+## 4. Évaluation du modèle en direct
+
+À lancer par un humain contre une cible autorisée déjà en service. Les secrets
+proviennent uniquement de l'environnement du processus (voir AGENTS.md :
+l'application et les scripts de maintenance ne chargent aucun fichier `.env`).
+Ne pas inscrire d'identifiants dans les documents de revue.
+
+```sh
+.venv/bin/python scripts/evaluate_rag.py --base-url https://<cible-autorisee> --strict
+```
+
+Cette commande **n'a pas été exécutée** par l'outillage de génération. Son
+résultat (taux de réussite dur, incidents de transport) doit être consigné dans
+la porte « Évaluation du modèle en direct » du brouillon de décision daté.
+
+Un brouillon de décision daté et reproductible peut être généré hors ligne :
+
+```sh
+.venv/bin/python scripts/farmer_evaluation.py --generate-decision
+```

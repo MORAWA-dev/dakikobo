@@ -1923,3 +1923,36 @@ cd - && git worktree remove "$WT" --force
   `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
   d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False`. Aucune
   évaluation en direct. FEAT-003 (générateur de scaffold) reste à faire.
+
+## 2026-09-17 — K2 FEAT-003 : générateur de brouillon de décision reproductible
+
+- Ajout d'un générateur hors ligne et déterministe dans
+  `scripts/farmer_evaluation.py` (nouvelle sous-commande `--generate-decision`,
+  fonctions `release_decision_scaffold`, `generate_release_decision`,
+  `_corpus_identity`, `_current_commit`). Aucun appel réseau ni modèle.
+- Artefact daté généré : `evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md`
+  (structure de `evaluation/RELEASE_DECISION_TEMPLATE.md`, français).
+- Champs d'identité reproductibles issus de l'état du dépôt uniquement :
+  commit (`git rev-parse HEAD`), empreinte du corpus via
+  `build_source_manifest` + `manifest_hash` (nombre de documents inclus),
+  configuration des modèles (`LLM_MODEL`, `GEMINI_MODEL`, `EMBEDDING_MODEL`),
+  révision de politique (`safety_policy_revision()`).
+- Toutes les portes humaines/opérationnelles restent en attente : revue
+  agronomique, répétition téléphone physique, observations participants,
+  évaluation en direct, hébergement/durabilité. Décision globale REPORTÉE ;
+  aucun relecteur, participant, résultat, date ni approbation inventé.
+- Commande d'évaluation en direct documentée (scaffold + section 4 de
+  `evaluation/HUMAN_VALIDATION_CHECKLIST.md`) :
+  `.venv/bin/python scripts/evaluate_rag.py --base-url https://<cible-autorisee> --strict`.
+  Secrets via l'environnement du processus (AGENTS.md, pas de `.env`) ; indiqué
+  explicitement comme NON exécutée.
+- Tests ajoutés : `tests/test_release_decision.py` (9 tests) prouvant fichier
+  daté, identité reproductible, décision REPORTÉE, champs humains vides, commande
+  documentée sans identifiants, et déterminisme.
+- Totaux de tests (exacts) : (1) `tests/test_farmer_evaluation.py
+  tests/test_evidence_ledger.py tests/test_evaluate_rag.py tests/test_release_decision.py`
+  => 49 passed ; (2) `tests --ignore=tests/test_rag.py` => 703 passed, 1 skipped,
+  1 warning (PyPDF2) ; (3) `pnpm test:js` => 33 pass ; (4) `git diff --check` => propre.
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED` inchangé. P2 non restauré.
