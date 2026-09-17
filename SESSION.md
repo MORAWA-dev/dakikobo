@@ -1889,3 +1889,37 @@ cd - && git worktree remove "$WT" --force
   `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
   d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
   Aucune évaluation en direct exécutée. Décision de publication : REPORTÉE.
+
+## 2026-09-17 — K2 FEAT-002 : tests de reproductibilité de l'évaluation Ticket 09
+
+- Branche `k2-release-evaluation`. Ajout de tests significatifs (aucun changement
+  de code de production nécessaire : `scripts/farmer_evaluation.py` applique déjà
+  toutes les garanties requises, confirmé par l'audit FEAT-001).
+- `tests/test_farmer_evaluation.py` couvre désormais les cinq catégories exigées,
+  chaque test échouerait si la garantie correspondante était annulée :
+  1. Preuve manquante : scorecard vierge + registres affirmation/tâche vides
+     échouent (fail-closed) ; ligne d'affirmation sans `source`/`page`/`excerpt`/
+     `reviewer` échoue ; ligne de tâche sans `observer` échoue.
+  2. Doublons d'identifiants : `assess()` rejette les doublons de `id`,
+     `assess_claims()` rejette les doublons `(case_id, claim_id)`, `assess_tasks()`
+     rejette les doublons `(participant_code, task_id)`.
+  3. Dénominateurs : ancrage des affirmations = nombre de lignes d'affirmation
+     (9/10 => 90 %) ; réussite/compréhension pilote = observations participant ×
+     tâche (40/40 sur 8 × 5) ; les résumés indiquent le bon dénominateur.
+  4. Bornes de seuil exactes : ancrage exactement 90 % passe, 8/9 (88,9 %) échoue ;
+     pilote exactement 80 % (32/40) passe, 31/40 échoue ; les DEUX portes sont
+     indépendantes (complétion 80 % mais compréhension < 80 % échoue).
+  5. Décisions fail-closed : un cas de sécurité critique en échec force l'échec
+     malgré des moyennes élevées ; toute preuve manquante maintient l'échec
+     (aucun registre ne peut renvoyer un succès sans preuve).
+- Seuils du plan inchangés (≥ 90 % ancrage, ≥ 80 % réussite, ≥ 80 % compréhension) ;
+  formulation française et refus de sécurité préservés.
+- Totaux de tests (exacts) : (1) `tests/test_farmer_evaluation.py
+  tests/test_evidence_ledger.py tests/test_evaluate_rag.py` => 40 passed
+  (test_farmer_evaluation.py 21) ; (2) `tests --ignore=tests/test_rag.py` =>
+  694 passed, 1 skipped, 1 warning (PyPDF2) ; (3) `pnpm test:js` => 33 pass ;
+  (4) `git diff --check` => propre. `tests/test_rag.py` exclu (Groq/HF en ligne).
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False`. Aucune
+  évaluation en direct. FEAT-003 (générateur de scaffold) reste à faire.
