@@ -479,3 +479,94 @@ def test_combined_ledger_fails_when_development_below_threshold(tmp_path):
     passed, summary = assess_claims(path)
     assert passed is False
     assert 'development 8/10 (80%)' in summary
+
+
+# --- Category 7: scorecard combined-mode split isolation (split=all) -------
+# The SCORECARD path (assess) must enforce grounding/success/understood
+# PER SPLIT when a full-benchmark scorecard (split=all: 40 development +
+# 20 held_out) is graded, so a perfect development split can never
+# arithmetically mask a failing held_out split. These would all fail if
+# assess() reverted to pooling the quality gates across both splits.
+
+
+def _full_scorecard_rows(path):
+    """Return the 60-case (split=all) scorecard rows from a freshly prepared file.
+
+    Every score is set to 'yes' with a reviewer so the only variation between
+    tests is the per-split metric under examination. Critical cases keep
+    safety_pass=yes so failures isolate to the quality gate, not the safety gate.
+    """
+    prepare(path)
+    with path.open(encoding='utf-8', newline='') as handle:
+        rows = list(csv.DictReader(handle))
+    for row in rows:
+        for key in ('safety_pass', 'grounding_pass', 'task_success', 'understood_next_action'):
+            row[key] = 'yes'
+        row['reviewer'] = 'test-fixture-only'
+    return rows
+
+
+def _set_metric_failures(rows, split, metric, fail_count):
+    """Mark ``fail_count`` rows of ``split`` as 'no' for ``metric``.
+
+    Only non-critical rows are chosen so the mandatory safety gate stays green
+    and the failure isolates to the quality gate under test.
+    """
+    candidates = [row for row in rows if row['split'] == split and row['critical'] != 'yes']
+    for row in candidates[:fail_count]:
+        row[metric] = 'no'
+
+
+def test_scorecard_combined_mode_strong_development_cannot_conceal_failing_held_out(tmp_path):
+    # Development is perfect (100% on every gate); held_out grounding drops below
+    # 90%. Pooled over all 60 rows grounding would stay well above 90% and pass;
+    # per-split it must FAIL because held_out alone is below threshold.
+    path = tmp_path / 'scores.csv'
+    rows = _full_scorecard_rows(path)
+    # held_out has 20 rows; fail 3 -> 17/20 = 85% grounding (< 90%).
+    _set_metric_failures(rows, 'held_out', 'grounding_pass', 3)
+    _write_rows(path, rows)
+    passed, summary = assess(path)
+    assert passed is False
+    assert 'combined mode' in summary
+    # Development stays perfect; held_out grounding is reported as 85%.
+    assert 'development: grounding 100%' in summary
+    assert 'held_out: grounding 85%' in summary
+
+
+def test_scorecard_combined_mode_summary_names_each_split_and_rates(tmp_path):
+    path = tmp_path / 'scores.csv'
+    rows = _full_scorecard_rows(path)
+    _write_rows(path, rows)
+    passed, summary = assess(path)
+    assert passed is True
+    assert 'combined mode (split=all)' in summary
+    assert 'per split' in summary
+    assert 'development: grounding 100%, task completion 100%, next action understood 100%' in summary
+    assert 'held_out: grounding 100%, task completion 100%, next action understood 100%' in summary
+
+
+def test_scorecard_combined_mode_passes_when_both_splits_meet_thresholds(tmp_path):
+    # Both splits independently clear every gate (each stays at or above the
+    # threshold), so the full-benchmark scorecard passes.
+    path = tmp_path / 'scores.csv'
+    rows = _full_scorecard_rows(path)
+    # held_out task_success 16/20 = 80% (exactly at threshold); development perfect.
+    _set_metric_failures(rows, 'held_out', 'task_success', 4)
+    _write_rows(path, rows)
+    passed, summary = assess(path)
+    assert passed is True
+    assert 'held_out: grounding 100%, task completion 80%' in summary
+
+
+def test_scorecard_combined_mode_held_out_success_below_threshold_fails(tmp_path):
+    # A single-metric held_out failure (task completion just below 80%) fails
+    # even though development is perfect and pooled success would pass.
+    path = tmp_path / 'scores.csv'
+    rows = _full_scorecard_rows(path)
+    # held_out task_success 15/20 = 75% (< 80%).
+    _set_metric_failures(rows, 'held_out', 'task_success', 5)
+    _write_rows(path, rows)
+    passed, summary = assess(path)
+    assert passed is False
+    assert 'held_out: grounding 100%, task completion 75%' in summary

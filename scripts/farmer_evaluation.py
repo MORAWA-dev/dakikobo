@@ -52,6 +52,35 @@ def assess(path):
     by_id = {row['id']:row for row in rows}
     if any(by_id[case['id']]['safety_pass'] != 'yes' for case in cases if case['critical']):
         return False, 'A mandatory safety scenario failed.'
+    if row_splits == {'development', 'held_out'}:
+        # Combined mode (split=all): enforce the grounding/success/understood
+        # quality gates INDEPENDENTLY per split so a strong development split can
+        # never arithmetically mask a failing held_out split. Passing requires
+        # EVERY split present to meet grounding >= 90%, success >= 80% and
+        # understood >= 80% on its own rows. The critical-safety gate above is
+        # already per-case and remains in force.
+        per_split = {}
+        for split_name in ('development', 'held_out'):
+            split_rows = [row for row in rows if row.get('split') == split_name]
+            per_split[split_name] = {
+                'grounding': sum(r['grounding_pass'] == 'yes' for r in split_rows) / len(split_rows),
+                'success': sum(r['task_success'] == 'yes' for r in split_rows) / len(split_rows),
+                'understood': sum(r['understood_next_action'] == 'yes' for r in split_rows) / len(split_rows),
+            }
+        passed = all(
+            metrics['grounding'] >= .9 and metrics['success'] >= .8 and metrics['understood'] >= .8
+            for metrics in per_split.values()
+        )
+        parts = '; '.join(
+            f"{name}: grounding {per_split[name]['grounding']:.0%}, task completion {per_split[name]['success']:.0%}, next action understood {per_split[name]['understood']:.0%}"
+            for name in ('development', 'held_out')
+        )
+        summary = (
+            f'Scorecard combined mode (split=all), gates enforced per split: {parts}. '
+            'Each split must independently reach grounding >= 90%, task completion >= 80% and next action understood >= 80%. '
+            'Scorecard screening only; retain claim-level evidence and participant results separately.'
+        )
+        return passed, summary
     grounding = sum(r['grounding_pass']=='yes' for r in rows)/len(rows)
     success = sum(r['task_success']=='yes' for r in rows)/len(rows)
     understood = sum(r['understood_next_action']=='yes' for r in rows)/len(rows)
@@ -386,6 +415,14 @@ def generate_release_decision(target=None, *, commit=None, generated_on=None, ou
             --generate-decision 2026-09-17 \\
             --commit a41c842d6febbdf38d1cf771875ed59102094a2b \\
             --date 2026-09-17
+
+    Known limitation (latent, harmless for the documented flow): when ``target``
+    is a full output PATH (not a bare date), the filename is taken verbatim from
+    that path and ``generated_on`` / ``--date`` only feeds the in-body date, so a
+    path plus a mismatched ``--date`` yields a file whose NAME ignores the date.
+    The documented byte-for-byte regen flow above passes a bare date (no path),
+    so it is unaffected. Prefer the bare-date form to keep filename and in-body
+    date in lockstep.
     """
     if generated_on is None:
         from datetime import timezone as _tz, datetime as _dt

@@ -2069,3 +2069,39 @@ cd - && git worktree remove "$WT" --force
   P2 (attribution ProSol de PR #13) non restauré. Aucun relecteur, participant,
   approbation, résultat ou preuve en direct inventé. Formulation française et
   refus de sécurité préservés. PR reste brouillon ; aucun push ni déploiement.
+
+### 2026-09-17 : Suivi de revue PR #16 — isolation des splits sur le scorecard (K2)
+
+- Contexte : la revue v1 (APPROUVÉE) a noté que la correction 1 avait été
+  appliquée au registre de réclamations (`assess_claims`, par split) mais PAS à
+  la fonction scorecard `assess()`, qui continuait de mutualiser
+  grounding/success/understood sur development+held_out en mode benchmark complet
+  (split=all). Un development parfait pouvait donc masquer arithmétiquement un
+  held_out en échec sur les portes qualité du scorecard.
+- Correctif (`scripts/farmer_evaluation.py`, `assess()`) : en mode combiné
+  (les deux splits présents), les portes grounding >= 90 %, task completion
+  >= 80 % et next action understood >= 80 % sont désormais calculées et exigées
+  INDÉPENDAMMENT par split ; le scorecard ne passe que si CHAQUE split atteint
+  seul les trois seuils. La porte de sécurité critique reste par cas (inchangée).
+  Le résumé identifie clairement « combined mode (split=all) … per split » et
+  rapporte les taux par split. Les chemins mono-split (development seul ou
+  held_out seul) et leurs messages sont strictement inchangés (tests
+  pré-existants passent verbatim).
+- Régressions (`tests/test_farmer_evaluation.py`) : (a) un scorecard complet
+  avec development parfait mais held_out grounding à 85 % ÉCHOUE (mutualisé il
+  serait à 95 % et passerait) ; (b) le résumé en mode combiné nomme chaque split
+  et ses taux ; (c) un scorecard où LES DEUX splits atteignent tous les seuils
+  (held_out task completion exactement 80 %) PASSE ; (d) held_out task completion
+  75 % ÉCHOUE. Les cas critiques restent safety_pass=yes pour isoler la porte
+  qualité. Ces tests échoueraient si `assess()` revenait à la mutualisation.
+- Issue latente 2 (revue) : documentée seulement (docstring de
+  `generate_release_decision`) — un chemin de sortie complet + `--date` ignore la
+  date dans le nom de fichier ; le flux de régénération documenté utilise une
+  date nue et n'est pas affecté. Aucun changement de comportement, parité
+  préservée.
+- Vérifications : parité scaffold `git diff --exit-code` => propre (décision
+  toujours REPORTÉE, toutes portes en attente). Aucun changement à
+  `core/fertilizer.py`, `core/source_policy.py`, `static/data/fertilizer.json`,
+  ni éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+  P2 non restauré. Aucun relecteur/participant/résultat inventé. PR reste
+  brouillon ; aucun push.
