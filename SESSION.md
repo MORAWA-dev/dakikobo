@@ -2106,6 +2106,35 @@ cd - && git worktree remove "$WT" --force
   P2 non restauré. Aucun relecteur/participant/résultat inventé. PR reste
   brouillon ; aucun push.
 
+### 2026-09-20 — Synchronization audit; execution blocked by task permissions
+
+- Owner explicitly requested finalization and synchronization of GitHub, local
+  checkout and Hugging Face Space. No human agronomic or pilot evidence supplied.
+- GitHub connector confirmed main at
+  `d7e7b0de45bd332d5d3321b7fb124dc0e0a09146`. Local checkout remains on
+  `docs/human-validation-checklist` at `194f1f11`; existing local changes preserved.
+- Only open PR found: #16, release-evaluation tooling, head
+  `f4c58352c6ef3aed9df345ae60e1a8474b3d6d39`. Inspected its patch and fresh
+  GitHub workflow status: offline regression, Docker build, headless browser,
+  and Docker journal continuity all succeeded. The regression job confirms
+  Python, JavaScript and generated fertilizer parity steps succeeded.
+- Requested draft-to-ready transition for #16 was rejected by the connector:
+  approval required but this task's approval policy is never. No merge performed.
+- Local Git cannot write `.git/FETCH_HEAD` or Git LFS temporary files
+  (Operation not permitted). No checkout, commit, fetch or push completed.
+- Live Space HTTP probe returned 403. Browser access to huggingface.co was
+  explicitly denied by browser security policy; no alternate route attempted
+  after that denial. No HF deployment or live-version verification completed.
+- Interrupted local Python suite did not produce a valid completion result:
+  network access to api.open-meteo.com was blocked. npm was absent from PATH;
+  bundled Node was located, but no JavaScript run was completed locally.
+- Next: restore task access/approvals, recheck PR head and CI, merge verified
+  PR #16, preserve local changes while updating the checkout, finish the remaining
+  K3/K4 and L3/L4 plan work, then deploy the exact accepted revision through the
+  separate HF history and verify build, health, version and live smoke results.
+- Agronomist review, physical-phone/pilot observations and provider durability
+  remain pending. No release approval or successful synchronization is claimed.
+
 ### 2026-09-20 — Access restored; integration and remaining preparation
 
 - Git fetch/push access restored and live Space /version reachable. Pre-deploy
