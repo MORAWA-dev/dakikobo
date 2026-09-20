@@ -513,3 +513,17 @@ hand-written rather than pasted.*
   evidence only** — hosting-provider disk durability, host rebuild/volume
   migration, and physical-browser evidence remain open, as do production
   persistence verification and live RAG evaluation.
+
+## Integration status — 2026-09-20
+
+- K1 review packet, K2 split-isolated evaluation and reproducible decision scaffold,
+  L1 evidence index and L2 physical-phone worksheet are integrated.
+- K3 provider-neutral procedure is prepared in
+  [HOSTING_VALIDATION.md](evaluation/HOSTING_VALIDATION.md); actual provider
+  durability and restore evidence remain pending. Existing automated fixture
+  and Docker modes remain the local checks.
+- K4/L4 reconcile current versus historical status and repair relative plan links.
+  L3 static French UI audit is recorded in
+  [the dated report](reports/FRENCH_UI_TEXT_AUDIT_2026-09-20.md).
+- Source approvals, numeric doses, physical-phone results and pilot outcomes
+  are unchanged. Field release remains REPORTÉE pending those human gates.

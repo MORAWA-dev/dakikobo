@@ -1,8 +1,29 @@
 # DakiKobo Project State
 
-Last updated: 2026-09-17 (post-merge documentation sync for PRs #7, #8, #9)
+Last updated: 2026-09-20 (integration and deployment preparation)
 
-## Current baseline — 2026-09-17
+## Current engineering status — 2026-09-20
+
+PR #16 is merged into GitHub main at `666a726c`. The combined code passed
+713 Python tests (1 skipped, 1 PyPDF2 warning) and 33 JavaScript tests locally.
+The credentialed local RAG test was excluded. These counts describe this dated
+run, not a permanent current-head guarantee.
+
+K1 source-review preparation, K2 reproducible evaluation, and L1/L2 evidence and
+phone worksheets are integrated. K3 provider verification is prepared in
+[evaluation/HOSTING_VALIDATION.md](evaluation/HOSTING_VALIDATION.md); provider
+execution remains pending. L3 text audit is recorded in
+[reports/FRENCH_UI_TEXT_AUDIT_2026-09-20.md](reports/FRENCH_UI_TEXT_AUDIT_2026-09-20.md).
+K4/L4 documentation reconciliation preserves historical evidence as historical.
+The demo deployment is being synchronized separately; consult the latest dated
+SESSION entry for its actual revision and health checks.
+
+Only CILSS and MAERAH/OAPH remain eligible. Numeric fertilizer guidance stays
+withheld. Agronomist approval, real-phone testing, participant results, and
+provider durability are still release blockers; the field-release decision
+remains REPORTÉE. Updating the existing demo does not approve those gates.
+
+## Historical baseline — 2026-09-17
 
 The application baseline before this documentation-only sync was
 `698571bbb2d5bcb229ccc727a0b6754458f41624`, after merging three reviewed pull
@@ -31,7 +52,7 @@ current only when it was written.
   per-run container names and cleanup that reports (never silently ignores)
   removal and workspace-deletion failures.
 
-Successful GitHub Actions workflows on this main head: **regression**,
+Successful GitHub Actions workflows on that historical main head: **regression**,
 **build-and-smoke**, **chromium-rehearsal**, and **journal-continuity** (all
 completed successfully).
 
@@ -74,14 +95,14 @@ Faso. It combines RAG over reviewed local Markdown documents, deterministic
 fertilizer guidance, weather and soil context tools, voice input/output, image
 screening, citations, confidence labels, and a mobile-first chat UI.
 
-## Live Deployment
+## Deployment references and historical observations
 
 - Public app: `https://kimcomehome-dakikobo.hf.space/`
 - Hugging Face Space repo: `https://huggingface.co/spaces/kimcomehome/dakikobo`
 - Space SDK: Docker
 - Runtime port: `7860`
 - Suggested hardware: `cpu-basic`
-- Latest HF runtime commit verified: `990b80e6` (GitHub `8028159b`)
+- HF runtime commit verified on 2026-07-10: `990b80e6` (GitHub `8028159b`)
 - Live health verified on 2026-07-10:
   - `ok=true`
   - `rag_ready=true`

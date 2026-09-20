@@ -39,12 +39,18 @@ Légende des statuts : `automated` · `human pending` · `phone pending` ·
   — la reprise locale par montage de volume est vérifiée ; la durabilité du
   stockage de l'hébergeur reste non démontrée (`hosting pending`).
 
+- Procédure hébergeur : [HOSTING_VALIDATION.md](HOSTING_VALIDATION.md)
+  — préparation effectuée, preuve hébergeur toujours `hosting pending`.
+
 ## 4. Répétition pilote sur téléphone réel — `phone pending`
 
 - Liste de contrôle :
   [PILOT_REHEARSAL_CHECKLIST_2026-09-12.md](PILOT_REHEARSAL_CHECKLIST_2026-09-12.md)
   — aucun test sur téléphone physique réalisé ; les résultats de répétition
   restent séparés du pilote agriculteurs.
+
+- Fiche téléphone : [PHONE_VALIDATION_WORKSHEET_2026-09-17.md](PHONE_VALIDATION_WORKSHEET_2026-09-17.md)
+  — résultats humains à renseigner.
 
 ## 5. Approbation du benchmark — `agronomist pending`
 

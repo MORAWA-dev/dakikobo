@@ -81,12 +81,11 @@ REBUILD_VECTORSTORE=false
 PORT=7860
 ```
 
-8. Push from this repo:
-
-```bash
-git remote add hf https://huggingface.co/spaces/kimcomehome/dakikobo
-git push hf main
-```
+8. Deploy the accepted GitHub revision through a separate `hf/main` worktree.
+   The two repositories have different histories: do not push GitHub `main`
+   directly over the Space history. Copy only tracked application files, preserve
+   HF binary/LFS handling, and label the deployment commit with the GitHub SHA.
+   Exclude secrets, runtime databases, user uploads, caches and local agent files.
 
 9. Wait for the Space to build, then open `/healthz` to confirm the Flask process is alive.
 10. Watch `/healthz` until `rag_status` is `ready`; the Docker image starts RAG warm-up in the background.
@@ -287,3 +286,9 @@ The original journal and snapshots remain unchanged. No real user data, provider
 calls, device browser, host reboot or durable provider volume are involved.
 Provider-volume persistence remains a release check; this local rehearsal cannot
 establish it. See `reports/operational_readiness_2026-09-15.md` for remaining gates.
+
+## Provider acceptance
+
+Use [the hosting validation procedure](evaluation/HOSTING_VALIDATION.md) for
+preflight, provider replacement/rebuild, isolated restore and rollback evidence.
+The local Docker rehearsal cannot certify hosting-provider durability.
