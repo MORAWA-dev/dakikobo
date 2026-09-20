@@ -1854,6 +1854,158 @@ cd - && git worktree remove "$WT" --force
   conditions d'application et doses avant tout déblocage numérique. Décision de
   publication : REPORTÉE. Aucune promotion de source ni aucun déploiement.
 
+## 2026-09-17 — Tâche K2 (Ticket 09) — FEAT-001 : base verte et audit
+
+- Branche `k2-release-evaluation` (worktree dédié, basée sur origin/main
+  e2fc384). Environnement : venv Python 3.11.15 (`python3 3.9` trop ancien pour
+  les unions `str | None`) + Node 22 / pnpm 10. Réseau OPEN_INTERNET.
+- Base de référence (aucun changement de code, audit en lecture seule) :
+  `.venv/bin/pytest -q tests/test_farmer_evaluation.py tests/test_evidence_ledger.py
+  tests/test_evaluate_rag.py` = 25 passed ; `.venv/bin/pytest -q tests
+  --ignore=tests/test_rag.py` = 679 passed / 1 skipped / 1 avertissement
+  (PyPDF2 déprécié) ; `pnpm test:js` = 33 passed / 0 fail ; `git diff --check`
+  propre. `tests/test_rag.py` exclu (nécessite Groq/HF en ligne).
+- Audit `scripts/farmer_evaluation.py` : `assess()` sépare les splits
+  (development seul, held_out seul, ou benchmark complet development+held_out)
+  et refuse un scorecard partiel ; screening seul, preuves de niveau
+  affirmation/participant conservées séparément. `assess_claims()` utilise les
+  affirmations comme dénominateur avec seuil ≥ 90 % et rejette doublons
+  (case_id, claim_id), cas inconnu, mismatch de split, preuve incomplète.
+  `assess_tasks()` exige ≥ 8 participants × 5 tâches (`PILOT_TASKS`), applique
+  deux portes séparées ≥ 80 % (`completed_independently` et
+  `understood_next_action`) sur les observations participant × tâche, rejette
+  doublons et tâche inconnue. Générateurs `prepare*/prepare_claims/prepare_tasks`
+  créent des gabarits vides (aucune preuve inventée).
+- Aucun générateur de scaffold de décision de livraison n'existe encore : seul
+  le gabarit statique `evaluation/RELEASE_DECISION_TEMPLATE.md` (défaut REPORTÉ)
+  est présent. FEAT-003 devra ajouter le générateur.
+- Aides d'identité réutilisables confirmées : `core.rag_pipeline.build_source_manifest`
+  (identité du corpus : sha256/octets par fichier + embedding_model, chunk),
+  `core.answer_safety.safety_policy_revision()` renvoie
+  `safety-2026-09-09.1f0345c393fd`, `config.LLM_MODEL` (openai/gpt-oss-120b) /
+  `config.GEMINI_MODEL` (gemini-2.5-flash) / `config.EMBEDDING_MODEL`
+  (paraphrase-multilingual-MiniLM-L12-v2), commit via `git rev-parse HEAD`.
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+  Aucune évaluation en direct exécutée. Décision de publication : REPORTÉE.
+
+## 2026-09-17 — K2 FEAT-002 : tests de reproductibilité de l'évaluation Ticket 09
+
+- Branche `k2-release-evaluation`. Ajout de tests significatifs (aucun changement
+  de code de production nécessaire : `scripts/farmer_evaluation.py` applique déjà
+  toutes les garanties requises, confirmé par l'audit FEAT-001).
+- `tests/test_farmer_evaluation.py` couvre désormais les cinq catégories exigées,
+  chaque test échouerait si la garantie correspondante était annulée :
+  1. Preuve manquante : scorecard vierge + registres affirmation/tâche vides
+     échouent (fail-closed) ; ligne d'affirmation sans `source`/`page`/`excerpt`/
+     `reviewer` échoue ; ligne de tâche sans `observer` échoue.
+  2. Doublons d'identifiants : `assess()` rejette les doublons de `id`,
+     `assess_claims()` rejette les doublons `(case_id, claim_id)`, `assess_tasks()`
+     rejette les doublons `(participant_code, task_id)`.
+  3. Dénominateurs : ancrage des affirmations = nombre de lignes d'affirmation
+     (9/10 => 90 %) ; réussite/compréhension pilote = observations participant ×
+     tâche (40/40 sur 8 × 5) ; les résumés indiquent le bon dénominateur.
+  4. Bornes de seuil exactes : ancrage exactement 90 % passe, 8/9 (88,9 %) échoue ;
+     pilote exactement 80 % (32/40) passe, 31/40 échoue ; les DEUX portes sont
+     indépendantes (complétion 80 % mais compréhension < 80 % échoue).
+  5. Décisions fail-closed : un cas de sécurité critique en échec force l'échec
+     malgré des moyennes élevées ; toute preuve manquante maintient l'échec
+     (aucun registre ne peut renvoyer un succès sans preuve).
+- Seuils du plan inchangés (≥ 90 % ancrage, ≥ 80 % réussite, ≥ 80 % compréhension) ;
+  formulation française et refus de sécurité préservés.
+- Totaux de tests (exacts) : (1) `tests/test_farmer_evaluation.py
+  tests/test_evidence_ledger.py tests/test_evaluate_rag.py` => 40 passed
+  (test_farmer_evaluation.py 21) ; (2) `tests --ignore=tests/test_rag.py` =>
+  694 passed, 1 skipped, 1 warning (PyPDF2) ; (3) `pnpm test:js` => 33 pass ;
+  (4) `git diff --check` => propre. `tests/test_rag.py` exclu (Groq/HF en ligne).
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False`. Aucune
+  évaluation en direct. FEAT-003 (générateur de scaffold) reste à faire.
+
+## 2026-09-17 — K2 FEAT-003 : générateur de brouillon de décision reproductible
+
+- Ajout d'un générateur hors ligne et déterministe dans
+  `scripts/farmer_evaluation.py` (nouvelle sous-commande `--generate-decision`,
+  fonctions `release_decision_scaffold`, `generate_release_decision`,
+  `_corpus_identity`, `_current_commit`). Aucun appel réseau ni modèle.
+- Artefact daté généré : `evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md`
+  (structure de `evaluation/RELEASE_DECISION_TEMPLATE.md`, français).
+- Champs d'identité reproductibles issus de l'état du dépôt uniquement :
+  commit (`git rev-parse HEAD`), empreinte du corpus via
+  `build_source_manifest` + `manifest_hash` (nombre de documents inclus),
+  configuration des modèles (`LLM_MODEL`, `GEMINI_MODEL`, `EMBEDDING_MODEL`),
+  révision de politique (`safety_policy_revision()`).
+- Toutes les portes humaines/opérationnelles restent en attente : revue
+  agronomique, répétition téléphone physique, observations participants,
+  évaluation en direct, hébergement/durabilité. Décision globale REPORTÉE ;
+  aucun relecteur, participant, résultat, date ni approbation inventé.
+- Commande d'évaluation en direct documentée (scaffold + section 4 de
+  `evaluation/HUMAN_VALIDATION_CHECKLIST.md`) :
+  `.venv/bin/python scripts/evaluate_rag.py --base-url https://<cible-autorisee> --strict`.
+  Secrets via l'environnement du processus (AGENTS.md, pas de `.env`) ; indiqué
+  explicitement comme NON exécutée.
+- Tests ajoutés : `tests/test_release_decision.py` (9 tests) prouvant fichier
+  daté, identité reproductible, décision REPORTÉE, champs humains vides, commande
+  documentée sans identifiants, et déterminisme.
+- Totaux de tests (exacts) : (1) `tests/test_farmer_evaluation.py
+  tests/test_evidence_ledger.py tests/test_evaluate_rag.py tests/test_release_decision.py`
+  => 49 passed ; (2) `tests --ignore=tests/test_rag.py` => 703 passed, 1 skipped,
+  1 warning (PyPDF2) ; (3) `pnpm test:js` => 33 pass ; (4) `git diff --check` => propre.
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED` inchangé. P2 non restauré.
+
+## K2 — Corrections PR #16 (partie 1 : code + tests)
+
+- Correction 1 (isolement des splits) : `assess_claims` dans
+  `scripts/farmer_evaluation.py` calcule désormais le seuil de fondement de 90 %
+  INDÉPENDAMMENT par split présent dans le registre. En mode combiné (plusieurs
+  splits), le résumé nomme explicitement le « combined mode » et rapporte le
+  supported/total et le pourcentage de CHAQUE split ; la réussite exige que
+  chaque split atteigne indépendamment ≥ 90 %. Une preuve development à 100 % ne
+  peut plus masquer un held_out en échec. Le comportement mono-split (résumé
+  `Claim grounding N/T (P%). Denominator: substantive claims reviewed.`) est
+  préservé.
+- Régressions ajoutées (`tests/test_farmer_evaluation.py`, catégorie 6) avec de
+  vrais ids held_out du benchmark (`agronomy_03`) : development 100 % + held_out
+  80 % ÉCHOUE ; le résumé du mode combiné nomme chaque split et son taux ; un
+  registre combiné où chaque split atteint ≥ 90 % PASSE ; un development en échec
+  n'est pas sauvé par un held_out fort.
+- Correction 2 (régénération reproductible) : ajout des entrées CLI explicites
+  `--commit SHA` et `--date YYYY-MM-DD` qui alimentent
+  `generate_release_decision(commit=..., generated_on=...)`. L'identité du
+  scaffold est le COMMIT DE CODE ÉVALUÉ, passé explicitement ; le défaut (HEAD
+  courant + aujourd'hui) ne reproduit PAS un artefact déjà committé. Commande
+  exacte de régénération byte-for-byte de
+  `evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md` :
+  `.venv/bin/python scripts/farmer_evaluation.py --generate-decision 2026-09-17 --commit a41c842d6febbdf38d1cf771875ed59102094a2b --date 2026-09-17`.
+  Test de parité `test_regenerates_committed_scaffold_byte_for_byte` : régénère
+  l'artefact depuis ses entrées déclarées dans `tmp_path` et compare les octets
+  exacts avec le fichier committé.
+- Correction 3 (isolement des tests) : `generate_release_decision` accepte un
+  paramètre `output_dir` (défaut `EVALUATION_DIR`) rendant le répertoire de
+  sortie injectable. `test_bare_date_target_uses_dated_convention` écrit
+  désormais sous `tmp_path` et le `.unlink()` touchant le vrai arbre
+  `evaluation/` est supprimé. Test de protection
+  `test_generation_never_touches_committed_artifact` : capture les octets du
+  scaffold 2026-09-17 committé, génère dans `tmp_path`, puis vérifie qu'il est
+  inchangé et toujours présent.
+- Format de rendu du scaffold INCHANGÉ ; l'artefact committé (a41c842 /
+  2026-09-17, décision REPORTÉE, toutes portes en attente) reste reproductible
+  byte-for-byte. `git diff --exit-code -- evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md`
+  => propre après exécution de la commande documentée.
+- Totaux de tests (exacts) : `rm -rf scripts/__pycache__ tests/__pycache__ &&
+  .venv/bin/pytest -q -p no:cacheprovider tests/test_farmer_evaluation.py tests/test_release_decision.py`
+  => 36 passed, 1 warning (PyPDF2) ; suite complète
+  `tests --ignore=tests/test_rag.py` => 709 passed, 1 skipped, 1 warning.
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED` inchangé. P2 non
+  restauré. Textes utilisateur en français préservés. (Corrections 4-6 —
+  suppression métadonnées, fusion origin/main, régénération finale et docs PR —
+  traitées séparément.)
 
 ### 2026-09-17 : Index des preuves (tâche légère L1)
 
@@ -1869,3 +2021,87 @@ cd - && git worktree remove "$WT" --force
   promotion de source, aucun déploiement.
 - Vérification : script de résolution des liens relatifs du plan L1 et
   `git diff --check` — résultats rapportés dans la PR brouillon.
+
+## K2 — Corrections PR #16 (partie 2 : intégration et finalisation)
+
+- Implémentation finale résumée fidèlement (corrections 1 à 6 de la PR #16) :
+  1. Isolement des splits (option b) : `assess_claims` calcule le seuil de
+     fondement de 90 % INDÉPENDAMMENT par split présent dans le registre ; en
+     mode combiné, le résumé identifie explicitement le « combined mode » et
+     rapporte supported/total et pourcentage de CHAQUE split ; la réussite exige
+     que chaque split (development ET held_out) atteigne ≥ 90 % de façon
+     indépendante. Une preuve development à 100 % ne peut plus masquer un
+     held_out en échec. Régressions ajoutées le prouvant.
+  2. Scaffold reproductible : entrées CLI explicites `--commit SHA` et
+     `--date YYYY-MM-DD` alimentant `generate_release_decision`. L'identité est
+     le COMMIT DE CODE ÉVALUÉ passé explicitement (le défaut HEAD/aujourd'hui ne
+     prétend PAS reproduire un artefact committé). Test de parité
+     `test_regenerates_committed_scaffold_byte_for_byte` comparant les octets
+     exacts. Commande documentée byte-for-byte :
+     `.venv/bin/python scripts/farmer_evaluation.py --generate-decision 2026-09-17 --commit a41c842d6febbdf38d1cf771875ed59102094a2b --date 2026-09-17`.
+  3. Isolement des tests : `generate_release_decision` accepte `output_dir`
+     (défaut `EVALUATION_DIR`) ; tous les tests écrivent sous `tmp_path`, le
+     `.unlink()` touchant le vrai arbre `evaluation/` est supprimé ; test de
+     protection `test_generation_never_touches_committed_artifact`.
+  4. Métadonnées internes retirées : `git rm -r
+     .agents/tasks/task-k2-release-evaluation/` (context.json, task.json,
+     features/FEAT-001..003.json, 2026-09-18-000000-review.md). Artefacts
+     d'orchestration, pas des livrables projet.
+  5. Intégration `origin/main` (31041731) par FUSION (pas rebase, pour préserver
+     le SHA `a41c842` enregistré comme identité on-branch du scaffold). Seul
+     conflit : `SESSION.md` (ajouts des deux côtés) résolu en PRÉSERVANT LES DEUX
+     HISTORIQUES (toutes les entrées K2 ET l'entrée PR #17 « Index des preuves »).
+     `evaluation/EVIDENCE_INDEX.md` (nouveau de PR #17) inchangé, byte-identique
+     à main.
+  6. Régénération finale du scaffold via la commande documentée : aucun
+     changement d'octet (parité prouvée). Décision globale REPORTÉE
+     (`[x] REPORTER`, `[ ] LIVRER`, `[ ] RÉDUIRE`) ; toutes les portes
+     humaine/agronomique/téléphone/pilote/modèle-en-direct/hébergement restent
+     « en attente » (résultats « À mesurer »).
+- Totaux de tests (exacts) : (1) `tests/test_farmer_evaluation.py
+  tests/test_evidence_ledger.py tests/test_evaluate_rag.py test_release_decision.py`
+  => 36 passed, 1 warning (PyPDF2) ; (2) `tests --ignore=tests/test_rag.py` =>
+  709 passed, 1 skipped, 1 warning ; (3) `pnpm test:js` => 33 pass ;
+  (4) `git diff --check` => propre. `tests/test_rag.py` exclu (Groq/HF en ligne).
+- Contraintes respectées : aucun changement à `core/fertilizer.py`,
+  `core/source_policy.py`, `static/data/fertilizer.json`, ni aux verdicts
+  d'éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+  P2 (attribution ProSol de PR #13) non restauré. Aucun relecteur, participant,
+  approbation, résultat ou preuve en direct inventé. Formulation française et
+  refus de sécurité préservés. PR reste brouillon ; aucun push ni déploiement.
+
+### 2026-09-17 : Suivi de revue PR #16 — isolation des splits sur le scorecard (K2)
+
+- Contexte : la revue v1 (APPROUVÉE) a noté que la correction 1 avait été
+  appliquée au registre de réclamations (`assess_claims`, par split) mais PAS à
+  la fonction scorecard `assess()`, qui continuait de mutualiser
+  grounding/success/understood sur development+held_out en mode benchmark complet
+  (split=all). Un development parfait pouvait donc masquer arithmétiquement un
+  held_out en échec sur les portes qualité du scorecard.
+- Correctif (`scripts/farmer_evaluation.py`, `assess()`) : en mode combiné
+  (les deux splits présents), les portes grounding >= 90 %, task completion
+  >= 80 % et next action understood >= 80 % sont désormais calculées et exigées
+  INDÉPENDAMMENT par split ; le scorecard ne passe que si CHAQUE split atteint
+  seul les trois seuils. La porte de sécurité critique reste par cas (inchangée).
+  Le résumé identifie clairement « combined mode (split=all) … per split » et
+  rapporte les taux par split. Les chemins mono-split (development seul ou
+  held_out seul) et leurs messages sont strictement inchangés (tests
+  pré-existants passent verbatim).
+- Régressions (`tests/test_farmer_evaluation.py`) : (a) un scorecard complet
+  avec development parfait mais held_out grounding à 85 % ÉCHOUE (mutualisé il
+  serait à 95 % et passerait) ; (b) le résumé en mode combiné nomme chaque split
+  et ses taux ; (c) un scorecard où LES DEUX splits atteignent tous les seuils
+  (held_out task completion exactement 80 %) PASSE ; (d) held_out task completion
+  75 % ÉCHOUE. Les cas critiques restent safety_pass=yes pour isoler la porte
+  qualité. Ces tests échoueraient si `assess()` revenait à la mutualisation.
+- Issue latente 2 (revue) : documentée seulement (docstring de
+  `generate_release_decision`) — un chemin de sortie complet + `--date` ignore la
+  date dans le nom de fichier ; le flux de régénération documenté utilise une
+  date nue et n'est pas affecté. Aucun changement de comportement, parité
+  préservée.
+- Vérifications : parité scaffold `git diff --exit-code` => propre (décision
+  toujours REPORTÉE, toutes portes en attente). Aucun changement à
+  `core/fertilizer.py`, `core/source_policy.py`, `static/data/fertilizer.json`,
+  ni éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
+  P2 non restauré. Aucun relecteur/participant/résultat inventé. PR reste
+  brouillon ; aucun push.
