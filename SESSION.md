@@ -2105,3 +2105,23 @@ cd - && git worktree remove "$WT" --force
   ni éligibilité `Data/reviews/*`. `NUMERIC_GUIDANCE_VERIFIED = False` inchangé.
   P2 non restauré. Aucun relecteur/participant/résultat inventé. PR reste
   brouillon ; aucun push.
+
+### 2026-09-20 — Access restored; integration and remaining preparation
+
+- Git fetch/push access restored and live Space /version reachable. Pre-deploy
+  Space revision a2798eb3, RAG ready, journal schema v5.
+- PR #16 merged at GitHub main 666a726c after verifying its four successful CI
+  workflows. Fresh combined-code local verification: 713 Python passed,
+  1 skipped, 1 PyPDF2 warning; 33 JavaScript passed; credentialed local RAG excluded.
+- K3 provider-neutral preflight/rebuild/restore/rollback procedure prepared in
+  evaluation/HOSTING_VALIDATION.md using existing automated fixture modes.
+  Actual provider durability remains unproven; no human evidence fabricated.
+- K4/L4 corrected stale README source/dose claims, marked previous state snapshots
+  historical, replaced the obsolete direct-HF-push recipe, and repaired relative
+  links in the historical assessment. L3 static French UI audit recorded no
+  observed issue within its stated scope. Evidence index updated.
+- Fertilizer asset parity and diff checks passed. Relative documentation file
+  links checked across README, state, implementation, deployment, evaluation,
+  source reviews and plans; no broken file targets after repairs.
+- Existing shared-checkout changes remain preserved. Deployment and final local
+  synchronization follow only after these changes are accepted into main.

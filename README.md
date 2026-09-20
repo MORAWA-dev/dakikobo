@@ -11,9 +11,10 @@ preload_from_hub:
 # DakiKobo — AI Agricultural Advisor for Burkina Faso 🌾
 
 DakiKobo is a French-language AI assistant for smallholder farmers in Burkina Faso.
-It uses a **Retrieval-Augmented Generation (RAG)** pipeline grounded in agricultural
-reference documents (FAO, AGRA, WFP and technical guides for the Sahel and Sudanian
-Savanna zones) so answers stay accurate and source-backed rather than invented.
+It uses a **Retrieval-Augmented Generation (RAG)** pipeline restricted to reviewed
+local sources. Currently only the CILSS and MAERAH/OAPH orientation summaries are
+eligible; technical guides remain candidates pending review. Unsupported field
+questions must receive an honest fallback, not an invented recommendation.
 
 The focus crops are **mil (millet), sorgho (sorghum), maïs (maize), niébé (cowpea)
 and arachide (groundnut)**. All output — answers, UI labels and voice — is in French,
@@ -25,7 +26,7 @@ Live Space: **https://kimcomehome-dakikobo.hf.space/**
 
 1. **Contexte parcelle** (optionnel) — culture, stade, lieu ; activez **Français simple** pour des phrases plus claires.
 2. **Question texte** — ex. « Quand semer le mil ? » → carte *Conseil agricole* + sources.
-3. **Engrais** — ex. « Dose d'engrais pour le sorgho » → doses **déterministes** (pas inventées par le LLM) + disclaimer agent.
+3. **Engrais** — ex. « Dose d'engrais pour le sorgho » → conseil **déterministe**, doses chiffrées suspendues jusqu’à validation agronomique + confirmation par un agent.
 4. **Photo de feuille** — dépistage prudent (*pas un diagnostic*).
 5. **Sources & limites** — preuves, météo/sol indicatifs, confirmation terrain obligatoire.
 
