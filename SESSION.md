@@ -2154,3 +2154,31 @@ cd - && git worktree remove "$WT" --force
   source reviews and plans; no broken file targets after repairs.
 - Existing shared-checkout changes remain preserved. Deployment and final local
   synchronization follow only after these changes are accepted into main.
+
+### 2026-09-21 — GitHub, local checkout and Hugging Face synchronized
+
+- PR #16 (release-evaluation hardening) merged into GitHub main, followed by
+  PR #19 (provider-validation preparation and documentation reconciliation).
+  GitHub main and the local main checkout now point to `62d357d7`.
+- PR #19's four checks passed: offline regression, Docker build, headless
+  Chromium rehearsal and Docker journal continuity. GitHub has no open PRs.
+- Fresh combined-code verification before deployment: 713 Python tests passed,
+  1 skipped, with one existing PyPDF2 deprecation warning; all 33 JavaScript
+  tests passed. Offline fertilizer export parity, diff checks and 121 relative
+  documentation links also passed.
+- Deployed GitHub main `62d357d7` through the separate Hugging Face history as
+  Space commit `33d59d00`. The deployed files were compared byte-for-byte with
+  the tracked GitHub snapshot before the HF commit; HF LFS attributes were kept.
+- Live Space verification: runtime RUNNING on cpu-basic; `/version` reports
+  `33d59d00`, journal schema v6 and RAG ready; `/healthz` is healthy with warm-up
+  complete. Security headers were present and private paths returned 404.
+- Live strict RAG evaluation passed 14/14 hard checks (100%, required 75%) with
+  3 advisory warnings. The final temporary report was written outside the repo
+  so historical committed evaluation evidence was not overwritten.
+- Hugging Face reports no persistent storage allocation. The demo is updated,
+  but provider journal durability remains unproven and release status remains
+  REPORTÉE pending agronomist approval, physical-phone testing, participant
+  results and provider durability evidence.
+- Existing untracked local files were preserved. The earlier interrupted
+  SESSION edit remains in a named Git stash and a private `.git` backup; neither
+  is part of the deployed application or GitHub history.
