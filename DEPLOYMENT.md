@@ -193,8 +193,10 @@ and `Options` overrides; otherwise move the same rules into the virtual-host
 configuration. Test that `/.env`, `/.git/config`, `/config.py`, and
 `/data/case_log.sqlite3` return 403 or 404 before making the site public.
 
-The app sends a restrictive Content Security Policy, anti-framing and MIME
-sniffing protections, a no-referrer policy, HTTPS transport security, and camera/
+The app sends a restrictive Content Security Policy that permits framing only
+from its own origin and Hugging Face origins, so the Space App tab can embed the
+service while other sites remain blocked. It also sends MIME-sniffing protection,
+a no-referrer policy, HTTPS transport security, and camera/
 microphone permissions limited to the app itself. Search indexing is disabled by
 default through `robots.txt` and `X-Robots-Tag`; enable it only with the server
 variable `SEARCH_ENGINE_INDEXING_ENABLED=true` after a deliberate public-launch

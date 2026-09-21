@@ -16,13 +16,28 @@ def test_all_responses_receive_browser_security_headers(monkeypatch):
     response = app_module.app.test_client().get("/")
 
     assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["X-Frame-Options"] == "DENY"
+    assert "X-Frame-Options" not in response.headers
     assert response.headers["Referrer-Policy"] == "no-referrer"
     assert response.headers["Cross-Origin-Opener-Policy"] == "same-origin"
     assert response.headers["Cross-Origin-Resource-Policy"] == "same-origin"
     assert response.headers["Strict-Transport-Security"].startswith("max-age=")
     assert "object-src 'none'" in response.headers["Content-Security-Policy"]
-    assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+    assert (
+        "frame-ancestors 'self' https://huggingface.co https://*.huggingface.co"
+        in response.headers["Content-Security-Policy"]
+    )
+
+
+def test_space_embedding_stays_restricted_to_hugging_face(monkeypatch):
+    """Catch headers that make the Hugging Face App tab refuse its iframe."""
+    monkeypatch.setattr(app_module, "IS_PRODUCTION", True)
+    response = app_module.app.test_client().get("/")
+    policy = response.headers["Content-Security-Policy"]
+
+    assert "frame-ancestors 'none'" not in policy
+    assert "https://huggingface.co" in policy
+    assert "https://*.huggingface.co" in policy
+    assert "http:" not in policy
 
 
 def test_private_demo_is_not_indexed_by_default():

@@ -289,7 +289,8 @@ def _add_security_headers(response):
     headers = {
         "Content-Security-Policy": (
             "default-src 'self'; base-uri 'none'; object-src 'none'; "
-            "frame-ancestors 'none'; form-action 'self'; "
+            "frame-ancestors 'self' https://huggingface.co "
+            "https://*.huggingface.co; form-action 'self'; "
             "script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
             "media-src 'self' blob:; connect-src 'self'; worker-src 'self'; "
             "manifest-src 'self'"
@@ -299,7 +300,6 @@ def _add_security_headers(response):
         "Permissions-Policy": "camera=(self), microphone=(self), geolocation=()",
         "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY",
         "X-Permitted-Cross-Domain-Policies": "none",
     }
     if IS_PRODUCTION:

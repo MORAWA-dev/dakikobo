@@ -2182,3 +2182,15 @@ cd - && git worktree remove "$WT" --force
 - Existing untracked local files were preserved. The earlier interrupted
   SESSION edit remains in a named Git stash and a private `.git` backup; neither
   is part of the deployed application or GitHub history.
+
+### 2026-09-21 — Restore Hugging Face App-tab embedding
+
+- User screenshot reproduced Firefox refusing the Space iframe while the direct
+  `hf.space` URL remained healthy. The live response sent both
+  `X-Frame-Options: DENY` and CSP `frame-ancestors 'none'`, which forbid the
+  Hugging Face Space page from embedding the running application.
+- Added a failing HTTP-header regression first, then restricted CSP framing to
+  `'self'`, `https://huggingface.co` and `https://*.huggingface.co`. Removed the
+  obsolete `X-Frame-Options: DENY`, which cannot express this origin allowlist.
+- Other CSP directives and browser protections remain unchanged. Deployment
+  documentation now describes the intended Hugging Face-only embedding policy.
