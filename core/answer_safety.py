@@ -49,6 +49,7 @@ _POLICY_SOURCE_FILES = (
     "disease.py",
     "fertilizer.py",
     "llm_chain.py",
+    "retrieval.py",
 )
 
 

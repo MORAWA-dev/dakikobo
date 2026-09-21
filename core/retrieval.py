@@ -190,6 +190,21 @@ _FIELD_PRACTICE_TOKENS = {
     "azote",
     "infiltration",
     "ruissellement",
+    "adventice",
+    "adventices",
+    "desherbage",
+    "desherber",
+    "herbe",
+    "herbes",
+}
+
+_EVIDENCE_REQUIRED_TOPIC_TOKENS = {
+    "adventice",
+    "adventices",
+    "desherbage",
+    "desherber",
+    "herbe",
+    "herbes",
 }
 
 _CITATION_ALIASES = {
@@ -219,6 +234,12 @@ _CITATION_ALIASES = {
     "symptomes": {"maladie", "maladies", "symptome", "tache", "feuille"},
     "tache": {"taches", "feuille", "feuilles", "maladie"},
     "taches": {"tache", "feuille", "feuilles", "maladie"},
+    "adventice": {"adventices", "desherbage", "desherber", "herbe", "herbes"},
+    "adventices": {"adventice", "desherbage", "desherber", "herbe", "herbes"},
+    "desherbage": {"adventice", "adventices", "desherber", "herbe", "herbes"},
+    "desherber": {"adventice", "adventices", "desherbage", "herbe", "herbes"},
+    "herbe": {"adventice", "adventices", "desherbage", "desherber", "herbes"},
+    "herbes": {"adventice", "adventices", "desherbage", "desherber", "herbe"},
 }
 
 
@@ -282,6 +303,36 @@ def _source_rank_score(title: str, base_score: float, *, heavy: bool = False) ->
 
 def _is_field_practice_query(query_tokens: set[str]) -> bool:
     return bool(query_tokens.intersection(_FIELD_PRACTICE_TOKENS))
+
+
+def filter_generation_documents(query: str, source_docs) -> list:
+    """Keep only chunks that can support an evidence-sensitive topic answer.
+
+    Vector similarity and crop metadata can rank a broad institutional document
+    highly even when its text says nothing about the requested topic. Weed and
+    weeding questions therefore require the chunk text/title to overlap those
+    concepts before it is passed to the language model. Other topics retain the
+    existing similarity-threshold behaviour until they receive their own
+    explicit evidence rule.
+    """
+    docs = list(source_docs)
+    query_tokens = _citation_tokens(query)
+    required_topics = query_tokens.intersection(_EVIDENCE_REQUIRED_TOPIC_TOKENS)
+    if not required_topics:
+        return docs
+
+    query_topics = query_tokens - query_tokens.intersection(_CROP_TOKENS)
+    if not query_topics:
+        return docs
+
+    eligible = []
+    for doc in docs:
+        metadata = getattr(doc, "metadata", {}) or {}
+        title = metadata.get("source", "Inconnu")
+        evidence_text = f"{title} {getattr(doc, 'page_content', '')}"
+        if query_topics.intersection(_citation_tokens(evidence_text)):
+            eligible.append(doc)
+    return eligible
 
 
 def _title_crop_hits(title: str, crop_tokens: set[str]) -> int:

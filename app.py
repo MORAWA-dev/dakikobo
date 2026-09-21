@@ -41,6 +41,7 @@ from core.retrieval import (
     GroundedAnswer,
     chunk_id,
     get_active_manifest_hash,
+    filter_generation_documents,
     ground_answer,
     manifest_hash,
     merge_scored_evidence,
@@ -336,6 +337,21 @@ def _no_rag_context_answer() -> str:
         "Je ne sais pas encore. Cette information n'est pas disponible "
         f"dans la base de données de {BOT_NAME} pour le Burkina Faso."
     )
+
+
+def _is_greeting(query: str) -> bool:
+    """Recognize a standalone greeting that needs no agricultural evidence."""
+    normalized = re.sub(r"[^a-zà-ÿ]+", " ", (query or "").lower()).strip()
+    return normalized in {
+        "bonjour",
+        "bonsoir",
+        "hello",
+        "hi",
+        "salut",
+        "salam",
+        "bonjour dakikobo",
+        "salut dakikobo",
+    }
 
 
 def _uncertain_fallback_answer() -> str:
@@ -1103,6 +1119,26 @@ def ask():
         re.search(r"météo|meteo|aujourd|demain|prévision|prevision|cette semaine", query, re.I))
     g.dynamic_context = dynamic_context
 
+    if _is_greeting(query):
+        answer = "Bonjour ! Comment puis-je vous aider pour votre culture ?"
+        _set_log_fields(
+            intent="greeting",
+            model="static",
+            outcome="ok",
+            confidence="Fort",
+            source_count=0,
+            audio_generated=False,
+            case_structured=False,
+        )
+        return jsonify({
+            "answer": answer,
+            "sources": [],
+            "confidence": "Fort",
+            "audio_url": "",
+            "answer_kind": "conversation",
+            "simple_french": simple_french,
+        })
+
     weather_signals, weather_payload = _weather_signals_for_location(
         effective_context.get("location", "")
     )
@@ -1286,9 +1322,12 @@ def ask():
             for doc, score in scored
             if score >= SIMILARITY_THRESHOLD
         ]
-        source_docs = [doc for doc, _ in accepted_scored]
+        threshold_docs = [doc for doc, _ in accepted_scored]
+        source_docs = filter_generation_documents(retrieval_query, threshold_docs)
         source_scores = {}
         for doc, score in accepted_scored:
+            if doc not in source_docs:
+                continue
             metadata = getattr(doc, "metadata", {}) or {}
             title = metadata.get("source", "Inconnu")
             if title not in source_scores or score > source_scores[title]:
