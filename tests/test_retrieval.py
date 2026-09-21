@@ -281,7 +281,7 @@ def test_manifest_hash_roundtrip(monkeypatch):
 def test_weed_generation_filter_rejects_crop_only_institutional_chunk():
     institutional = _doc(
         "MAERAH/OAPH 2026 - orientation Burkina",
-        "Structure ministérielle, programmes publics et projets agropastoraux.",
+        "Structure ministérielle, culture, programmes et projets agropastoraux.",
         crops="arachide, mil, sorgho",
         topics="politique publique, programmes",
     )

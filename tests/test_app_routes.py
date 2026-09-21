@@ -2016,7 +2016,7 @@ class _InstitutionalWeedHarness:
                     },
                     page_content=(
                         "Programme agropastoral et halieutique 2023-2025. "
-                        "Structure du ministère et liste des projets publics."
+                        "Structure du ministère, culture et projets publics."
                     ),
                 ),
                 0.88,
