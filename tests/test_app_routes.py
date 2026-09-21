@@ -1974,6 +1974,87 @@ def test_zero_document_refusal_is_logged_without_an_llm_call(monkeypatch, caplog
     assert ask_events[-1]["refusal"] is True
 
 
+def test_greeting_is_answered_without_rag_or_an_advice_case(monkeypatch):
+    """A greeting is conversation, not agricultural evidence."""
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(
+        app_module,
+        "get_rag_chain",
+        lambda: (_ for _ in ()).throw(AssertionError("RAG called for greeting")),
+    )
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask", data={"messageText": "hi", "simple_french": "true"}
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["answer"].startswith("Bonjour")
+    assert payload["sources"] == []
+    assert payload["answer_kind"] == "conversation"
+    assert "case" not in payload
+
+
+class _InstitutionalWeedHarness:
+    """High vector similarity with no field evidence about weeds."""
+
+    def __init__(self):
+        self.combine_documents_chain = self
+        self.llm_calls = 0
+
+    def similarity_search_with_relevance_scores(self, query, k):
+        return [
+            (
+                SimpleNamespace(
+                    metadata={
+                        "source": "MAERAH/OAPH 2026 - orientation Burkina",
+                        "doc_type": "program_doc",
+                        "crops": "arachide, mil, sorgho",
+                        "topics": "politique publique, programmes",
+                        "scope": "Orientation institutionnelle, pas un manuel de terrain.",
+                    },
+                    page_content=(
+                        "Programme agropastoral et halieutique 2023-2025. "
+                        "Structure du ministère et liste des projets publics."
+                    ),
+                ),
+                0.88,
+            )
+        ]
+
+    def run(self, *, input_documents, question):
+        self.llm_calls += 1
+        raise AssertionError("LLM called with off-topic institutional evidence")
+
+
+def test_field_practice_query_refuses_when_chunks_only_match_the_crop(monkeypatch):
+    harness = _InstitutionalWeedHarness()
+    monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
+    monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
+    monkeypatch.setattr(app_module, "_rag_db", harness)
+    monkeypatch.setattr(app_module, "text_to_speech_to_static", lambda text: "")
+
+    response = app_module.app.test_client().post(
+        "/ask",
+        data={
+            "messageText": (
+                "Quelles sont les herbes nuisibles à la culture de l'arachide "
+                "au Burkina ?"
+            )
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert harness.llm_calls == 0
+    assert "Je ne sais pas encore" in payload["answer"]
+    assert payload["sources"] == []
+    assert payload["confidence"] == "Faible"
+    assert payload["answer_kind"] == "refusal"
+    assert "case" not in payload
+
+
 class _UnsafeAnswerHarness:
     """A grounded answer that names a product and a dose."""
 

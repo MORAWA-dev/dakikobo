@@ -13,6 +13,7 @@ from core.retrieval import (
     _is_weak_source_title,
     _source_rank_score,
     chunk_id,
+    filter_generation_documents,
     get_active_manifest_hash,
     ground_answer,
     set_active_manifest_hash,
@@ -275,3 +276,23 @@ def test_manifest_hash_roundtrip(monkeypatch):
     set_active_manifest_hash("abc123def4567890")
     assert get_active_manifest_hash() == "abc123def4567890"
     set_active_manifest_hash(None)
+
+
+def test_weed_generation_filter_rejects_crop_only_institutional_chunk():
+    institutional = _doc(
+        "MAERAH/OAPH 2026 - orientation Burkina",
+        "Structure ministérielle, programmes publics et projets agropastoraux.",
+        crops="arachide, mil, sorgho",
+        topics="politique publique, programmes",
+    )
+    field_guide = _doc(
+        "Guide arachide",
+        "Les adventices de l'arachide doivent être identifiées avant le désherbage.",
+    )
+
+    eligible = filter_generation_documents(
+        "Quelles herbes nuisibles dans la culture de l'arachide ?",
+        [institutional, field_guide],
+    )
+
+    assert eligible == [field_guide]

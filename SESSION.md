@@ -2194,3 +2194,16 @@ cd - && git worktree remove "$WT" --force
   obsolete `X-Frame-Options: DENY`, which cannot express this origin allowlist.
 - Other CSP directives and browser protections remain unchanged. Deployment
   documentation now describes the intended Hugging Face-only embedding policy.
+
+### 2026-09-21 — Prevent greeting and weed-answer hallucinations
+
+- Reproduced two live answer-quality failures: a standalone `hi` was rendered
+  as sourced agricultural advice, and an arachide weed question reached the LLM
+  with a high-scoring institutional programme document that contained no weed
+  evidence.
+- Added a deterministic, source-free greeting response with no advice case.
+  Added a pre-generation evidence rule for weed/desherbage questions: crop
+  metadata alone is insufficient, and a chunk must mention the requested weed
+  concepts before the LLM may see it.
+- Included retrieval policy code in the safety revision digest so deployments
+  invalidate answers cached under the previous grounding policy.
