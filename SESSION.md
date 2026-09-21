@@ -2207,3 +2207,7 @@ cd - && git worktree remove "$WT" --force
   concepts before the LLM may see it.
 - Included retrieval policy code in the safety revision digest so deployments
   invalidate answers cached under the previous grounding policy.
+- The first live deployment revealed that a generic shared word (`culture`)
+  still admitted the institutional chunk. Tightened the rule to require a real
+  weed/desherbage concept in the chunk and extended the regressions with that
+  live-shaped false match before redeploying.

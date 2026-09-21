@@ -321,16 +321,12 @@ def filter_generation_documents(query: str, source_docs) -> list:
     if not required_topics:
         return docs
 
-    query_topics = query_tokens - query_tokens.intersection(_CROP_TOKENS)
-    if not query_topics:
-        return docs
-
     eligible = []
     for doc in docs:
         metadata = getattr(doc, "metadata", {}) or {}
         title = metadata.get("source", "Inconnu")
         evidence_text = f"{title} {getattr(doc, 'page_content', '')}"
-        if query_topics.intersection(_citation_tokens(evidence_text)):
+        if required_topics.intersection(_citation_tokens(evidence_text)):
             eligible.append(doc)
     return eligible
 

@@ -9,7 +9,7 @@ Ce document est un brouillon reproductible généré hors ligne à partir de l'�
 - Commit : `a41c842d6febbdf38d1cf771875ed59102094a2b`
 - Date de génération du brouillon (UTC) : 2026-09-17
 - Environnement d'exécution mesuré : ＿＿＿＿＿＿＿＿＿＿＿＿ (à remplir par l'opérateur)
-- Révision de politique de sécurité : `safety-2026-09-09.c625b9b546ba`
+- Révision de politique de sécurité : `safety-2026-09-09.1a4c0265a779`
 - Modèle de conversation : `openai/gpt-oss-120b`
 - Modèle Vision : `gemini-2.5-flash`
 - Modèle d'embarquement (embeddings) : `paraphrase-multilingual-MiniLM-L12-v2`
