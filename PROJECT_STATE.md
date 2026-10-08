@@ -1,6 +1,22 @@
 # DakiKobo Project State
 
-Last updated: 2026-09-20 (integration and deployment preparation)
+Last updated: 2026-10-08 (roadmap and synchronization handoff)
+
+## Current handoff — 2026-10-08
+
+The next-work sequence and the required local/GitHub/Hugging Face synchronization
+contract are recorded in
+[plans/DAKIKOBO_NEXT_WORK_PLAN_2026-10-08.md](plans/DAKIKOBO_NEXT_WORK_PLAN_2026-10-08.md).
+Start a fresh engineering chat from its copyable prompt and the newest
+`SESSION.md` entry. The immediate technical priority is a reproducible deployment
+manifest check; the main product priority remains expanding the eligible corpus
+only through documented agronomist review.
+
+At this handoff, the public Space was healthy with RAG ready and GitHub had no
+open pull requests. The release decision remains **REPORTÉE** because agronomist,
+physical-phone, participant, and hosting-provider durability evidence is still
+missing. Fetch both remotes and query the public `/version` endpoint before using
+any dated commit hash as current state.
 
 ## Current engineering status — 2026-09-20
 

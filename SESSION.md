@@ -65,6 +65,27 @@ cd - && git worktree remove "$WT" --force
 
 ## Session entries
 
+### 2026-10-08 — Next-work roadmap and synchronization contract prepared
+
+**Verified before authoring**
+
+- Local `main` and GitHub `origin/main` matched at `f75c4c39085bebf3cab35a51d27a21256336b57f`.
+- Hugging Face `hf/main` and the live `/version` endpoint matched at
+  `ac35e8857a8899fe5391030f17190ce74583abaa`; `/healthz` was healthy and RAG was ready.
+- GitHub had no open pull requests. The GitHub and HF histories remain separate by design.
+
+**Changed**
+
+- Added `plans/DAKIKOBO_NEXT_WORK_PLAN_2026-10-08.md` with an exact synchronization
+  contract, standard delivery procedure, prioritized improvement phases, human-only
+  evidence gates, definition of done, and a prompt for starting a fresh chat.
+- Refreshed the top of `PROJECT_STATE.md` so future work begins from the new plan.
+
+**Next up**
+
+- Start Phase 0: implement a normalized GitHub/HF deployment manifest check, then
+  deliver it through the full GitHub/local/HF synchronization procedure.
+
 ### 2026-09-09 — Kiro PR #1 third follow-up review (`5e90fa1d`)
 
 **Verified**
