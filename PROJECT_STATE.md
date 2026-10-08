@@ -2,6 +2,16 @@
 
 Last updated: 2026-10-08 (roadmap and synchronization handoff)
 
+## Phase 0 — Deployment verification tooling (2026-10-08)
+
+`scripts/verify_deployment.py` compares committed GitHub/HF manifests, normalizes
+LFS content identities, checks the deployment commit mapping, and verifies live
+version and health. The manual dispatch and release-record checklist are in
+`DEPLOYMENT.md`. Tests cover file/mode drift, LFS, stale versions, unhealthy RAG,
+and preservation of untracked/local edits. See the newest `SESSION.md` entry for
+actual test, CI and deployment outcomes; this tooling does not satisfy the
+agronomist, phone, participant or provider durability gates.
+
 ## Current handoff — 2026-10-08
 
 The next-work sequence and the required local/GitHub/Hugging Face synchronization

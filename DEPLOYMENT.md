@@ -4,6 +4,48 @@ This app can be hosted as a Flask web service on Hugging Face Spaces, Render, Ra
 
 ## Recommended Demo Path
 
+### Release checklist and deployment identity
+
+For every release, update `PROJECT_STATE.md`, `README.md`, and `SESSION.md` with
+the scope, measured checks, and remaining gates. Follow the
+[synchronization plan](plans/DAKIKOBO_NEXT_WORK_PLAN_2026-10-08.md): merge only
+after all four CI checks pass, fast-forward local `main`, then copy that exact
+accepted tree into the separate HF history, retaining only HF `.gitattributes`.
+Use the commit subject `Deploy GitHub main <full-GitHub-SHA> to Space`.
+
+Run this manual post-deployment check from the repository (Python 3.11+;
+standard library only, no application credentials or tokens required):
+
+```bash
+git fetch origin main
+git fetch hf main
+python3 scripts/verify_deployment.py --dry-run
+python3 scripts/verify_deployment.py
+```
+
+The JSON report prints GitHub, HF and live SHAs, differing paths, deployment
+message mapping, and PASS/FAIL; failure exits 1. Dry-run success proves only
+tree equality and the commit mapping, not a live deployment. The live check
+also requires `/version` to identify the full HF SHA with ready RAG and
+`/healthz` to report healthy and ready. HTTP/JSON/Git errors fail closed.
+Refs and the URL can be overridden with `--github-ref`, `--hf-ref`, and
+`--base-url`; fetch first because refs are local snapshots.
+
+The manifest compares committed file paths, modes, byte sizes and SHA-256
+identities. Only the root `.gitattributes` is excluded. Canonical Git LFS
+pointers normalize to their content SHA-256 and size, matching ordinary Git
+blobs without downloading binary files. This does not prove remote LFS object
+availability; build, smoke and strict RAG checks remain required. Unsupported
+LFS pointers and submodules fail closed. Local edits and untracked files never
+enter the comparison. No whitespace or line-ending differences are ignored.
+
+After deployment, append the actual GitHub/HF SHA mapping and live evaluation
+results to `SESSION.md`. Keep this post-deployment receipt as a local uncommitted
+append until the next reviewed release; record that exception explicitly when
+reporting local state. Committing a receipt changes the accepted snapshot, so
+do not claim the new documentation commit is already deployed. This avoids a
+self-referencing cycle of new commits merely to record their own deployment.
+
 If the budget is zero, start with Hugging Face Spaces using the Docker SDK:
 
 - Free CPU Spaces are realistic for this app's Python/RAG dependency stack.

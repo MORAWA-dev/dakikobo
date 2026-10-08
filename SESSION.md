@@ -2232,3 +2232,33 @@ cd - && git worktree remove "$WT" --force
   still admitted the institutional chunk. Tightened the rule to require a real
   weed/desherbage concept in the chunk and extended the regressions with that
   live-shaped false match before redeploying.
+
+### 2026-10-08 — Phase 0: deployment synchronization guardrails
+
+- Baseline fetched and verified: local/GitHub main
+  `ccfce4a6be352ea89c0de89e9a2dfdcb3d1a319d`; HF and live `/version`
+  `f825f95b7fb7e8f0d1fe8f161a02005b0291f539`. Space RUNNING, health OK,
+  RAG ready, no open GitHub PRs. Existing untracked `.agents/`,
+  `plans/KIRO_GITHUB_WORK_PLAN_2026-09-15.md`, and `skills-lock.json` preserved.
+- Isolated `codex/sync-guardrails` branch: added standard-library-only
+  `scripts/verify_deployment.py`, comparing committed path/mode/content manifests
+  with LFS SHA-256/size normalization and only root `.gitattributes` excluded.
+  Checks the deployment commit mapping and full live HF SHA, health and RAG.
+  Errors and mismatches exit 1; dry-run success explicitly excludes live proof.
+- Added 13 real-Git/loopback-HTTP regressions. Initial test failed before the
+  command existed; focused suite now passes. Full offline suite: **730 passed,
+  1 skipped**, one existing PyPDF2 deprecation warning. JavaScript: **33 passed**.
+  Fertilizer parity, Python compilation and `git diff --check` passed.
+- Existing `.venv` interpreter target was absent. Tests used an isolated
+  temporary Python 3.12 environment with project requirements; the native Chroma
+  extension required `ARCHFLAGS='-arch x86_64'` on this Mac. Existing environment
+  was not changed. Credentialed local RAG test excluded; strict Space evaluation
+  remains a required post-deployment step.
+- Dry-run and live verification both PASS against the baseline above, with no
+  differing paths. README, PROJECT_STATE, IMPLEMENTATION_PLAN and DEPLOYMENT now
+  describe the verifier and release checklist. Post-deployment receipts are
+  appended locally for the next reviewed release to avoid recursive SHA changes.
+- Next: open PR, wait for all four CI jobs, merge, fast-forward shared main,
+  deploy the accepted tree, verify live identity/security and strict RAG, then
+  append the actual mapping and completion receipt. No source eligibility,
+  fertilizer values, human evidence or REPORTÉE decision changed.
