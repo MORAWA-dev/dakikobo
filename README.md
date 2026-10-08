@@ -24,6 +24,12 @@ and the interface is mobile-first for use on phones.
 
 Live Space: **https://kimcomehome-dakikobo.hf.space/**
 
+Deployment identity can be checked with `python3 scripts/verify_deployment.py`
+after fetching both remotes. It compares the accepted GitHub and HF trees and
+checks the live version and health. See the [release checklist](DEPLOYMENT.md#release-checklist-and-deployment-identity)
+for the offline dry run, LFS normalization, and required release records.
+Field release remains **REPORTÉE** pending the recorded human and hosting gates.
+
 1. **Contexte parcelle** (optionnel) — culture, stade, lieu ; activez **Français simple** pour des phrases plus claires.
 2. **Question texte** — ex. « Quand semer le mil ? » → carte *Conseil agricole* + sources.
 3. **Engrais** — ex. « Dose d'engrais pour le sorgho » → conseil **déterministe**, doses chiffrées suspendues jusqu’à validation agronomique + confirmation par un agent.

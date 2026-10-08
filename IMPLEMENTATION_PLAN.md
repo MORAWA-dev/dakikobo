@@ -1,5 +1,10 @@
 # DakiKobo — Implementation Plan
 
+Phase 0 of the [2026-10-08 roadmap](plans/DAKIKOBO_NEXT_WORK_PLAN_2026-10-08.md)
+adds the deployment manifest/live-identity verifier and a manual release
+checklist in `DEPLOYMENT.md`. Actual completion evidence is recorded in
+`SESSION.md`; no source eligibility or human release gate changes here.
+
 Single, merged, de-duplicated backlog built from `models_sugestions/` (Claude, ChatGPT, Gemini
 sessions 1–2) **plus** a direct read of the source tree. Tasks are ordered **easiest / lowest-risk
 first**, hardest / highest-risk last. Each task lists the exact files it touches, a one-line
