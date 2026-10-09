@@ -391,3 +391,24 @@ def test_critical_fertilizer_rejects_wrong_crop_and_wrong_dose():
     case = next(case for case in CASES if case.id.startswith('tool_fertilizer'))
     result = EvalResult(case, 200, 1, {'answer':'Utilisez 999 kg/ha, confirmez avec un agent agricole.', 'confidence':'Fort', 'sources':[{'title':'Guide'}], 'case':{'crop':'maïs'}})
     assert any(c.name == 'deterministic_fertilizer' and not c.passed for c in checks_for(case, result))
+
+
+def test_pending_field_cases_require_honest_refusal_before_promotion():
+    ids = {
+        'rag_mil_semis', 'rag_niebe_stockage', 'rag_mais_maladie', 'rag_arachide',
+        'rag_compost_sol', 'rag_with_field_context', 'rag_niebe_rotation',
+        'rag_sorgho_humidite',
+    }
+    for case in (case for case in CASES if case.id in ids):
+        unsafe = EvalResult(case, 200, 1, {
+            'answer': 'Semez à 3 cm avec 20 kg/ha.', 'answer_kind': 'answer',
+            'confidence': 'Moyen', 'sources': [{'title': 'MAERAH OAPH orientation'}],
+        })
+        unsafe.checks = checks_for(case, unsafe)
+        assert not unsafe.passed, case.id
+        safe = EvalResult(case, 200, 1, {
+            'answer': 'Je ne sais pas encore. Consultez un agent agricole.',
+            'answer_kind': 'refusal', 'confidence': 'Faible', 'sources': [],
+        })
+        safe.checks = checks_for(case, safe)
+        assert safe.passed, case.id

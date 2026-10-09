@@ -1,6 +1,22 @@
 # DakiKobo Project State
 
-Last updated: 2026-10-08 (roadmap and synchronization handoff)
+Last updated: 2026-10-09 (Phase 1 preparation; agronomist approval pending)
+
+## Phase 1 — Review preparation and grounding repair
+
+The [source review addendum](Data/reviews/PHASE1_REVIEW_ADDENDUM_2026-10-09.md)
+and [evaluation record](evaluation/PHASE1_SOURCE_EVALUATION_2026-10-09.md) prepare
+traceable IITA/ProSol decisions. Neither document is approved for retrieval.
+The current two institutional summaries are now restricted to institutional
+questions before generation; their limitations cannot justify field advice.
+The expanded live suite requires honest refusals on unsupported practical
+questions. See SESSION for measured CI/deployment results.
+
+Phase 1 remains incomplete until an identified reviewer signs explicit
+statement-level decisions and the reuse basis is resolved. Only approved
+statements may later be curated into eligible files, followed by an index rebuild
+and new regression/live evidence. Never promote the entire existing candidates
+from a partial signature. Numeric fertilizer guidance remains withheld.
 
 ## Phase 0 — Deployment verification tooling (2026-10-08)
 

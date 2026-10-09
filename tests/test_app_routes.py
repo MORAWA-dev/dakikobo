@@ -2010,6 +2010,7 @@ class _InstitutionalWeedHarness:
                     metadata={
                         "source": "MAERAH/OAPH 2026 - orientation Burkina",
                         "doc_type": "program_doc",
+                        "source_id": "bf_maerah_oaph_orientation_2026",
                         "crops": "arachide, mil, sorgho",
                         "topics": "politique publique, programmes",
                         "scope": "Orientation institutionnelle, pas un manuel de terrain.",
@@ -2028,7 +2029,14 @@ class _InstitutionalWeedHarness:
         raise AssertionError("LLM called with off-topic institutional evidence")
 
 
-def test_field_practice_query_refuses_when_chunks_only_match_the_crop(monkeypatch):
+@pytest.mark.parametrize("question", [
+    "Quelles sont les herbes nuisibles à la culture de l'arachide au Burkina ?",
+    "Quand semer le mil ?",
+    "Comment stocker le niébé contre les bruches ?",
+    "Quels conseils pour réussir l'arachide au Burkina Faso ?",
+    "Comment garder l'humidité du sol pour le sorgho ?",
+])
+def test_field_practice_query_refuses_when_chunks_only_match_the_crop(monkeypatch, question):
     harness = _InstitutionalWeedHarness()
     monkeypatch.setattr(app_module, "ANSWER_CACHE_ENABLED", False)
     monkeypatch.setattr(app_module, "get_rag_chain", lambda: harness)
@@ -2038,10 +2046,7 @@ def test_field_practice_query_refuses_when_chunks_only_match_the_crop(monkeypatc
     response = app_module.app.test_client().post(
         "/ask",
         data={
-            "messageText": (
-                "Quelles sont les herbes nuisibles à la culture de l'arachide "
-                "au Burkina ?"
-            )
+            "messageText": question
         },
     )
     payload = response.get_json()

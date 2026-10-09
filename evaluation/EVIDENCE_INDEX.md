@@ -12,6 +12,11 @@ Légende des statuts : `automated` · `human pending` · `phone pending` ·
 
 ## 1. Revue des sources — `human pending` / `agronomist pending`
 
+- Complément actuel : [revue Phase 1](../Data/reviews/PHASE1_REVIEW_ADDENDUM_2026-10-09.md)
+  — décisions par formulation à signer ; droits et vérification complémentaire
+  ProSol encore en attente. [Évaluation associée](PHASE1_SOURCE_EVALUATION_2026-10-09.md)
+  — questions, preuves candidates et refus exigés avant toute promotion.
+
 - Inventaire canonique : [SOURCE_ELIGIBILITY.md](../Data/reviews/SOURCE_ELIGIBILITY.md)
   (régénéré par `scripts/audit_source_eligibility.py` ; les versions datées
   `SOURCE_ELIGIBILITY_2026-09-06.md` et `SOURCE_ELIGIBILITY_2026-09-12.md`

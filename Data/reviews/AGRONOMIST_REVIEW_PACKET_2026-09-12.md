@@ -1,5 +1,11 @@
 # Dossier de revue agronomique — 12 septembre 2026
 
+> Mise à jour du 9 octobre 2026 : consulter l'[addendum de revue](PHASE1_REVIEW_ADDENDUM_2026-10-09.md).
+> Les constats historiques de manque portent sur les extraits alors retenus,
+> pas sur l'absence de chapitres culturaux dans le catalogue ProSol complet.
+> Les nouveaux passages repérés restent candidats ; aucune validation ni
+> extension d'éligibilité n'est implicite.
+
 **Statut : PRÊT POUR REVUE HUMAINE — relecteur et date à confirmer.**
 **Objet :** validation des 20 cellules de la matrice de couverture cultures × thèmes.
 **Document de référence :** `Data/reviews/CROP_COVERAGE_MATRIX_2026-09-09.md`

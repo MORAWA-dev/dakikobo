@@ -296,3 +296,57 @@ def test_weed_generation_filter_rejects_crop_only_institutional_chunk():
     )
 
     assert eligible == [field_guide]
+
+
+
+def test_orientation_sources_cannot_support_practical_crop_advice():
+    # Includes technical words from the real source's limitations: those are
+    # not evidence that this orientation summary contains field guidance.
+    institutional = _doc(
+        "MAERAH Burkina Faso - orientation institutionnelle et OAPH 2023-2025",
+        "Ne pas inventer des doses ni calendriers de semis. Filières : mil, niébé.",
+        source_id="bf_maerah_oaph_orientation_2026",
+    )
+    for query in (
+        "Quand semer le mil ?", "Comment stocker le niébé contre les bruches ?",
+        "Quels conseils pour réussir l'arachide au Burkina Faso ?",
+        "Comment préparer du compost ?", "Quelles adventices dans le niébé ?",
+        "Selon OAPH, quand semer le mil ?",
+    ):
+        assert filter_generation_documents(query, [institutional]) == [], query
+
+
+def test_orientation_question_keeps_institutional_source():
+    institutional = _doc(
+        "MAERAH Burkina Faso - orientation institutionnelle et OAPH 2023-2025",
+        "OAPH = Offensive Agropastorale et Halieutique 2023-2025.",
+        source_id="bf_maerah_oaph_orientation_2026",
+    )
+    assert filter_generation_documents("C'est quoi l'OAPH ?", [institutional]) == [institutional]
+
+
+def test_field_evidence_kept_when_orientation_is_rejected():
+    institutional = _doc("CILSS - orientation regionale Sahel et Afrique de l'Ouest",
+                         "Pas de calendriers de semis.", source_id="cilss_orientation_2026")
+    guide = _doc("Guide de semis du mil", "Semis du mil après une pluie utile.")
+    assert filter_generation_documents("Quand semer le mil ?", [institutional, guide]) == [guide]
+
+
+def test_current_corpus_scope_matches_live_evaluation_questions():
+    """Real source text (including disclaimers) cannot act as field evidence."""
+    from pathlib import Path
+    from core.source_policy import split_markdown_frontmatter
+    from scripts.evaluate_rag import CASES
+
+    root = Path(__file__).resolve().parents[1]
+    docs = []
+    for name in ("maerah_oaph_orientation_burkina_2026.md", "cilss_orientation_sahel_2026.md"):
+        metadata, body = split_markdown_frontmatter(
+            (root / "Data/markdown/scraped_reviewed" / name).read_text()
+        )
+        docs.append(_doc(metadata["title"], body, **metadata))
+    for case in CASES:
+        if case.expect_refusal and case.id.startswith("rag_"):
+            assert filter_generation_documents(case.prompt, docs) == [], case.id
+    for query in ("C'est quoi l'OAPH ?", "Quel est le rôle du CILSS ?"):
+        assert filter_generation_documents(query, docs) == docs

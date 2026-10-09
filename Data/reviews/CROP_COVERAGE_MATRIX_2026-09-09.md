@@ -1,5 +1,11 @@
 # Matrice de couverture à faire valider — 9 septembre 2026
 
+> Mise à jour du 9 octobre 2026 : consulter l'[addendum de revue](PHASE1_REVIEW_ADDENDUM_2026-10-09.md).
+> Les constats historiques de manque portent sur les extraits alors retenus,
+> pas sur l'absence de chapitres culturaux dans le catalogue ProSol complet.
+> Les nouveaux passages repérés restent candidats ; aucune validation ni
+> extension d'éligibilité n'est implicite.
+
 Préparation du ticket 05. Ce document est un dossier pour la revue, pas un conseil
 agricole ni une validation des sources. Le 12 septembre 2026, les deux PDF
 originaux candidats ont été récupérés, leur identité contrôlée et les pages citées

@@ -24,6 +24,7 @@ FIXED_DATE = '2026-09-18'
 COMMITTED_SCAFFOLD = EVALUATION_DIR / 'RELEASE_DECISION_SCAFFOLD_2026-09-17.md'
 COMMITTED_COMMIT = 'a41c842d6febbdf38d1cf771875ed59102094a2b'
 COMMITTED_DATE = '2026-09-17'
+COMMITTED_POLICY = 'safety-2026-09-09.1a4c0265a779'
 
 
 def _fixed_body():
@@ -72,6 +73,7 @@ def test_regenerates_committed_scaffold_byte_for_byte(tmp_path):
         COMMITTED_DATE,
         commit=COMMITTED_COMMIT,
         generated_on=COMMITTED_DATE,
+        policy_revision=COMMITTED_POLICY,
         output_dir=tmp_path,
     )
     assert generated.parent == tmp_path
@@ -185,3 +187,21 @@ def test_generate_is_deterministic_across_two_writes(tmp_path):
         str(tmp_path / 'second.md'), commit=FIXED_COMMIT, generated_on=FIXED_DATE
     )
     assert first.read_text(encoding='utf-8') == second.read_text(encoding='utf-8')
+
+
+def test_cli_reproduces_historical_scaffold_without_rewriting_it(tmp_path):
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    output = tmp_path / 'historical.md'
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run([
+        sys.executable, str(root / 'scripts/farmer_evaluation.py'),
+        '--generate-decision', str(output), '--commit', COMMITTED_COMMIT,
+        '--date', COMMITTED_DATE, '--policy-revision', COMMITTED_POLICY,
+    ], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert output.read_bytes() == COMMITTED_SCAFFOLD.read_bytes()
+    current = generate_release_decision(str(tmp_path / 'current.md'), commit=FIXED_COMMIT)
+    assert safety_policy_revision() in current.read_text()

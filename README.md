@@ -30,6 +30,13 @@ checks the live version and health. See the [release checklist](DEPLOYMENT.md#re
 for the offline dry run, LFS normalization, and required release records.
 Field release remains **REPORTÉE** pending the recorded human and hosting gates.
 
+Practical crop questions now require evidence beyond institutional orientation:
+MAERAH/OAPH and CILSS summaries cannot justify field instructions. Pending source
+review, unsupported sowing, storage, weed and crop-management questions receive
+an honest refusal. The 19-case live suite treats these refusals as mandatory
+safety contracts. See the [Phase 1 review and evaluation record](evaluation/PHASE1_SOURCE_EVALUATION_2026-10-09.md).
+
+
 1. **Contexte parcelle** (optionnel) — culture, stade, lieu ; activez **Français simple** pour des phrases plus claires.
 2. **Question texte** — ex. « Quand semer le mil ? » → carte *Conseil agricole* + sources.
 3. **Engrais** — ex. « Dose d'engrais pour le sorgho » → conseil **déterministe**, doses chiffrées suspendues jusqu’à validation agronomique + confirmation par un agent.

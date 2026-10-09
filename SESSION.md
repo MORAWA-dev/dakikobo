@@ -2262,3 +2262,97 @@ cd - && git worktree remove "$WT" --force
   deploy the accepted tree, verify live identity/security and strict RAG, then
   append the actual mapping and completion receipt. No source eligibility,
   fertilizer values, human evidence or REPORTÉE decision changed.
+
+### 2026-10-08 — Phase 0 completed: accepted snapshot deployed and verified
+
+- PR #24: https://github.com/MORAWA-dev/dakikobo/pull/24 merged only after all
+  four checks passed for head `3a5e3a2703d6129897cac9ba7ed0321484ecf5c6`:
+  regression, build-and-smoke, chromium-rehearsal and journal-continuity.
+- GitHub accepted main and shared local main both:
+  `b5817a11adfb5d5f263ca7f90b8a9b3204a974d0` (fast-forwarded).
+  HF deployment and live `/version`:
+  `56edbfdcd73cf50b8ce2a8700b3427add87f5144`.
+  HF commit subject records the full GitHub SHA using the required format.
+- Before the HF push, the staged normalized manifest matched every accepted
+  GitHub file, with the original HF `.gitattributes` preserved byte-for-byte.
+  The staged diff contained exactly the seven accepted Phase 0 files.
+- Post-deployment verifier: **PASS**, no differing paths, deployment message
+  mapping correct, full live HF SHA correct, RAG ready, `/healthz` healthy/ready.
+  HF runtime RUNNING on cpu-basic with domain READY.
+- Live homepage returned 200. CSP retained the Hugging Face framing allowlist;
+  nosniff, no-referrer, HSTS, permissions policy and noindex headers present.
+  `/.env`, `/.git/config`, `/config.py`, `/data/case_log.sqlite3` all returned 404.
+- Strict live RAG evaluation: **14/14 hard checks passed (100%, minimum 75%)**,
+  three advisory warnings, exit 0. Report:
+  `/private/tmp/dakikobo-phase0-live-rag.md`; historical reports untouched.
+  These are structural smoke checks, not an agronomic grounding approval.
+  Report inspection found the mil-sowing answer giving precise depth/seed-rate
+  guidance while citing the institutional OAPH source; that citation does not
+  establish support for those figures. Carry this concrete grounding concern
+  into Phase 1's query-to-evidence evaluation before claiming answer quality.
+  Local evidence remains 730 Python passed / 1 skipped / one PyPDF2 warning,
+  33 JavaScript passed, fertilizer parity, compilation and diff checks passed.
+- Both task-created worktrees archived and local `codex/sync-guardrails` branch
+  deleted after merge. Existing unrelated worktrees, untracked files and the
+  original broken `.venv` are preserved. No secrets or generated runtime data
+  were committed or deployed.
+- This post-deployment receipt is intentionally a local uncommitted SESSION
+  append for the next reviewed release, as described in DEPLOYMENT.md. HEAD
+  remains the exact accepted/deployed GitHub snapshot; the working tree differs
+  only by this receipt plus the pre-existing untracked items.
+- **Phase 0 complete. Next incomplete phase: Phase 1**, prepare traceable IITA
+  niébé and ProSol review materials and crop-management evaluation cases before
+  requesting explicit agronomist approval. No eligibility promotion or numeric
+  dose approval is inferred. Phone, participant and provider durability evidence
+  remain missing; field release remains **REPORTÉE**.
+
+### 2026-10-09 — Phase 1 preparation and institutional-scope grounding repair
+
+- Verified starting state: local/GitHub `b5817a11adfb5d5f263ca7f90b8a9b3204a974d0`,
+  HF/live `56edbfdcd73cf50b8ce2a8700b3427add87f5144`; deployment verifier PASS,
+  ready RAG and healthy Space; no open PRs. Prior Phase 0 local receipt included
+  in this review branch. Existing untracked items remain untouched.
+- Isolated `codex/phase1-source-evidence` branch. Reproduced the known defect
+  with six failing tests: institutional summaries reached generation for sowing,
+  storage and crop-management questions despite lacking field evidence.
+  `core/retrieval.py` now limits the two orientation sources to institutional
+  requests, rejecting practical/mixed requests before the model call. Existing
+  weed evidence filter retained. Retrieval is in the safety digest, so older
+  cached advice is invalidated by the changed policy.
+- Live evaluator expanded to 19 cases, including weeds, sowing depth/seed rate,
+  mixed OAPH/field questions and a positive CILSS question. Twelve unsupported
+  practical questions require structured refusal, low confidence, no source and
+  no action case; these mandatory gates cannot be averaged away. The new suite
+  against the OLD deployment failed correctly: 10/19 passed, 18 advisory warnings,
+  strict exit 1. `/private/tmp/dakikobo-phase1-before.md` holds the comparison.
+- Added actual-corpus query-to-evidence regressions and extended route tests to
+  prove no LLM call on orientation-only field requests. Positive institutional
+  questions and applicable synthetic field guides remain supported.
+- Research/PDF review produced `Data/reviews/PHASE1_REVIEW_ADDENDUM_2026-10-09.md`:
+  nine blank statement-level decisions, exact physical/printed page locators,
+  crop/zone/conditions/limits and rights fields. IITA PDF hash/page count match;
+  weed page PDF 30 / printed 24 visually verified. ProSol web text reveals
+  crop-specific arachide/niébé chapters missing from the earlier packet's scope;
+  historical packet/matrix annotated to defer to the new addendum.
+- ProSol local original download failed TLS (independent curl/urllib/requests
+  attempts); new page locators come from paginated web text, without a fresh
+  byte hash or visual verification. The historical hash is explicitly labelled
+  historical. Recheck original bytes/pages before future promotion. Reuse rights
+  remain unknown for BOTH candidates. No human approval has been fabricated.
+- Added `evaluation/PHASE1_SOURCE_EVALUATION_2026-10-09.md`, indexed the review
+  materials, and updated README/PROJECT_STATE/IMPLEMENTATION_PLAN. Existing
+  candidate Markdown, eligibility inventory/policy, fertilizer tool/asset and
+  historical release scaffold remain byte-unchanged; exactly two sources eligible.
+- Full regression initially exposed the scaffold generator's implicit current
+  safety fingerprint input. Added explicit `--policy-revision` for historical
+  regeneration, retaining the current fingerprint default for new drafts.
+  API and CLI parity tests preserve the original September artifact byte-for-byte;
+  corpus/models still must match and the option does not reconstruct old code.
+- Final local checks: **740 Python passed, 1 skipped**, one existing PyPDF2
+  warning; **33 JavaScript passed**. Fertilizer parity, compilation, diff check,
+  and 38 relative documentation links passed. Isolated temporary Python 3.12
+  environment reused; original broken `.venv` preserved.
+- Next: CI review/merge, shared-main fast-forward preserving the prior receipt,
+  exact HF snapshot deployment, live identity/security and 19-case strict RAG
+  comparison. Phase 1 source promotion remains blocked on a completed signed
+  statement-level review and documented reuse basis; field release REPORTÉE.
