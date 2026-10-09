@@ -395,7 +395,7 @@ def release_decision_scaffold(*, commit, generated_on, corpus, models, policy_re
     return '\n'.join(lines)
 
 
-def generate_release_decision(target=None, *, commit=None, generated_on=None, output_dir=None):
+def generate_release_decision(target=None, *, commit=None, generated_on=None, output_dir=None, policy_revision=None):
     """Write the dated release-decision scaffold and return its path.
 
     ``target`` may be a full output path or a date string (YYYY-MM-DD); when a
@@ -409,12 +409,14 @@ def generate_release_decision(target=None, *, commit=None, generated_on=None, ou
     generation date, both passed explicitly. The default (current HEAD + today)
     does NOT reproduce a previously committed artifact. To regenerate the
     committed evaluation/RELEASE_DECISION_SCAFFOLD_2026-09-17.md byte-for-byte,
-    pass its declared inputs:
+    pass its declared inputs, including the historical safety fingerprint.
+    Corpus and model inputs still come from the checkout and must match the
+    historical artifact; this option does not reconstruct an old checkout:
 
         .venv/bin/python scripts/farmer_evaluation.py \\
             --generate-decision 2026-09-17 \\
             --commit a41c842d6febbdf38d1cf771875ed59102094a2b \\
-            --date 2026-09-17
+            --date 2026-09-17 --policy-revision safety-2026-09-09.1a4c0265a779
 
     Known limitation (latent, harmless for the documented flow): when ``target``
     is a full output PATH (not a bare date), the filename is taken verbatim from
@@ -452,7 +454,8 @@ def generate_release_decision(target=None, *, commit=None, generated_on=None, ou
             'vision': config.GEMINI_MODEL,
             'embedding': config.EMBEDDING_MODEL,
         },
-        policy_revision=__import__('core.answer_safety', fromlist=['safety_policy_revision']).safety_policy_revision(),
+        policy_revision=(policy_revision if policy_revision is not None else
+                         __import__('core.answer_safety', fromlist=['safety_policy_revision']).safety_policy_revision()),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(body, encoding='utf-8')
@@ -490,12 +493,18 @@ def main():
         help='Generation date recorded in the scaffold; defaults to today (UTC). '
              'Pass explicitly to reproduce a previously committed artifact.',
     )
+    parser.add_argument(
+        '--policy-revision',
+        help='Historical scaffold safety fingerprint; defaults to the current '
+             'policy for new drafts. Does not establish approval or reconstruct old code.',
+    )
     args = parser.parse_args()
     if args.generate_decision is not None:
         path = generate_release_decision(
             args.generate_decision or None,
             commit=args.commit,
             generated_on=args.date,
+            policy_revision=args.policy_revision,
         )
         print(f'Release-decision scaffold written to {path}. Decision stays REPORTÉE; '
               'no human, agronomic, or live-run evidence has been recorded.')

@@ -207,6 +207,18 @@ _EVIDENCE_REQUIRED_TOPIC_TOKENS = {
     "herbes",
 }
 
+# These reviewed summaries are approved for institutional orientation only.
+# Their disclaimers mention field practices, which is not supporting evidence.
+_ORIENTATION_SOURCE_IDS = {"bf_maerah_oaph_orientation_2026", "cilss_orientation_2026"}
+_INSTITUTIONAL_QUERY_TOKENS = {
+    "oaph", "maerah", "cilss", "ministere", "institution", "institutions",
+    "programme", "programmes", "politique", "politiques", "filiere", "filieres",
+}
+_PRACTICAL_QUERY_TOKENS = _FIELD_PRACTICE_TOKENS | {
+    "conseil", "conseils", "reussir", "cultiver", "profondeur", "espacement",
+    "dose", "doses", "traiter", "ravageur", "ravageurs", "arroser", "irriguer",
+}
+
 _CITATION_ALIASES = {
     "arachide": {"groundnut", "cacahuete"},
     "bruche": {"bruches", "insecte", "insectes", "ravageur", "ravageurs"},
@@ -309,14 +321,31 @@ def filter_generation_documents(query: str, source_docs) -> list:
     """Keep only chunks that can support an evidence-sensitive topic answer.
 
     Vector similarity and crop metadata can rank a broad institutional document
-    highly even when its text says nothing about the requested topic. Weed and
-    weeding questions therefore require the chunk text/title to overlap those
-    concepts before it is passed to the language model. Other topics retain the
-    existing similarity-threshold behaviour until they receive their own
-    explicit evidence rule.
+    highly even when its text says nothing about the requested topic. The two
+    approved orientation summaries may answer institutional questions only;
+    practical or mixed requests cannot use their limitations as field evidence.
+    Weed questions additionally require weed concepts in the chunk itself.
+    Source eligibility remains the ingestion policy's responsibility.
     """
     docs = list(source_docs)
     query_tokens = _citation_tokens(query)
+    institutional_query = (
+        bool(query_tokens & _INSTITUTIONAL_QUERY_TOKENS)
+        and not query_tokens.intersection(_PRACTICAL_QUERY_TOKENS)
+    )
+    if not institutional_query:
+        retained = []
+        for doc in docs:
+            metadata = getattr(doc, "metadata", {}) or {}
+            title = _normalize_for_match(metadata.get("source", ""))
+            # Title fallback also protects indexes created before source_id was
+            # propagated; changing the content wording must not bypass scope.
+            orientation = metadata.get("source_id") in _ORIENTATION_SOURCE_IDS or (
+                "orientation" in title and any(name in title for name in ("maerah", "oaph", "cilss"))
+            )
+            if not orientation:
+                retained.append(doc)
+        docs = retained
     required_topics = query_tokens.intersection(_EVIDENCE_REQUIRED_TOPIC_TOKENS)
     if not required_topics:
         return docs

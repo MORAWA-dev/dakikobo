@@ -1,5 +1,10 @@
 # DakiKobo — Implementation Plan
 
+Phase 1 preparation (2026-10-09): source-review addendum and query-to-evidence
+evaluation record prepared; institutional summaries restricted to their scope.
+Source promotion remains blocked on explicit signed review and reuse rights.
+See `evaluation/PHASE1_SOURCE_EVALUATION_2026-10-09.md`.
+
 Phase 0 of the [2026-10-08 roadmap](plans/DAKIKOBO_NEXT_WORK_PLAN_2026-10-08.md)
 adds the deployment manifest/live-identity verifier and a manual release
 checklist in `DEPLOYMENT.md`. Actual completion evidence is recorded in
